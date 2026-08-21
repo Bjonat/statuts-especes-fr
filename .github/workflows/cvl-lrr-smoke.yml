@@ -99,9 +99,13 @@ jobs:
             }
           }
           const byId = new Map(packages.map((pkg) => [pkg.source.id, pkg]))
-          if (byId.get('arb-cvl-lrr-odonates-2022').statuses.length !== 68) throw new Error('Odonates CVL: 68 statuts attendus')
-          if (byId.get('arb-cvl-lrr-papillons-2024').statuses.length < 130) throw new Error('Papillons CVL: volume anormalement faible')
-          if (byId.get('ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025').statuses.length !== 47) throw new Error('Coléoptères aquatiques CVL: 47 statuts attendus')
+          const odonates = byId.get('arb-cvl-lrr-odonates-2022')
+          const papillons = byId.get('arb-cvl-lrr-papillons-2024')
+          const coleopteres = byId.get('ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025')
+          if (odonates.statuses.length !== 68 || odonates.diagnostics.matchRate !== 1) throw new Error('Odonates CVL: 68 statuts raccordés à 100 % attendus')
+          if (papillons.statuses.length !== 147 || papillons.diagnostics.matchRate !== 1) throw new Error('Papillons CVL: 147 statuts raccordés à 100 % attendus')
+          if (papillons.diagnostics.excludedWrongOrder !== 2) throw new Error(`Papillons CVL: 2 lignes Odonata parasites attendues, reçu ${papillons.diagnostics.excludedWrongOrder}`)
+          if (coleopteres.statuses.length !== 47 || coleopteres.diagnostics.matchRate !== 1) throw new Error('Coléoptères aquatiques CVL: 47 statuts raccordés à 100 % attendus')
           console.log(packages.map((pkg) => ({ source: pkg.source.id, statuses: pkg.statuses.length, diagnostics: pkg.diagnostics })))
           NODE
 
