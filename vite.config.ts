@@ -34,7 +34,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\/data\/(?:taxa|status-definitions|status-links)-[a-z0-9-]+-[a-f0-9]+\.json$/i,
+            urlPattern: /\/data\/(?:taxa-[a-z0-9-]+|status-definitions|status-links-[a-z0-9-]+)-[a-f0-9]+\.json$/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'statuts-data-catalogs',
