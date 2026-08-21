@@ -20,11 +20,19 @@ npm run data:build -- \
   --out public/data
 ```
 
-Le manifeste `public/data/manifest.json` référence huit jeux versionnés : deux catalogues taxonomiques (Faune/Flore) et six jeux de statuts (Faune/Flore × CVL/NAQ/OCC).
+Le manifeste v3 référence :
+
+- deux catalogues taxonomiques (Faune / Flore) ;
+- un dictionnaire global de définitions de statuts ;
+- un jeu de liens compacts par règne et par région.
+
+Les métadonnées répétitives (`label`, valeur, citation, URL documentaire, source) ne sont plus dupliquées dans chaque relation taxon × région. Un lien régional contient uniquement le `CD_REF`, l'identifiant de définition, un code de portée et, uniquement pour une portée partielle, son libellé territorial.
+
+Sur les sources officielles v18 et les trois régions pilotes, **229 813 relations sont décrites par 686 définitions uniques**. Le volume JSON brut complet tombe à environ **31 Mio**, dont ~26 Mio de taxonomie ; les données de statuts elles-mêmes n'occupent plus qu'environ 5 Mio.
 
 ## Validation métier des jeux générés
 
-Les tests unitaires vérifient le parseur, les filtres taxonomiques et les règles territoriales. Après génération d'un jeu officiel, un second niveau contrôle des **cas sentinelles de terrain** :
+Les tests unitaires vérifient le parseur, les filtres taxonomiques, la compaction/hydratation et les règles territoriales. Après génération d'un jeu officiel, un second niveau contrôle des **cas sentinelles de terrain** :
 
 ```bash
 node data-pipeline/validate-generated.mjs --dir public/data
@@ -61,7 +69,7 @@ Les statuts départementaux sont conservés comme portées partielles tant que l
 
 ## Données effectivement exploitées
 
-La BDC fournit notamment : listes rouges nationales/régionales, protections, déterminance ZNIEFF, PNA et autres réglementations. Chaque relation conserve sa catégorie, sa valeur, la zone d'application, la citation et l'URL documentaire lorsqu'elles sont fournies.
+La BDC fournit notamment : listes rouges nationales/régionales, protections, déterminance ZNIEFF, PNA et autres réglementations. Chaque relation restituée par l'application conserve sa catégorie, sa valeur, sa zone d'application, sa citation et son URL documentaire lorsqu'elles sont fournies ; la compaction ne change que leur représentation sur disque.
 
 Les indicateurs régionaux non homogènes — par exemple certaines classes de rareté ou de responsabilité — seront intégrés par des adaptateurs séparés uniquement lorsqu'une source institutionnelle actuelle et traçable est disponible.
 

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { buildStatusDictionary, statusToCompactLink } from './compact.mjs'
 import {
   buildSources,
   buildStatuses,
@@ -40,7 +41,7 @@ async function clearGeneratedDatasets(outputDirectory) {
     const entries = await fs.readdir(outputDirectory)
     await Promise.all(
       entries
-        .filter((entry) => /^(?:catalog|taxa|statuses)-.*\.json$/.test(entry))
+        .filter((entry) => /^(?:catalog|taxa|statuses|status-definitions|status-links)-.*\.json$/.test(entry))
         .map((entry) => fs.rm(path.join(outputDirectory, entry))),
     )
   } catch (error) {
@@ -70,13 +71,16 @@ const keptRefs = new Set(taxa.map((taxon) => taxon.cdRef))
 statuses = statuses.filter((status) => keptRefs.has(status.cdRef))
 console.log(`${taxa.length.toLocaleString('fr-FR')} taxons conservés après filtre métropolitain sécurisé.`)
 
+const { definitions, definitionIds } = buildStatusDictionary(statuses)
+console.log(`${definitions.length.toLocaleString('fr-FR')} définitions de statut uniques après déduplication.`)
+
 const realmByRef = new Map(taxa.map((taxon) => [taxon.cdRef, taxon.realm]))
 const taxaByRealm = {
   flora: taxa.filter((taxon) => taxon.realm === 'flora'),
   fauna: taxa.filter((taxon) => taxon.realm === 'fauna'),
 }
 const regions = publicRegions()
-const statusesByRealmRegion = {
+const linksByRealmRegion = {
   flora: Object.fromEntries(regions.map((region) => [region.code, []])),
   fauna: Object.fromEntries(regions.map((region) => [region.code, []])),
 }
@@ -84,19 +88,20 @@ const statusesByRealmRegion = {
 for (const status of statuses) {
   const realm = realmByRef.get(status.cdRef)
   if (!realm) continue
-  statusesByRealmRegion[realm][status.region].push(status)
+  linksByRealmRegion[realm][status.region].push(statusToCompactLink(status, definitionIds))
 }
 
 await fs.mkdir(outputDirectory, { recursive: true })
 await clearGeneratedDatasets(outputDirectory)
 
-console.log('Écriture des jeux offline fractionnés…')
+console.log('Écriture des jeux offline compacts…')
 const files = {
   taxa: {
     flora: await writeDataset(outputDirectory, 'taxa-flora', taxaByRealm.flora),
     fauna: await writeDataset(outputDirectory, 'taxa-fauna', taxaByRealm.fauna),
   },
-  statuses: {
+  statusDefinitions: await writeDataset(outputDirectory, 'status-definitions', definitions),
+  statusLinks: {
     flora: {},
     fauna: {},
   },
@@ -104,10 +109,10 @@ const files = {
 
 for (const realm of ['flora', 'fauna']) {
   for (const region of regions) {
-    files.statuses[realm][region.code] = await writeDataset(
+    files.statusLinks[realm][region.code] = await writeDataset(
       outputDirectory,
-      `statuses-${realm}-${region.code.toLowerCase()}`,
-      statusesByRealmRegion[realm][region.code],
+      `status-links-${realm}-${region.code.toLowerCase()}`,
+      linksByRealmRegion[realm][region.code],
     )
   }
 }
@@ -116,7 +121,7 @@ const generatedAt = new Date().toISOString()
 const sources = buildSources(generatedAt.slice(0, 10))
 const datasetVersion = hashContent(JSON.stringify(files))
 const manifest = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   generatedAt,
   datasetVersion,
   official: true,
@@ -128,4 +133,4 @@ const manifest = {
 }
 
 await fs.writeFile(path.join(outputDirectory, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
-console.log(`Manifest v2 écrit dans ${path.join(outputDirectory, 'manifest.json')} (${datasetVersion}).`)
+console.log(`Manifest v3 écrit dans ${path.join(outputDirectory, 'manifest.json')} (${datasetVersion}).`)

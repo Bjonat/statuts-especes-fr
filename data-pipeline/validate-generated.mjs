@@ -21,11 +21,13 @@ function findStatus(statuses, cdRef, predicate) {
   return statuses.find((status) => status.cdRef === cdRef && predicate(status))
 }
 
+const scopeByCode = ['national', 'regional', 'partial']
+
 const args = parseArgs(process.argv.slice(2))
 const directory = args.dir ?? 'public/data'
 const manifest = await readJson(path.join(directory, 'manifest.json'))
 
-assert.equal(manifest.schemaVersion, 2, 'manifest schemaVersion')
+assert.equal(manifest.schemaVersion, 3, 'manifest schemaVersion')
 assert.equal(manifest.official, true, 'manifest officiel')
 assert.equal(manifest.taxrefVersion, '18', 'version TAXREF')
 assert.equal(manifest.bdcVersion, '18', 'version BDC')
@@ -38,8 +40,25 @@ for (const source of manifest.sources) {
 
 const flora = await readJson(path.join(directory, manifest.files.taxa.flora.file))
 const fauna = await readJson(path.join(directory, manifest.files.taxa.fauna.file))
+const definitions = await readJson(path.join(directory, manifest.files.statusDefinitions.file))
 assert.ok(flora.length > 20_000, 'volume flore plausible')
 assert.ok(fauna.length > 50_000, 'volume faune plausible')
+assert.ok(definitions.length > 100, 'dictionnaire de statuts plausible')
+
+async function loadStatuses(realm, region) {
+  const links = await readJson(path.join(directory, manifest.files.statusLinks[realm][region].file))
+  return links.map(([cdRef, definitionId, scopeCode, scopeLabel]) => {
+    const definition = definitions[definitionId]
+    assert.ok(definition, `définition #${definitionId} disponible`)
+    return {
+      cdRef,
+      region,
+      ...definition,
+      scope: scopeByCode[scopeCode],
+      ...(scopeLabel ? { scopeLabel } : {}),
+    }
+  })
+}
 
 const lotus = flora.find((taxon) => taxon.cdRef === 106634)
 assert.equal(lotus?.scientificName, 'Lotus angustissimus', 'Lotus angustissimus présent dans TAXREF local')
@@ -51,9 +70,9 @@ assert.ok(aconitum, 'Aconitum napellus s.l. présent dans TAXREF local')
 const alcedo = fauna.find((taxon) => taxon.cdRef === 3571)
 assert.equal(alcedo?.scientificName, 'Alcedo atthis', 'Martin-pêcheur présent dans TAXREF local')
 
-const cvlFlora = await readJson(path.join(directory, manifest.files.statuses.flora.CVL.file))
-const naqFlora = await readJson(path.join(directory, manifest.files.statuses.flora.NAQ.file))
-const cvlFauna = await readJson(path.join(directory, manifest.files.statuses.fauna.CVL.file))
+const cvlFlora = await loadStatuses('flora', 'CVL')
+const naqFlora = await loadStatuses('flora', 'NAQ')
+const cvlFauna = await loadStatuses('fauna', 'CVL')
 
 const lotusCvlLrr = findStatus(
   cvlFlora,
@@ -87,7 +106,8 @@ const alcedoNationalProtection = findStatus(
 )
 assert.ok(alcedoNationalProtection, 'Alcedo atthis: protection nationale disponible en Centre-Val de Loire')
 
-console.log('Validation métier des jeux officiels: OK')
+console.log('Validation métier des jeux officiels compacts: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
+console.log(`- définitions de statut: ${definitions.length.toLocaleString('fr-FR')}`)
 console.log('- cas sentinelles: Lotus angustissimus, Aconitum napellus, Alcedo atthis')

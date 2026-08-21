@@ -1,5 +1,16 @@
 import { DEMO_DATA_WARNING, regions as demoRegions, sources as demoSources, statuses as demoStatuses, taxa as demoTaxa } from './demo'
-import type { DataManifest, Realm, Region, RegionCode, SourceDataset, Taxon, TaxonStatus } from './types'
+import { hydrateStatusLinks } from './status-data'
+import type {
+  DataManifest,
+  Realm,
+  Region,
+  RegionCode,
+  SourceDataset,
+  StatusDefinition,
+  StatusLink,
+  Taxon,
+  TaxonStatus,
+} from './types'
 
 export interface DataStore {
   official: boolean
@@ -23,7 +34,7 @@ function isManifest(value: unknown): value is DataManifest {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<DataManifest>
   if (
-    candidate.schemaVersion !== 2 ||
+    candidate.schemaVersion !== 3 ||
     candidate.official !== true ||
     typeof candidate.generatedAt !== 'string' ||
     typeof candidate.datasetVersion !== 'string' ||
@@ -35,12 +46,22 @@ function isManifest(value: unknown): value is DataManifest {
   }
 
   const taxa = candidate.files.taxa
-  const statuses = candidate.files.statuses
-  if (!taxa || !statuses || !isDatasetFile(taxa.flora) || !isDatasetFile(taxa.fauna)) return false
+  const definitions = candidate.files.statusDefinitions
+  const links = candidate.files.statusLinks
+  if (
+    !taxa ||
+    !definitions ||
+    !links ||
+    !isDatasetFile(taxa.flora) ||
+    !isDatasetFile(taxa.fauna) ||
+    !isDatasetFile(definitions)
+  ) {
+    return false
+  }
 
   const regionCodes: RegionCode[] = ['CVL', 'NAQ', 'OCC']
   return (['flora', 'fauna'] as Realm[]).every((realm) =>
-    regionCodes.every((region) => isDatasetFile(statuses[realm]?.[region])),
+    regionCodes.every((region) => isDatasetFile(links[realm]?.[region])),
   )
 }
 
@@ -77,6 +98,12 @@ function createDemoStore(): DataStore {
 function createOfficialStore(manifest: DataManifest): DataStore {
   const taxaCache = new Map<Realm, Taxon[]>()
   const statusCache = new Map<string, TaxonStatus[]>()
+  let definitionsPromise: Promise<StatusDefinition[]> | null = null
+
+  function loadDefinitions(): Promise<StatusDefinition[]> {
+    definitionsPromise ??= fetchArray<StatusDefinition>(manifest.files.statusDefinitions.file)
+    return definitionsPromise
+  }
 
   async function loadTaxa(realm: Realm): Promise<Taxon[]> {
     const cached = taxaCache.get(realm)
@@ -90,7 +117,12 @@ function createOfficialStore(manifest: DataManifest): DataStore {
     const key = `${realm}:${region}`
     const cached = statusCache.get(key)
     if (cached) return cached
-    const rows = await fetchArray<TaxonStatus>(manifest.files.statuses[realm][region].file)
+
+    const [definitions, links] = await Promise.all([
+      loadDefinitions(),
+      fetchArray<StatusLink>(manifest.files.statusLinks[realm][region].file),
+    ])
+    const rows = hydrateStatusLinks(definitions, links, region)
     statusCache.set(key, rows)
     return rows
   }
@@ -105,8 +137,9 @@ function createOfficialStore(manifest: DataManifest): DataStore {
     const files = [
       manifest.files.taxa.flora.file,
       manifest.files.taxa.fauna.file,
+      manifest.files.statusDefinitions.file,
       ...(['flora', 'fauna'] as Realm[]).flatMap((realm) =>
-        (['CVL', 'NAQ', 'OCC'] as RegionCode[]).map((region) => manifest.files.statuses[realm][region].file),
+        (['CVL', 'NAQ', 'OCC'] as RegionCode[]).map((region) => manifest.files.statusLinks[realm][region].file),
       ),
     ]
 

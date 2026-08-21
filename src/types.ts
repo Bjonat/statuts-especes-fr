@@ -45,6 +45,18 @@ export interface TaxonStatus {
   documentUrl?: string
 }
 
+export interface StatusDefinition {
+  category: StatusCategory
+  label: string
+  value: string
+  sourceId: string
+  citation?: string
+  documentUrl?: string
+}
+
+export type StatusScopeCode = 0 | 1 | 2
+export type StatusLink = [cdRef: number, definitionId: number, scopeCode: StatusScopeCode, scopeLabel?: string]
+
 export interface SourceDataset {
   id: string
   name: string
@@ -73,7 +85,7 @@ export interface DatasetFile {
 }
 
 export interface DataManifest {
-  schemaVersion: 2
+  schemaVersion: 3
   generatedAt: string
   datasetVersion: string
   official: true
@@ -83,6 +95,7 @@ export interface DataManifest {
   sources: SourceDataset[]
   files: {
     taxa: Record<Realm, DatasetFile>
-    statuses: Record<Realm, Record<RegionCode, DatasetFile>>
+    statusDefinitions: DatasetFile
+    statusLinks: Record<Realm, Record<RegionCode, DatasetFile>>
   }
 }
