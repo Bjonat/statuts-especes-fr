@@ -28,6 +28,10 @@ select {
   cursor: pointer;
 }
 
+a {
+  color: #405b37;
+}
+
 .shell {
   width: min(100% - 24px, 680px);
   margin: 0 auto;
@@ -50,6 +54,10 @@ select {
 
 .hero {
   text-align: center;
+}
+
+.home-status {
+  margin-top: 16px;
 }
 
 .eyebrow {
@@ -131,6 +139,16 @@ h2 {
   font-weight: 700;
 }
 
+.primary-button {
+  min-height: 46px;
+  border: 1px solid #516849;
+  border-radius: 11px;
+  padding: 10px 16px;
+  background: #566f4e;
+  color: #fff;
+  font-weight: 750;
+}
+
 .offline-badge {
   font-size: 0.78rem;
   color: #566151;
@@ -138,6 +156,12 @@ h2 {
   border-radius: 999px;
   padding: 6px 9px;
   white-space: nowrap;
+}
+
+.loading-panel {
+  min-height: 180px;
+  display: grid;
+  align-content: center;
 }
 
 .field-label {
@@ -253,7 +277,7 @@ h2 {
 .status-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 6px 12px;
   align-items: center;
   padding: 11px 0;
   border-bottom: 1px solid #ecece7;
@@ -263,10 +287,27 @@ h2 {
   color: #535a50;
 }
 
+.status-row dt small {
+  display: block;
+  margin-top: 4px;
+  color: #7a6650;
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .status-row dd {
   margin: 0;
   font-weight: 800;
   text-align: right;
+}
+
+.status-source {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #747a70;
+  font-size: 0.76rem;
+  line-height: 1.4;
 }
 
 .sources-details {
@@ -292,6 +333,12 @@ h2 {
 
 .source-row span {
   color: #666d62;
+}
+
+.source-row a,
+.status-source a {
+  font-weight: 700;
+  text-underline-offset: 2px;
 }
 
 @media (max-width: 430px) {

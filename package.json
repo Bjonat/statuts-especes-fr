@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run src && node --test data-pipeline/*.test.mjs",
+    "data:build": "node data-pipeline/build.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

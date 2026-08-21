@@ -1,11 +1,14 @@
 import './styles.css'
-import { DEMO_DATA_WARNING, regions, sources, statuses, taxa } from './demo'
+import { loadDataStore } from './catalog'
 import { searchTaxa } from './search'
-import type { Realm, RegionCode, Taxon } from './types'
+import type { Realm, RegionCode, Taxon, TaxonStatus } from './types'
 
 const rootElement = document.querySelector<HTMLDivElement>('#app')
 if (!rootElement) throw new Error('Élément #app introuvable')
-const root: HTMLDivElement = rootElement
+const root = rootElement
+
+const dataStore = await loadDataStore()
+const { regions, sources } = dataStore
 
 const storedRegion = localStorage.getItem('region')
 const defaultRegion = regions.some((region) => region.code === storedRegion) ? (storedRegion as RegionCode) : 'CVL'
@@ -15,11 +18,21 @@ const state: {
   region: RegionCode
   query: string
   selectedTaxon: Taxon | null
+  taxa: Taxon[]
+  statuses: TaxonStatus[]
+  loading: boolean
+  error: string | null
+  offlineReady: boolean
 } = {
   realm: null,
   region: defaultRegion,
   query: '',
   selectedTaxon: null,
+  taxa: [],
+  statuses: [],
+  loading: false,
+  error: null,
+  offlineReady: dataStore.datasetVersion === 'demo',
 }
 
 function escapeHtml(value: string): string {
@@ -35,6 +48,37 @@ function escapeHtml(value: string): string {
   })
 }
 
+function safeExternalUrl(value?: string): string | null {
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null
+  } catch {
+    return null
+  }
+}
+
+function renderDataNotice(): string {
+  if (!dataStore.warning) return ''
+  return `<aside class="warning" role="note">${escapeHtml(dataStore.warning)}</aside>`
+}
+
+function offlineBadgeText(): string {
+  if (state.offlineReady) return 'Hors ligne prêt'
+  if (navigator.onLine) return 'Préparation hors ligne…'
+  return 'Données hors ligne partielles'
+}
+
+function offlineBadge(): string {
+  return `<span class="offline-badge">${escapeHtml(offlineBadgeText())}</span>`
+}
+
+function refreshOfflineBadges(): void {
+  document.querySelectorAll<HTMLElement>('.offline-badge').forEach((badge) => {
+    badge.textContent = offlineBadgeText()
+  })
+}
+
 function regionOptions(): string {
   return regions
     .map(
@@ -44,12 +88,50 @@ function regionOptions(): string {
     .join('')
 }
 
+async function loadRealmData(realm: Realm, region: RegionCode): Promise<void> {
+  state.loading = true
+  state.error = null
+  render()
+
+  try {
+    const [taxa, statuses] = await Promise.all([dataStore.loadTaxa(realm), dataStore.loadStatuses(realm, region)])
+    if (state.realm !== realm || state.region !== region) return
+    state.taxa = taxa
+    state.statuses = statuses
+    state.loading = false
+    render()
+  } catch {
+    if (state.realm !== realm || state.region !== region) return
+    state.loading = false
+    state.error = navigator.onLine
+      ? 'Impossible de charger les référentiels locaux. Réessayez.'
+      : 'Ce jeu de données n’est pas encore disponible hors connexion sur cet appareil.'
+    render()
+  }
+}
+
+async function chooseRealm(realm: Realm): Promise<void> {
+  state.realm = realm
+  state.query = ''
+  state.selectedTaxon = null
+  state.taxa = []
+  state.statuses = []
+  await loadRealmData(realm, state.region)
+}
+
+async function changeRegion(region: RegionCode): Promise<void> {
+  state.region = region
+  state.selectedTaxon = null
+  state.statuses = []
+  localStorage.setItem('region', region)
+  if (state.realm) await loadRealmData(state.realm, region)
+  else render()
+}
+
 function bindRegionSelect(): void {
   const select = document.querySelector<HTMLSelectElement>('#region-select')
   select?.addEventListener('change', () => {
-    state.region = select.value as RegionCode
-    localStorage.setItem('region', state.region)
-    render()
+    void changeRegion(select.value as RegionCode)
   })
 }
 
@@ -70,31 +152,79 @@ function renderRealmChoice(): void {
             <span>Faune</span>
           </button>
         </div>
+        <div class="home-status">${offlineBadge()}</div>
       </section>
+      ${renderDataNotice()}
     </main>
   `
 
   document.querySelectorAll<HTMLButtonElement>('[data-realm]').forEach((button) => {
     button.addEventListener('click', () => {
-      state.realm = button.dataset.realm as Realm
-      state.query = ''
-      state.selectedTaxon = null
-      render()
+      void chooseRealm(button.dataset.realm as Realm)
     })
+  })
+}
+
+function renderLoading(): void {
+  root.innerHTML = `
+    <main class="shell">
+      <header class="topbar">
+        <button class="link-button" id="cancel-loading" type="button">← Retour</button>
+        ${offlineBadge()}
+      </header>
+      <section class="panel loading-panel" aria-live="polite">
+        <p class="eyebrow">${state.realm === 'flora' ? 'Flore' : 'Faune'}</p>
+        <h1>Chargement des données locales…</h1>
+        <p class="intro">Le prochain accès utilisera le cache de l’appareil.</p>
+      </section>
+    </main>
+  `
+
+  document.querySelector<HTMLButtonElement>('#cancel-loading')?.addEventListener('click', () => {
+    state.realm = null
+    state.loading = false
+    state.error = null
+    render()
+  })
+}
+
+function renderError(): void {
+  root.innerHTML = `
+    <main class="shell">
+      <header class="topbar">
+        <button class="link-button" id="error-back" type="button">← Retour</button>
+        ${offlineBadge()}
+      </header>
+      <section class="panel">
+        <p class="eyebrow">Données indisponibles</p>
+        <h1>Référentiel non chargé</h1>
+        <p class="intro">${escapeHtml(state.error ?? 'Une erreur est survenue.')}</p>
+        <button class="primary-button" id="retry-load" type="button">Réessayer</button>
+      </section>
+    </main>
+  `
+
+  document.querySelector<HTMLButtonElement>('#error-back')?.addEventListener('click', () => {
+    state.realm = null
+    state.error = null
+    render()
+  })
+  document.querySelector<HTMLButtonElement>('#retry-load')?.addEventListener('click', () => {
+    if (state.realm) void loadRealmData(state.realm, state.region)
   })
 }
 
 function renderSearch(): void {
   if (!state.realm) return
 
-  const results = searchTaxa(taxa, state.realm, state.query)
+  const results = searchTaxa(state.taxa, state.realm, state.query)
   const realmLabel = state.realm === 'flora' ? 'Flore' : 'Faune'
 
   root.innerHTML = `
     <main class="shell">
       <header class="topbar">
         <button class="link-button" id="change-realm" type="button">← ${realmLabel}</button>
-        <span class="offline-badge">Hors ligne prêt</span>
+        ${offlineBadge()}
       </header>
 
       <section class="panel">
@@ -135,7 +265,7 @@ function renderSearch(): void {
         </div>
       </section>
 
-      <aside class="warning" role="note">${escapeHtml(DEMO_DATA_WARNING)}</aside>
+      ${renderDataNotice()}
     </main>
   `
 
@@ -144,6 +274,7 @@ function renderSearch(): void {
   document.querySelector<HTMLButtonElement>('#change-realm')?.addEventListener('click', () => {
     state.realm = null
     state.query = ''
+    state.selectedTaxon = null
     render()
   })
 
@@ -159,7 +290,7 @@ function renderSearch(): void {
   document.querySelectorAll<HTMLButtonElement>('[data-cd-ref]').forEach((button) => {
     button.addEventListener('click', () => {
       const cdRef = Number(button.dataset.cdRef)
-      state.selectedTaxon = taxa.find((taxon) => taxon.cdRef === cdRef) ?? null
+      state.selectedTaxon = state.taxa.find((taxon) => taxon.cdRef === cdRef) ?? null
       render()
     })
   })
@@ -170,15 +301,15 @@ function renderDetail(): void {
   if (!taxon || !state.realm) return
 
   const region = regions.find((item) => item.code === state.region)
-  const taxonStatuses = statuses.filter((status) => status.cdRef === taxon.cdRef && status.region === state.region)
-  const sourceIds = [...new Set(taxonStatuses.map((status) => status.sourceId))]
+  const taxonStatuses = state.statuses.filter((status) => status.cdRef === taxon.cdRef)
+  const sourceIds = [...new Set([taxon.sourceId, ...taxonStatuses.map((status) => status.sourceId)].filter(Boolean))] as string[]
   const taxonSources = sources.filter((source) => sourceIds.includes(source.id))
 
   root.innerHTML = `
     <main class="shell">
       <header class="topbar">
         <button class="link-button" id="back-to-search" type="button">← Recherche</button>
-        <span class="offline-badge">Hors ligne prêt</span>
+        ${offlineBadge()}
       </header>
 
       <section class="panel taxon-card">
@@ -194,17 +325,22 @@ function renderDetail(): void {
           taxonStatuses.length
             ? `<dl class="status-list">
                 ${taxonStatuses
-                  .map(
-                    (status) => `
+                  .map((status) => {
+                    const documentUrl = safeExternalUrl(status.documentUrl)
+                    return `
                       <div class="status-row">
-                        <dt>${escapeHtml(status.label)}</dt>
+                        <dt>
+                          ${escapeHtml(status.label)}
+                          ${status.scope === 'partial' && status.scopeLabel ? `<small>Zone partielle : ${escapeHtml(status.scopeLabel)}</small>` : ''}
+                        </dt>
                         <dd>${escapeHtml(status.value)}</dd>
+                        ${status.citation ? `<p class="status-source">${escapeHtml(status.citation)}${documentUrl ? ` · <a href="${escapeHtml(documentUrl)}" target="_blank" rel="noopener noreferrer">source</a>` : ''}</p>` : ''}
                       </div>
-                    `,
-                  )
+                    `
+                  })
                   .join('')}
               </dl>`
-            : '<p class="empty-state">Aucun statut disponible pour ce taxon et cette région dans les données locales actuelles.</p>'
+            : '<p class="empty-state">Aucun statut disponible pour ce taxon et cette région dans les référentiels chargés.</p>'
         }
 
         <details class="sources-details">
@@ -212,22 +348,25 @@ function renderDetail(): void {
           ${
             taxonSources.length
               ? taxonSources
-                  .map(
-                    (source) => `
+                  .map((source) => {
+                    const sourceUrl = safeExternalUrl(source.url)
+                    return `
                       <div class="source-row">
                         <strong>${escapeHtml(source.name)}</strong>
                         <span>${escapeHtml(source.producer)} · ${escapeHtml(source.version)}</span>
-                        <span>${source.official ? 'Source officielle' : 'Source de démonstration'}</span>
+                        <span>${source.official ? 'Source officielle' : 'Source de démonstration'}${source.checkedAt ? ` · vérifiée le ${escapeHtml(source.checkedAt)}` : ''}</span>
+                        ${sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Ouvrir la source</a>` : ''}
                       </div>
-                    `,
-                  )
+                    `
+                  })
                   .join('')
               : '<p>Aucune source associée.</p>'
           }
+          <p class="source-row">Jeu généré le ${escapeHtml(new Date(dataStore.generatedAt).toLocaleDateString('fr-FR'))}.</p>
         </details>
       </section>
 
-      <aside class="warning" role="note">${escapeHtml(DEMO_DATA_WARNING)}</aside>
+      ${renderDataNotice()}
     </main>
   `
 
@@ -243,6 +382,16 @@ function render(): void {
     return
   }
 
+  if (state.loading) {
+    renderLoading()
+    return
+  }
+
+  if (state.error) {
+    renderError()
+    return
+  }
+
   if (state.selectedTaxon) {
     renderDetail()
     return
@@ -251,4 +400,11 @@ function render(): void {
   renderSearch()
 }
 
+window.addEventListener('online', refreshOfflineBadges)
+window.addEventListener('offline', refreshOfflineBadges)
+
 render()
+void dataStore.primeOffline().then((ready) => {
+  state.offlineReady = ready
+  refreshOfflineBadges()
+})

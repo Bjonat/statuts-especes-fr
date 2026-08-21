@@ -14,6 +14,9 @@ export interface Taxon {
   vernacularNames: string[]
   synonyms: string[]
   family?: string
+  rank?: string
+  biogeographicStatus?: string
+  sourceId?: string
 }
 
 export type StatusCategory =
@@ -22,9 +25,12 @@ export type StatusCategory =
   | 'protection_national'
   | 'protection_regional'
   | 'znieff'
+  | 'pna'
   | 'rarity'
   | 'indigenous_status'
   | 'other'
+
+export type StatusScope = 'national' | 'regional' | 'partial'
 
 export interface TaxonStatus {
   cdRef: number
@@ -33,6 +39,10 @@ export interface TaxonStatus {
   label: string
   value: string
   sourceId: string
+  scope?: StatusScope
+  scopeLabel?: string
+  citation?: string
+  documentUrl?: string
 }
 
 export interface SourceDataset {
@@ -42,4 +52,37 @@ export interface SourceDataset {
   version: string
   publicationYear?: number
   official: boolean
+  url?: string
+  checkedAt?: string
+}
+
+export interface Catalog {
+  schemaVersion: 1
+  generatedAt: string
+  official: boolean
+  warning?: string
+  regions: Region[]
+  taxa: Taxon[]
+  statuses: TaxonStatus[]
+  sources: SourceDataset[]
+}
+
+export interface DatasetFile {
+  file: string
+  count: number
+}
+
+export interface DataManifest {
+  schemaVersion: 2
+  generatedAt: string
+  datasetVersion: string
+  official: true
+  taxrefVersion: string
+  bdcVersion: string
+  regions: Region[]
+  sources: SourceDataset[]
+  files: {
+    taxa: Record<Realm, DatasetFile>
+    statuses: Record<Realm, Record<RegionCode, DatasetFile>>
+  }
 }
