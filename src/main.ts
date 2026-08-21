@@ -63,10 +63,20 @@ function renderDataNotice(): string {
   return `<aside class="warning" role="note">${escapeHtml(dataStore.warning)}</aside>`
 }
 
+function offlineBadgeText(): string {
+  if (state.offlineReady) return 'Hors ligne prêt'
+  if (navigator.onLine) return 'Préparation hors ligne…'
+  return 'Données hors ligne partielles'
+}
+
 function offlineBadge(): string {
-  if (state.offlineReady) return '<span class="offline-badge">Hors ligne prêt</span>'
-  if (navigator.onLine) return '<span class="offline-badge">Préparation hors ligne…</span>'
-  return '<span class="offline-badge">Données hors ligne partielles</span>'
+  return `<span class="offline-badge">${escapeHtml(offlineBadgeText())}</span>`
+}
+
+function refreshOfflineBadges(): void {
+  document.querySelectorAll<HTMLElement>('.offline-badge').forEach((badge) => {
+    badge.textContent = offlineBadgeText()
+  })
 }
 
 function regionOptions(): string {
@@ -390,9 +400,11 @@ function render(): void {
   renderSearch()
 }
 
+window.addEventListener('online', refreshOfflineBadges)
+window.addEventListener('offline', refreshOfflineBadges)
+
 render()
 void dataStore.primeOffline().then((ready) => {
-  if (state.offlineReady === ready) return
   state.offlineReady = ready
-  render()
+  refreshOfflineBadges()
 })
