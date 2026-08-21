@@ -18,7 +18,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,json}'],
-        globIgnores: ['data/catalog-*.json'],
+        globIgnores: ['data/manifest.json', 'data/taxa-*.json', 'data/statuses-*.json'],
         runtimeCaching: [
           {
             urlPattern: /\/data\/manifest\.json$/,
@@ -29,12 +29,12 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\/data\/catalog-[a-f0-9]+\.json$/,
+            urlPattern: /\/data\/(?:taxa|statuses)-[a-z0-9-]+-[a-f0-9]+\.json$/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'statuts-data-catalogs',
               expiration: {
-                maxEntries: 3,
+                maxEntries: 20,
                 maxAgeSeconds: 60 * 60 * 24 * 365,
               },
             },
