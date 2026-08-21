@@ -38,17 +38,46 @@ jobs:
           curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lrr_paca_reptiles_amphibiens_2016.xlsx' -o "$RUNNER_TEMP/pac/lrr-herpetofaune-2016.xlsx"
           curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lr_paca_orthop_2018_web.xlsx' -o "$RUNNER_TEMP/pac/lrr-orthopteres-2018.xlsx"
 
-          test "$(head -c 2 "$RUNNER_TEMP/pac/znieff-faune-2024.xlsx")" = 'PK'
-          test "$(head -c 8 "$RUNNER_TEMP/pac/znieff-flore-2016.xls" | xxd -p)" = 'd0cf11e0a1b11ae1'
-          for file in "$RUNNER_TEMP"/pac/lrr-*.xlsx; do
-            test "$(head -c 2 "$file")" = 'PK'
+          maintenance=0
+          for file in "$RUNNER_TEMP"/pac/*; do
+            if head -c 512 "$file" | grep -Eqi '<!doctype html|<html'; then
+              if grep -qi 'Maintenance en cours' "$file"; then
+                echo "::warning::$(basename "$file"): source DREAL PACA momentanément indisponible (page Maintenance en cours)."
+                maintenance=$((maintenance + 1))
+                continue
+              fi
+              echo "::error::$(basename "$file"): page HTML inattendue reçue à la place du référentiel."
+              exit 1
+            fi
+
+            case "$file" in
+              *.xlsx)
+                test "$(head -c 2 "$file")" = 'PK' || { echo "::error::Signature XLSX invalide: $file"; exit 1; }
+                ;;
+              *.xls)
+                test "$(head -c 8 "$file" | xxd -p)" = 'd0cf11e0a1b11ae1' || { echo "::error::Signature XLS invalide: $file"; exit 1; }
+                ;;
+            esac
           done
+
           sha256sum "$RUNNER_TEMP"/pac/*
           echo "PAC_DIR=$RUNNER_TEMP/pac" >> "$GITHUB_ENV"
+          echo "PAC_MAINTENANCE_COUNT=$maintenance" >> "$GITHUB_ENV"
+          if [ "$maintenance" -gt 0 ]; then
+            echo "::notice::$maintenance source(s) PACA non inspectable(s) pendant la maintenance DREAL ; ce run reste informatif."
+          fi
 
-      - name: Inspect PACA schemas
+      - name: Inspect available PACA schemas
+        shell: bash
         run: |
+          set -euo pipefail
+          inspected=0
           for file in "$PAC_DIR"/*; do
+            if head -c 512 "$file" | grep -Eqi '<!doctype html|<html'; then
+              continue
+            fi
             echo "===== $file ====="
             python data-pipeline/regions/inspect_workbook.py "$file"
+            inspected=$((inspected + 1))
           done
+          echo "PACA: $inspected fichier(s) structuré(s) inspecté(s), ${PAC_MAINTENANCE_COUNT:-0} indisponible(s)."
