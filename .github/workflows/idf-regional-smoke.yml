@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'data-pipeline/regions/idf/**'
+      - 'data-pipeline/regional.mjs'
       - '.github/workflows/idf-regional-smoke.yml'
 
 jobs:
@@ -15,6 +16,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
       - name: Download GeoNat IDF status table
         shell: bash
         run: |
@@ -22,40 +40,44 @@ jobs:
           URL='https://geonature.arb-idf.fr/geonature/api/media/exports/schedules/Statuts_des_taxons_STyt8fLcp03L11.csv'
           curl --fail --location --retry 3 "$URL" -o "$RUNNER_TEMP/idf-statuts.csv"
           test -s "$RUNNER_TEMP/idf-statuts.csv"
-          head -n 3 "$RUNNER_TEMP/idf-statuts.csv"
+          grep -q '"zdet"' "$RUNNER_TEMP/idf-statuts.csv"
+          grep -q '"cd_nom"' "$RUNNER_TEMP/idf-statuts.csv"
           sha256sum "$RUNNER_TEMP/idf-statuts.csv"
-          file "$RUNNER_TEMP/idf-statuts.csv"
           echo "IDF_SOURCE=$RUNNER_TEMP/idf-statuts.csv" >> "$GITHUB_ENV"
 
-      - name: Validate expected columns
+      - name: Build IDF ZNIEFF package
         shell: bash
         run: |
-          python - <<'PY'
-          import csv, os
-          from pathlib import Path
-          path = Path(os.environ['IDF_SOURCE'])
-          data = path.read_bytes()
-          text = None
-          for enc in ('utf-8-sig', 'utf-8', 'cp1252', 'latin1'):
-              try:
-                  text = data.decode(enc)
-                  break
-              except UnicodeDecodeError:
-                  pass
-          if text is None:
-              raise SystemExit('CSV non décodable')
-          sample = text[:20000]
-          try:
-              dialect = csv.Sniffer().sniff(sample, delimiters=';\t,|')
-              delimiter = dialect.delimiter
-          except csv.Error:
-              delimiter = ';'
-          reader = csv.DictReader(text.splitlines(), delimiter=delimiter)
-          headers = reader.fieldnames or []
-          print({'delimiter': delimiter, 'headers': headers, 'rows_sample': [next(reader, None) for _ in range(3)]})
-          normalized = {h.strip().casefold().replace('_', '').replace(' ', '') for h in headers if h}
-          if not any('detznieff' in h for h in normalized):
-              raise SystemExit('Colonne DetZnieff absente')
-          if not any(h in normalized for h in {'cdnom', 'cdref'}):
-              raise SystemExit('Identifiant TAXREF absent')
-          PY
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/idf-packages"
+          python data-pipeline/regions/idf/build_geonat_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$IDF_SOURCE" \
+            --out "$RUNNER_TEMP/idf-packages/idf-znieff.json" \
+            --min-match-rate 0.97
+          echo "IDF_PACKAGES_DIR=$RUNNER_TEMP/idf-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional package contract
+        shell: bash
+        run: |
+          REGIONAL_DIR="$IDF_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 1) throw new Error(`1 paquet IDF attendu, reçu ${packages.length}`)
+          const pkg = packages[0]
+          if (pkg.source.id !== 'arb-idf-geonat-statuts-znieff-2026') throw new Error('Source IDF inattendue')
+          if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error('SHA-256 IDF absent')
+          if (pkg.statuses.length < 500) throw new Error(`Volume ZNIEFF IDF anormalement faible: ${pkg.statuses.length}`)
+          if (!pkg.replaces.every((rule) => rule.region === 'IDF' && rule.category === 'znieff' && Array.isArray(rule.cdRefs) && rule.cdRefs.length > 0)) {
+            throw new Error('Overrides ZNIEFF IDF non ciblés')
+          }
+          console.log({ statuses: pkg.statuses.length, diagnostics: pkg.diagnostics })
+          NODE
+
+      - name: Upload normalized package
+        uses: actions/upload-artifact@v4
+        with:
+          name: idf-znieff-regional-package
+          path: ${{ env.IDF_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7
