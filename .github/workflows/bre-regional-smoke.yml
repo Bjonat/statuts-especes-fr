@@ -1,0 +1,86 @@
+name: Bretagne regional sources smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/bre/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/bre-regional-smoke.yml'
+
+jobs:
+  build-bretagne-packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download OEB Bretagne CSVs
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://www.data.gouv.fr/api/1/datasets/r/4ada0b2b-d56e-44a9-8532-9ca2335c625b \
+            -o "$RUNNER_TEMP/bre-znieff.csv"
+          curl --fail --location --retry 3 \
+            https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96 \
+            -o "$RUNNER_TEMP/bre-lrr.csv"
+          sha256sum "$RUNNER_TEMP/bre-znieff.csv" "$RUNNER_TEMP/bre-lrr.csv"
+
+      - name: Build Bretagne regional packages
+        run: |
+          mkdir -p "$RUNNER_TEMP/regional"
+          python data-pipeline/regions/bre/build_oeb.py \
+            --taxref "$TAXREF_FILE" \
+            --znieff "$RUNNER_TEMP/bre-znieff.csv" \
+            --lrr "$RUNNER_TEMP/bre-lrr.csv" \
+            --out-dir "$RUNNER_TEMP/regional" \
+            --min-match-rate 0.97
+
+      - name: Validate regional package contract
+        run: |
+          REGIONAL_DIR="$RUNNER_TEMP/regional" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 2) throw new Error(`2 paquets Bretagne attendus, reçu ${packages.length}`)
+          const ids = new Set(packages.map((pkg) => pkg.source.id))
+          if (!ids.has('oeb-bretagne-znieff-csv-2026-01-29')) throw new Error('Paquet ZNIEFF Bretagne absent')
+          if (!ids.has('oeb-bretagne-lrr-csv-2026-01-29')) throw new Error('Paquet LRR Bretagne absent')
+          for (const pkg of packages) {
+            if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${pkg.source.id}`)
+            if (pkg.statuses.length === 0) throw new Error(`Paquet vide: ${pkg.source.id}`)
+          }
+          console.log(packages.map((pkg) => ({ id: pkg.source.id, statuses: pkg.statuses.length, diagnostics: pkg.diagnostics })))
+          NODE
+
+      - name: Upload normalized packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: bre-regional-packages
+          path: ${{ runner.temp }}/regional/*.json
+          if-no-files-found: error
+          retention-days: 7
