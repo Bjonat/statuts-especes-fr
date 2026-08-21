@@ -1,0 +1,51 @@
+name: Normandie LRR source smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/nor/**'
+      - 'data-pipeline/regions/inspect_workbook.py'
+      - '.github/workflows/normandie-lrr-smoke.yml'
+
+jobs:
+  probe-normandie-lrr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install workbook readers
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Download official ANBDD tables
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nor-lrr"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2025/01/LR_Oiseaux_Nicheurs-_Normandie_2024_telechargement.xlsx' -o "$RUNNER_TEMP/nor-lrr/oiseaux-2024.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/05/LR_RHOPALO_tableau-de-synthese_ANBDD.xlsx' -o "$RUNNER_TEMP/nor-lrr/rhopaloceres.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/11/Tableau_Liste_Rouge_Mammiferes_Normandie_2022-VF.xlsx' -o "$RUNNER_TEMP/nor-lrr/mammiferes-2022.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2023/05/Liste_Rouge_ORTHO_Normandie_ANBDD_2022.xlsx' -o "$RUNNER_TEMP/nor-lrr/orthopteres-2022.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/09/Tableau-LR-Amphibiens-Normandie-2022.xlsx' -o "$RUNNER_TEMP/nor-lrr/amphibiens-2022.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/09/LR_ODONATES_tableau-de-synthese_pour_ANBDD_VF.xlsx' -o "$RUNNER_TEMP/nor-lrr/odonates.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/publication/liste-rouge-des-reptiles-de-normandie/tableau-lr-reptiles-normandie-2022/' -o "$RUNNER_TEMP/nor-lrr/reptiles-2022.xlsx"
+
+          for file in "$RUNNER_TEMP"/nor-lrr/*.xlsx; do
+            test "$(head -c 2 "$file")" = 'PK' || { echo "::error::$file n'est pas un XLSX réel"; exit 1; }
+          done
+          sha256sum "$RUNNER_TEMP"/nor-lrr/*.xlsx
+          echo "NOR_LRR_DIR=$RUNNER_TEMP/nor-lrr" >> "$GITHUB_ENV"
+
+      - name: Inspect workbook schemas
+        run: |
+          for file in "$NOR_LRR_DIR"/*.xlsx; do
+            echo "===== $file ====="
+            python data-pipeline/regions/inspect_workbook.py "$file"
+          done
