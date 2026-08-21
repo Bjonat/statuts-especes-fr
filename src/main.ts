@@ -176,15 +176,29 @@ function formatCheckedDate(value?: string): string {
   return `${match[3]}/${match[2]}/${match[1]}`
 }
 
-function sourceSummary(): string {
+function sourceSummary(statuses: TaxonStatus[]): string {
   if (!dataStore.official) return 'Sources et versions : données de démonstration'
 
   const taxref = sources.find((source) => source.id === 'taxref-v18')
   const bdc = sources.find((source) => source.id === 'bdc-v18')
-  const version = bdc?.version ?? taxref?.version ?? dataStore.datasetVersion
-  const checkedAt = bdc?.checkedAt ?? taxref?.checkedAt
+  const bdcVersion = bdc?.version ?? taxref?.version ?? dataStore.datasetVersion
+  const usedSourceIds = new Set(statuses.map((status) => status.sourceId))
+  const regionalSources = sources.filter(
+    (source) => !['taxref-v18', 'bdc-v18'].includes(source.id) && usedSourceIds.has(source.id),
+  )
 
-  return `Sources et versions : TAXREF / BDC-Statuts PatriNat-SINP ${version} - vérifié le ${formatCheckedDate(checkedAt)}`
+  const labels = [
+    'TAXREF',
+    `BDC-Statuts PatriNat-SINP ${bdcVersion}`,
+    ...regionalSources.map((source) => `${cleanDisplayText(source.name)} ${cleanDisplayText(source.version)}`),
+  ]
+  const checkedAt = [taxref, bdc, ...regionalSources]
+    .map((source) => source?.checkedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1)
+
+  return `Sources et versions : ${labels.join(' / ')} - vérifié le ${formatCheckedDate(checkedAt)}`
 }
 
 function shortStatusLabel(status: TaxonStatus): string {
@@ -475,7 +489,7 @@ function renderDetail(): void {
             : '<p class="empty-state">Aucun statut disponible pour ce taxon et cette région dans les référentiels chargés.</p>'
         }
 
-        <p class="source-summary">${escapeHtml(sourceSummary())}</p>
+        <p class="source-summary">${escapeHtml(sourceSummary(taxonStatuses))}</p>
       </section>
 
       ${renderDataNotice()}
