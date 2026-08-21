@@ -19,23 +19,48 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends poppler-utils
 
-      - name: Download and print final table text
+      - name: Download and extract PDF
         shell: bash
         run: |
           set -euo pipefail
           curl --fail --location --retry 3 \
             'https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/listes%20rouges/LRR-papillons_2024_vf-4.pdf' \
             -o "$RUNNER_TEMP/papillons.pdf"
-          pdftotext -layout "$RUNNER_TEMP/papillons.pdf" "$RUNNER_TEMP/papillons.txt"
-          start="$(grep -n -i 'Liste par catégories de menace' "$RUNNER_TEMP/papillons.txt" | tail -n 1 | cut -d: -f1)"
-          test -n "$start"
-          end=$((start + 260))
-          echo "TABLE_LINES=$start-$end"
-          sed -n "${start},${end}p" "$RUNNER_TEMP/papillons.txt" | nl -ba
+          pdftotext -layout "$RUNNER_TEMP/papillons.pdf" "$RUNNER_TEMP/papillons-layout.txt"
+          pdftotext -raw "$RUNNER_TEMP/papillons.pdf" "$RUNNER_TEMP/papillons-raw.txt"
 
-      - name: Print every LC-like row in table
+      - name: Inspect corrupted taxa in layout and raw modes
         shell: bash
         run: |
           set -euo pipefail
-          start="$(grep -n -i 'Liste par catégories de menace' "$RUNNER_TEMP/papillons.txt" | tail -n 1 | cut -d: -f1)"
-          tail -n "+$start" "$RUNNER_TEMP/papillons.txt" | grep -n -E '(^|[[:space:]])LC([[:space:]]|$)' || true
+          for mode in layout raw; do
+            txt="$RUNNER_TEMP/papillons-${mode}.txt"
+            echo "===== MODE $mode ====="
+            for taxon in \
+              'Anthocharis cardamines' \
+              'Apatura ilia' \
+              'Aphantopus hyperantus' \
+              'Aporia crataegi' \
+              'Limenitis camilla' \
+              'Lopinga achine' \
+              'Lycaena phlaeas' \
+              'Hemianax ephippiger' \
+              'Trithemis annulata'; do
+              echo "--- $taxon ---"
+              grep -n -C 4 "$taxon" "$txt" | head -n 30 || true
+            done
+          done
+
+      - name: Inspect raw category-table neighborhood
+        shell: bash
+        run: |
+          set -euo pipefail
+          txt="$RUNNER_TEMP/papillons-raw.txt"
+          for taxon in 'Anthocharis cardamines' 'Limenitis camilla'; do
+            line="$(grep -n "$taxon" "$txt" | head -n 1 | cut -d: -f1 || true)"
+            test -n "$line" || continue
+            start=$((line - 25)); if [ "$start" -lt 1 ]; then start=1; fi
+            end=$((line + 45))
+            echo "===== RAW around $taxon ====="
+            sed -n "${start},${end}p" "$txt" | nl -ba
+          done
