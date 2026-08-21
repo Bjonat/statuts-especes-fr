@@ -6,19 +6,41 @@ on:
     branches: [main]
     paths:
       - 'data-pipeline/regions/cvl/**'
+      - 'data-pipeline/regional.mjs'
       - '.github/workflows/cvl-lrr-smoke.yml'
 
 jobs:
-  probe-cvl-lrr:
+  build-cvl-lrr:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Install PDF text extractor
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends poppler-utils
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 \
+            https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip \
+            -o "$RUNNER_TEMP/taxref.zip" \
+          || curl --fail --location --retry 3 \
+            https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip \
+            -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
 
       - name: Download ARB CVL red-list publications
         shell: bash
@@ -37,28 +59,47 @@ jobs:
           sha256sum "$RUNNER_TEMP"/cvl-lrr/*.pdf
           echo "CVL_LRR_DIR=$RUNNER_TEMP/cvl-lrr" >> "$GITHUB_ENV"
 
-      - name: Extract table text
+      - name: Build CVL regional packages
         shell: bash
         run: |
           set -euo pipefail
-          command -v pdftotext
-          for file in "$CVL_LRR_DIR"/*.pdf; do
-            txt="${file%.pdf}.txt"
-            pdftotext -layout "$file" "$txt"
-            test -s "$txt"
-            echo "===== $(basename "$txt") ====="
-            grep -n -i -E 'Liste par catégories|Liste des espèces par catégories' "$txt" | head -n 3 || true
-            tail -n 260 "$txt" | head -n 80 || true
-          done
+          mkdir -p "$RUNNER_TEMP/cvl-packages"
+          python data-pipeline/regions/cvl/build_arb_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --odonates "$CVL_LRR_DIR/odonates-2022.pdf" \
+            --papillons "$CVL_LRR_DIR/papillons-2024.pdf" \
+            --out-dir "$RUNNER_TEMP/cvl-packages" \
+            --min-match-rate 0.97
+          echo "CVL_PACKAGES_DIR=$RUNNER_TEMP/cvl-packages" >> "$GITHUB_ENV"
 
-      - name: Validate expected scientific names and UICN categories
+      - name: Validate regional package contract
         shell: bash
         run: |
-          set -euo pipefail
-          grep -q 'Sympetrum depressiusculum' "$CVL_LRR_DIR/odonates-2022.txt"
-          grep -q 'Coenagrion ornatum' "$CVL_LRR_DIR/odonates-2022.txt"
-          grep -q 'Euphydryas maturna' "$CVL_LRR_DIR/papillons-2024.txt"
-          grep -q 'Thymelicus lineola' "$CVL_LRR_DIR/papillons-2024.txt"
-          grep -Eqi '\b(RE|CR\*?|EN|VU|NT|LC|DD|NA|NE)\b' "$CVL_LRR_DIR/odonates-2022.txt"
-          grep -Eqi '\b(RE|CR\*?|EN|VU|NT|LC|DD|NA|NE)\b' "$CVL_LRR_DIR/papillons-2024.txt"
-          echo 'ARB CVL: PDF officiels accessibles et tableaux textuels détectés.'
+          REGIONAL_DIR="$CVL_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 2) throw new Error(`2 paquets CVL attendus, reçu ${packages.length}`)
+          const ids = new Set(packages.map((pkg) => pkg.source.id))
+          for (const id of ['arb-cvl-lrr-odonates-2022', 'arb-cvl-lrr-papillons-2024']) {
+            if (!ids.has(id)) throw new Error(`Source CVL absente: ${id}`)
+          }
+          for (const pkg of packages) {
+            if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${pkg.source.id}`)
+            if (!pkg.replaces.every((rule) => rule.region === 'CVL' && rule.category === 'red_list_regional' && rule.realm === 'fauna' && Array.isArray(rule.cdRefs) && rule.cdRefs.length > 0)) {
+              throw new Error(`Override CVL non ciblé: ${pkg.source.id}`)
+            }
+          }
+          const odonates = packages.find((pkg) => pkg.source.id === 'arb-cvl-lrr-odonates-2022')
+          const papillons = packages.find((pkg) => pkg.source.id === 'arb-cvl-lrr-papillons-2024')
+          if (odonates.statuses.length < 60) throw new Error(`Volume Odonates trop faible: ${odonates.statuses.length}`)
+          if (papillons.statuses.length < 130) throw new Error(`Volume Papillons trop faible: ${papillons.statuses.length}`)
+          console.log(packages.map((pkg) => ({ source: pkg.source.id, statuses: pkg.statuses.length, diagnostics: pkg.diagnostics })))
+          NODE
+
+      - name: Upload normalized CVL packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: cvl-lrr-regional-packages
+          path: ${{ env.CVL_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7
