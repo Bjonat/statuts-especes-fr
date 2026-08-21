@@ -9,7 +9,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       scope: './',
-      includeAssets: [],
+      includeAssets: ['icon.svg'],
       manifest: {
         name: 'Statuts espèces FR',
         short_name: 'Statuts FR',
@@ -20,6 +20,20 @@ export default defineConfig({
         start_url: './',
         scope: './',
         lang: 'fr',
+        icons: [
+          {
+            src: 'icon.svg',
+            sizes: '192x192',
+            type: 'image/svg+xml',
+            purpose: 'any',
+          },
+          {
+            src: 'icon.svg',
+            sizes: '512x512',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,json}'],

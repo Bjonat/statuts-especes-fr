@@ -1,6 +1,6 @@
 import type { Region, SourceDataset, Taxon, TaxonStatus } from './types'
 
-export const DEMO_DATA_WARNING = 'Données de démonstration non officielles — ne pas utiliser pour une décision terrain.'
+export const DEMO_DATA_WARNING = 'Données de démonstration non officielles - ne pas utiliser pour une décision terrain.'
 
 export const regions: Region[] = [
   { code: 'CVL', name: 'Centre-Val de Loire' },

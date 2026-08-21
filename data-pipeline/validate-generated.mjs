@@ -37,6 +37,7 @@ assert.ok(/^\d{4}-\d{2}-\d{2}T/.test(manifest.generatedAt), 'date de génératio
 for (const source of manifest.sources) {
   assert.equal(source.official, true, `source officielle: ${source.id}`)
   assert.match(source.checkedAt ?? '', /^\d{4}-\d{2}-\d{2}$/, `date de vérification: ${source.id}`)
+  assert.equal('url' in source, false, `pas de lien documentaire embarqué: ${source.id}`)
 }
 
 const flora = await readJson(path.join(directory, manifest.files.taxa.flora.file))
@@ -45,6 +46,8 @@ const definitions = await readJson(path.join(directory, manifest.files.statusDef
 assert.ok(flora.length > 20_000, 'volume flore plausible')
 assert.ok(fauna.length > 50_000, 'volume faune plausible')
 assert.ok(definitions.length > 100, 'dictionnaire de statuts plausible')
+assert.ok(definitions.every((definition) => !('citation' in definition) && !('documentUrl' in definition)), 'aucune citation longue ni URL documentaire dans les définitions')
+assert.ok(definitions.every((definition) => typeof definition.value === 'string' && definition.value.length <= 80), 'valeurs de statuts compactes pour le terrain')
 
 async function loadLinks(realm, region) {
   return readJson(path.join(directory, manifest.files.statusLinks[realm][region].file))
@@ -106,7 +109,6 @@ const lotusNaqProtection = findStatus(
     /Aquitaine/i.test(status.scopeLabel ?? ''),
 )
 assert.ok(lotusNaqProtection, 'Lotus angustissimus: protection Aquitaine conservée comme portée partielle en NAQ')
-assert.ok(lotusNaqProtection.citation, 'Lotus angustissimus: citation réglementaire disponible')
 
 const aconitumCvlProtection = findStatus(
   cvlFlora,

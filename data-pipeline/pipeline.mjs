@@ -150,11 +150,27 @@ export function statusCategory(cdTypeStatut) {
   return 'other'
 }
 
+function compactLabel(value) {
+  return String(value ?? '')
+    .replace(/&amp;/gi, '&')
+    .replace(/<\/?(?:em|i|strong|b)>/gi, '')
+    .replace(/[—–]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function statusValue(row) {
-  const code = String(row.code_statut || '').trim()
-  const label = String(row.label_statut || '').trim()
-  if (code && label && code.toLowerCase() !== label.toLowerCase()) return `${code} — ${label}`
-  return code || label || 'Oui'
+  const code = compactLabel(row.code_statut)
+  const label = compactLabel(row.label_statut)
+
+  if (code && label && code.toLowerCase() !== label.toLowerCase()) {
+    if (label.length > 72) return code
+    return `${code} - ${label}`
+  }
+
+  if (code) return code
+  if (label.length > 72) return 'Oui'
+  return label || 'Oui'
 }
 
 export async function buildStatuses(bdcPath, knownTaxa) {
@@ -171,10 +187,8 @@ export async function buildStatuses(bdcPath, knownTaxa) {
       if (!scope) continue
 
       const category = statusCategory(row.cd_type_statut)
-      const label = String(row.lb_type_statut || row.regroupement_type || row.cd_type_statut || 'Statut').trim()
+      const label = compactLabel(row.lb_type_statut || row.regroupement_type || row.cd_type_statut || 'Statut')
       const value = statusValue(row)
-      const citation = String(row.full_citation || '').trim() || undefined
-      const documentUrl = String(row.doc_url || '').trim() || undefined
       const dedupeKey = [cdRef, region.code, category, label, value, row.cd_sig, row.cd_doc].join('|')
       if (seen.has(dedupeKey)) continue
       seen.add(dedupeKey)
@@ -188,8 +202,6 @@ export async function buildStatuses(bdcPath, knownTaxa) {
         sourceId: 'bdc-v18',
         scope: scope.scope,
         scopeLabel: scope.scopeLabel,
-        citation,
-        documentUrl,
       })
     }
   }
@@ -213,16 +225,14 @@ export function buildSources(checkedAt = new Date().toISOString().slice(0, 10)) 
       version: 'v18',
       publicationYear: 2025,
       official: true,
-      url: 'https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip',
       checkedAt,
     },
     {
       id: 'bdc-v18',
-      name: 'Base de connaissance Statuts',
+      name: 'BDC-Statuts',
       producer: 'PatriNat / SINP',
       version: 'v18',
       official: true,
-      url: 'https://assets.patrinat.fr/files/referentiel/BDC.zip',
       checkedAt,
     },
   ]

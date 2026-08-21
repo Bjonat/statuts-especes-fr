@@ -10,8 +10,6 @@ function definitionPayload(status) {
     label: status.label,
     value: status.value,
     sourceId: status.sourceId,
-    ...(status.citation ? { citation: status.citation } : {}),
-    ...(status.documentUrl ? { documentUrl: status.documentUrl } : {}),
   }
 }
 
