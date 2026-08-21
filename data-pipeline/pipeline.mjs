@@ -2,6 +2,8 @@ import fs from 'node:fs'
 import readline from 'node:readline'
 import { REGIONS, resolveScope } from './regions.mjs'
 
+const SEARCHABLE_RANKS = new Set(['ES', 'SSES', 'VAR', 'SVAR', 'FO', 'CAR', 'RACE', 'AGES'])
+
 function normalizeHeader(value) {
   return String(value ?? '').replace(/^\uFEFF/, '').trim().toLowerCase()
 }
@@ -84,6 +86,15 @@ function realmFromTaxref(row) {
   return null
 }
 
+export function isMetropolitanBiogeographicStatus(value) {
+  const status = String(value ?? '').trim().toUpperCase()
+  return Boolean(status) && !['A', 'Q'].includes(status)
+}
+
+export function isSearchableRank(value) {
+  return SEARCHABLE_RANKS.has(String(value ?? '').trim().toUpperCase())
+}
+
 export async function buildTaxa(taxrefPath) {
   const accepted = new Map()
   const synonymsByRef = new Map()
@@ -100,6 +111,7 @@ export async function buildTaxa(taxrefPath) {
     if (!label) continue
 
     if (cdNom === cdRef) {
+      if (!isSearchableRank(row.rang)) continue
       accepted.set(cdRef, {
         cdRef,
         realm,
@@ -107,6 +119,8 @@ export async function buildTaxa(taxrefPath) {
         vernacularNames: splitNames(row.nom_vern),
         synonyms: [],
         family: String(row.famille || '').trim() || undefined,
+        rank: String(row.rang || '').trim() || undefined,
+        biogeographicStatus: String(row.fr || '').trim() || undefined,
         sourceId: 'taxref-v18',
       })
     } else {
@@ -181,6 +195,13 @@ export async function buildStatuses(bdcPath, knownTaxa) {
   }
 
   return statuses.sort((a, b) => a.cdRef - b.cdRef || a.region.localeCompare(b.region) || a.label.localeCompare(b.label, 'fr'))
+}
+
+export function filterTaxaForMetropolitanRegions(taxa, statuses) {
+  const refsWithApplicableStatus = new Set(statuses.map((status) => status.cdRef))
+  return taxa.filter(
+    (taxon) => isMetropolitanBiogeographicStatus(taxon.biogeographicStatus) || refsWithApplicableStatus.has(taxon.cdRef),
+  )
 }
 
 export function buildSources(checkedAt = new Date().toISOString().slice(0, 10)) {
