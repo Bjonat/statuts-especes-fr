@@ -57,22 +57,25 @@ npm run data:build -- \
 
 Les fichiers sources bruts ne sont pas versionnés dans Git.
 
-Le pipeline produit un **manifeste léger** et des jeux immuables fractionnés :
+Le pipeline v3 produit un **manifeste léger**, deux catalogues taxonomiques, un dictionnaire global des définitions de statuts et des liens régionaux compacts :
 
 ```text
 public/data/
 ├── manifest.json
 ├── taxa-flora-<hash>.json
 ├── taxa-fauna-<hash>.json
-├── statuses-flora-cvl-<hash>.json
-├── statuses-flora-naq-<hash>.json
-├── statuses-flora-occ-<hash>.json
-├── statuses-fauna-cvl-<hash>.json
-├── statuses-fauna-naq-<hash>.json
-└── statuses-fauna-occ-<hash>.json
+├── status-definitions-<hash>.json
+├── status-links-flora-cvl-<hash>.json
+├── status-links-flora-naq-<hash>.json
+├── status-links-flora-occ-<hash>.json
+├── status-links-fauna-cvl-<hash>.json
+├── status-links-fauna-naq-<hash>.json
+└── status-links-fauna-occ-<hash>.json
 ```
 
-L'application ne charge en mémoire que le règne choisi et les statuts de la région sélectionnée. Lorsqu'une nouvelle version est disponible, les jeux sont mis en cache pour le mode hors ligne sans interrompre la recherche en cours.
+Sur TAXREF v18 + BDC v18 réels, **229 813 relations de statuts sont représentées par seulement 686 définitions uniques**. Pour les trois régions pilotes, le volume JSON brut total passe d'environ 118 Mio à **31 Mio**, taxonomie comprise. Le dictionnaire des statuts pèse environ 0,3 Mio et chaque jeu régional de liens environ 0,5 à 1,2 Mio.
+
+L'application ne charge en mémoire que le règne choisi, le dictionnaire et les liens de la région sélectionnée. Lorsqu'une nouvelle version est disponible, les jeux sont mis en cache pour le mode hors ligne sans interrompre la recherche en cours.
 
 Le workflow de données vérifie également des **cas sentinelles métier** sur les jeux officiels générés (notamment `Lotus angustissimus`, `Aconitum napellus` et `Alcedo atthis`).
 
@@ -80,7 +83,7 @@ Le workflow de données vérifie également des **cas sentinelles métier** sur 
 
 ```text
 TAXREF v18 ───────┐
-                  ├─ data-pipeline ─► manifeste + jeux fractionnés ─► PWA offline
+                  ├─ data-pipeline ─► manifeste + jeux compacts ─► PWA offline
 BDC Statuts v18 ──┤
                   │
 Référentiels ─────┘
