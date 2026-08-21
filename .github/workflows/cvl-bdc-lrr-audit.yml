@@ -1,0 +1,97 @@
+name: CVL BDC regional red-list audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/cvl-bdc-lrr-audit.yml'
+
+jobs:
+  audit-cvl-bdc-lrr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download BDC Statuts v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bdc"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/BDC.zip -o "$RUNNER_TEMP/bdc.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/BDC-STATUTS-v18.zip -o "$RUNNER_TEMP/bdc.zip"
+          unzip -q "$RUNNER_TEMP/bdc.zip" -d "$RUNNER_TEMP/bdc"
+          BDC_FILE=''
+          while IFS= read -r candidate; do
+            header="$(head -n 1 "$candidate" | tr '[:upper:]' '[:lower:]')"
+            if grep -q 'cd_ref' <<< "$header" && grep -q 'cd_type_statut' <<< "$header"; then
+              BDC_FILE="$candidate"
+              break
+            fi
+          done < <(find "$RUNNER_TEMP/bdc" -type f -iname '*.csv')
+          test -n "$BDC_FILE"
+          echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
+
+      - name: Audit CVL LRR documents and scopes
+        shell: bash
+        run: |
+          BDC_FILE="$BDC_FILE" node --input-type=module - <<'NODE'
+          import { rowsFromFile, statusCategory } from './data-pipeline/pipeline.mjs'
+          import { REGIONS, resolveScope } from './data-pipeline/regions.mjs'
+
+          const region = REGIONS.find((item) => item.code === 'CVL')
+          const groups = new Map()
+          let total = 0
+          let firstKeys = null
+
+          for await (const row of rowsFromFile(process.env.BDC_FILE)) {
+            if (statusCategory(row.cd_type_statut) !== 'red_list_regional') continue
+            const scope = resolveScope(row.cd_sig, region)
+            if (!scope) continue
+            total += 1
+            if (!firstKeys) firstKeys = Object.keys(row)
+            const doc = row.cd_doc || '<sans-cd-doc>'
+            const title = row.lb_doc || row.nom_doc || row.intitule_doc || row.reference_doc || row.lb_type_statut || '<sans-intitulé>'
+            const key = `${doc}|${title}|${row.cd_sig}|${scope.scope}|${scope.scopeLabel ?? ''}`
+            const current = groups.get(key) ?? {
+              cdDoc: doc,
+              title,
+              cdSig: row.cd_sig,
+              scope: scope.scope,
+              scopeLabel: scope.scopeLabel ?? null,
+              count: 0,
+              typeCodes: new Set(),
+              statusCodes: new Set(),
+              examples: [],
+            }
+            current.count += 1
+            current.typeCodes.add(row.cd_type_statut)
+            if (row.code_statut) current.statusCodes.add(row.code_statut)
+            if (current.examples.length < 4) {
+              current.examples.push({
+                cdRef: row.cd_ref,
+                codeStatut: row.code_statut,
+                labelStatut: row.label_statut,
+              })
+            }
+            groups.set(key, current)
+          }
+
+          console.log('BDC_HEADERS=', firstKeys)
+          console.log('CVL_LRR_ROWS=', total)
+          const report = [...groups.values()]
+            .map((item) => ({
+              ...item,
+              typeCodes: [...item.typeCodes].sort(),
+              statusCodes: [...item.statusCodes].sort(),
+            }))
+            .sort((a, b) => b.count - a.count || String(a.cdDoc).localeCompare(String(b.cdDoc)))
+          console.log(JSON.stringify(report, null, 2))
+          if (!total) throw new Error('Aucune LRR BDC applicable à CVL')
+          NODE
