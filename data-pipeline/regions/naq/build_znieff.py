@@ -148,6 +148,7 @@ def build_package(taxref_path: Path, workbook_path: Path, checked_at: str):
 
     matched = stats['exact'] + stats['core']
     match_rate = matched / stats['determining'] if stats['determining'] else 0
+    covered_refs = sorted({status['cdRef'] for status in statuses})
     package = {
         'schemaVersion': 1,
         'source': {
@@ -160,7 +161,7 @@ def build_package(taxref_path: Path, workbook_path: Path, checked_at: str):
             'checkedAt': checked_at,
         },
         'replaces': [
-            {'region': 'NAQ', 'category': 'znieff', 'realm': 'flora'},
+            {'region': 'NAQ', 'category': 'znieff', 'realm': 'flora', 'cdRefs': covered_refs},
         ],
         'statuses': sorted(statuses, key=lambda status: (status['cdRef'], status.get('scopeLabel', ''))),
         'diagnostics': {
