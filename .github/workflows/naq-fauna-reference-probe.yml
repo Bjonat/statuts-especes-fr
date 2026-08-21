@@ -14,54 +14,71 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inspect FAUNA reference page and assets
+      - name: Download FAUNA reference page
         shell: bash
         run: |
           set -euo pipefail
-          page="$RUNNER_TEMP/fauna.html"
           curl --fail --location --retry 3 \
             'https://observatoire-fauna.fr/programmes/referentiel-especes/rechercher-especes' \
-            -o "$page"
-          echo '===== download/csv/reference hints in HTML ====='
-          grep -Eio '.{0,140}(référentiel complet|referentiel complet|download|telecharg|télécharg|\.csv|\.tsv|export).{0,180}' "$page" | head -n 120 || true
-          echo '===== script assets ====='
-          grep -Eo '<script[^>]+src=["'"'][^"'"']+' "$page" | sed -E 's/.*src=["'"']//g' | tee "$RUNNER_TEMP/scripts.txt" || true
+            -o "$RUNNER_TEMP/fauna.html"
+          test -s "$RUNNER_TEMP/fauna.html"
 
-          : > "$RUNNER_TEMP/assets.txt"
-          while IFS= read -r src; do
-            [ -n "$src" ] || continue
-            case "$src" in
-              http*) url="$src" ;;
-              /*) url="https://observatoire-fauna.fr$src" ;;
-              *) url="https://observatoire-fauna.fr/programmes/referentiel-especes/$src" ;;
-            esac
-            safe="$(printf '%s' "$src" | tr '/?&=' '____')"
-            out="$RUNNER_TEMP/asset-${safe##*_}"
-            if curl --fail --location --retry 2 "$url" -o "$out" 2>/dev/null; then
-              echo "$url|$out" >> "$RUNNER_TEMP/assets.txt"
-            fi
-          done < "$RUNNER_TEMP/scripts.txt"
-
-      - name: Search JavaScript for export endpoints
+      - name: Inspect inline download logic
         shell: bash
         run: |
-          set -euo pipefail
-          echo '===== endpoint candidates ====='
-          while IFS='|' read -r url file; do
-            [ -f "$file" ] || continue
-            hits="$(grep -Eio '.{0,180}(référentiel complet|referentiel complet|download|telecharg|télécharg|csv|export|referentiel-especes).{0,220}' "$file" | head -n 80 || true)"
-            if [ -n "$hits" ]; then
-              echo "### $url"
-              printf '%s\n' "$hits"
-            fi
-          done < "$RUNNER_TEMP/assets.txt"
+          PAGE="$RUNNER_TEMP/fauna.html" python - <<'PY'
+          import os, re
+          from pathlib import Path
 
-      - name: Extract URL-like candidates
+          text = Path(os.environ['PAGE']).read_text(encoding='utf-8', errors='replace')
+          print('download-csv occurrences:', text.count('download-csv'))
+          for token in ['download-csv', 'csv', 'export', 'ajax', 'fetch(', 'XMLHttpRequest', 'telechargement', 'referentiel']:
+              print(f'===== {token} =====')
+              for match in list(re.finditer(re.escape(token), text, flags=re.I))[:30]:
+                  start = max(0, match.start() - 500)
+                  end = min(len(text), match.end() + 900)
+                  snippet = re.sub(r'\s+', ' ', text[start:end])
+                  print(snippet)
+                  print('---')
+
+          print('===== relative endpoint candidates =====')
+          candidates = set()
+          patterns = [
+              r'["\'](/[^"\']*(?:csv|export|download|referentiel|référentiel)[^"\']*)["\']',
+              r'(?:url|href)\s*[:=]\s*["\']([^"\']+)["\']',
+          ]
+          for pattern in patterns:
+              for value in re.findall(pattern, text, flags=re.I):
+                  if any(word in value.casefold() for word in ('csv', 'export', 'download', 'referentiel', 'référentiel')):
+                      candidates.add(value)
+          for value in sorted(candidates):
+              print(value)
+          PY
+
+      - name: Inspect scripts referenced by page
         shell: bash
         run: |
-          set -euo pipefail
-          cat "$RUNNER_TEMP/fauna.html" $(cut -d'|' -f2 "$RUNNER_TEMP/assets.txt" 2>/dev/null || true) \
-            | grep -Eo 'https?://[^"'"' <>]+' \
-            | grep -Ei 'fauna|referentiel|csv|download|export' \
-            | sort -u \
-            | head -n 200 || true
+          PAGE="$RUNNER_TEMP/fauna.html" python - <<'PY'
+          import os, re, urllib.parse, urllib.request
+          from pathlib import Path
+
+          text = Path(os.environ['PAGE']).read_text(encoding='utf-8', errors='replace')
+          sources = re.findall(r'<script[^>]+src=["\']([^"\']+)', text, flags=re.I)
+          print('scripts:', sources)
+          for src in sources:
+              url = urllib.parse.urljoin('https://observatoire-fauna.fr/programmes/referentiel-especes/rechercher-especes', src)
+              try:
+                  data = urllib.request.urlopen(url, timeout=30).read().decode('utf-8', 'replace')
+              except Exception as exc:
+                  print('FAILED', url, exc)
+                  continue
+              hits = []
+              for token in ('download-csv', 'referentiel', 'csv', 'export'):
+                  for match in list(re.finditer(token, data, flags=re.I))[:20]:
+                      hits.append(re.sub(r'\s+', ' ', data[max(0, match.start()-350):match.end()+650]))
+              if hits:
+                  print('===== SCRIPT', url, '=====')
+                  for hit in hits[:60]:
+                      print(hit)
+                      print('---')
+          PY
