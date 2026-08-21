@@ -8,10 +8,8 @@ describe('hydrateStatusLinks', () => {
       {
         category: 'protection_regional',
         label: 'Protection régionale',
-        value: 'PR — Protégée',
+        value: 'PR - Protégée',
         sourceId: 'bdc-v18',
-        citation: 'Arrêté Aquitaine',
-        documentUrl: 'https://example.test/pr',
       },
     ]
     const links: StatusLink[] = [[106634, 0, 2, 'ancienne région Aquitaine']]
@@ -22,10 +20,8 @@ describe('hydrateStatusLinks', () => {
         region: 'NAQ',
         category: 'protection_regional',
         label: 'Protection régionale',
-        value: 'PR — Protégée',
+        value: 'PR - Protégée',
         sourceId: 'bdc-v18',
-        citation: 'Arrêté Aquitaine',
-        documentUrl: 'https://example.test/pr',
         scope: 'partial',
         scopeLabel: 'ancienne région Aquitaine',
       },
