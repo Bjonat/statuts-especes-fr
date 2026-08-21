@@ -1,6 +1,22 @@
 export type Realm = 'flora' | 'fauna'
 
-export type RegionCode = 'CVL' | 'NAQ' | 'OCC'
+export const METROPOLITAN_REGION_CODES = [
+  'ARA',
+  'BFC',
+  'BRE',
+  'CVL',
+  'COR',
+  'GES',
+  'HDF',
+  'IDF',
+  'NOR',
+  'NAQ',
+  'OCC',
+  'PDL',
+  'PAC',
+] as const
+
+export type RegionCode = (typeof METROPOLITAN_REGION_CODES)[number]
 
 export interface Region {
   code: RegionCode

@@ -19,7 +19,7 @@ Le cœur métier fonctionne sans connexion. Le réseau sert principalement à v�
 - PWA installable et utilisable hors ligne ;
 - moteur commun faune/flore ;
 - recherche tolérante : accents, noms partiels, noms vernaculaires/scientifiques, synonymes et petites fautes ;
-- sélection de la région ;
+- **13 régions métropolitaines** ;
 - affichage compact des statuts ;
 - traçabilité des sources et versions ;
 - aucune carte, aucun compte, aucune saisie d'observation dans le MVP.
@@ -65,15 +65,18 @@ public/data/
 ├── taxa-flora-<hash>.json
 ├── taxa-fauna-<hash>.json
 ├── status-definitions-<hash>.json
-├── status-links-flora-cvl-<hash>.json
-├── status-links-flora-naq-<hash>.json
-├── status-links-flora-occ-<hash>.json
-├── status-links-fauna-cvl-<hash>.json
-├── status-links-fauna-naq-<hash>.json
-└── status-links-fauna-occ-<hash>.json
+└── status-links-<realm>-<region>-<hash>.json  # 2 règnes × 13 régions
 ```
 
-Sur TAXREF v18 + BDC v18 réels, **229 813 relations de statuts sont représentées par seulement 686 définitions uniques**. Pour les trois régions pilotes, le volume JSON brut total passe d'environ 118 Mio à **31 Mio**, taxonomie comprise. Le dictionnaire des statuts pèse environ 0,3 Mio et chaque jeu régional de liens environ 0,5 à 1,2 Mio.
+Sur TAXREF v18 + BDC v18 réels pour toute la métropole :
+
+- **106 357 taxons** conservés après filtrage sécurisé : 26 405 Flore et 79 952 Faune ;
+- **877 930 relations taxon × territoire × statut** ;
+- **1 411 définitions de statut uniques** après déduplication ;
+- environ **43 Mio de JSON brut** pour tout le jeu métropolitain offline, taxonomie comprise ;
+- environ **6,3 Mo** pour l'artifact compressé généré par la CI.
+
+Chaque région possède des relations BDC réellement territoriales en plus des statuts nationaux. Les anciennes régions restent interprétées selon leur périmètre : une ancienne région composant une région fusionnée est signalée comme portée partielle ; une région dont le périmètre n'a pas changé reste une portée régionale complète.
 
 L'application ne charge en mémoire que le règne choisi, le dictionnaire et les liens de la région sélectionnée. Lorsqu'une nouvelle version est disponible, les jeux sont mis en cache pour le mode hors ligne sans interrompre la recherche en cours.
 

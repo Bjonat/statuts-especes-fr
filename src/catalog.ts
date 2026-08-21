@@ -1,5 +1,6 @@
 import { DEMO_DATA_WARNING, regions as demoRegions, sources as demoSources, statuses as demoStatuses, taxa as demoTaxa } from './demo'
 import { hydrateStatusLinks } from './status-data'
+import { METROPOLITAN_REGION_CODES } from './types'
 import type {
   DataManifest,
   Realm,
@@ -30,6 +31,17 @@ function isDatasetFile(value: unknown): value is { file: string; count: number }
   return typeof candidate.file === 'string' && /^[a-z0-9-]+-[a-f0-9]+\.json$/i.test(candidate.file) && typeof candidate.count === 'number'
 }
 
+function isRegion(value: unknown): value is Region {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as { code?: unknown; name?: unknown }
+  return (
+    typeof candidate.code === 'string' &&
+    METROPOLITAN_REGION_CODES.includes(candidate.code as RegionCode) &&
+    typeof candidate.name === 'string' &&
+    candidate.name.length > 0
+  )
+}
+
 function isManifest(value: unknown): value is DataManifest {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<DataManifest>
@@ -39,11 +51,16 @@ function isManifest(value: unknown): value is DataManifest {
     typeof candidate.generatedAt !== 'string' ||
     typeof candidate.datasetVersion !== 'string' ||
     !Array.isArray(candidate.regions) ||
+    candidate.regions.length !== METROPOLITAN_REGION_CODES.length ||
+    !candidate.regions.every(isRegion) ||
     !Array.isArray(candidate.sources) ||
     !candidate.files
   ) {
     return false
   }
+
+  const regionSet = new Set(candidate.regions.map((region) => region.code))
+  if (!METROPOLITAN_REGION_CODES.every((region) => regionSet.has(region))) return false
 
   const taxa = candidate.files.taxa
   const definitions = candidate.files.statusDefinitions
@@ -59,9 +76,8 @@ function isManifest(value: unknown): value is DataManifest {
     return false
   }
 
-  const regionCodes: RegionCode[] = ['CVL', 'NAQ', 'OCC']
   return (['flora', 'fauna'] as Realm[]).every((realm) =>
-    regionCodes.every((region) => isDatasetFile(links[realm]?.[region])),
+    METROPOLITAN_REGION_CODES.every((region) => isDatasetFile(links[realm]?.[region])),
   )
 }
 
@@ -139,7 +155,7 @@ function createOfficialStore(manifest: DataManifest): DataStore {
       manifest.files.taxa.fauna.file,
       manifest.files.statusDefinitions.file,
       ...(['flora', 'fauna'] as Realm[]).flatMap((realm) =>
-        (['CVL', 'NAQ', 'OCC'] as RegionCode[]).map((region) => manifest.files.statusLinks[realm][region].file),
+        METROPOLITAN_REGION_CODES.map((region) => manifest.files.statusLinks[realm][region].file),
       ),
     ]
 

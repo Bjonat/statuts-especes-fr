@@ -31,6 +31,7 @@ assert.equal(manifest.schemaVersion, 3, 'manifest schemaVersion')
 assert.equal(manifest.official, true, 'manifest officiel')
 assert.equal(manifest.taxrefVersion, '18', 'version TAXREF')
 assert.equal(manifest.bdcVersion, '18', 'version BDC')
+assert.equal(manifest.regions.length, 13, '13 régions métropolitaines')
 assert.ok(/^\d{4}-\d{2}-\d{2}T/.test(manifest.generatedAt), 'date de génération valide')
 
 for (const source of manifest.sources) {
@@ -45,8 +46,12 @@ assert.ok(flora.length > 20_000, 'volume flore plausible')
 assert.ok(fauna.length > 50_000, 'volume faune plausible')
 assert.ok(definitions.length > 100, 'dictionnaire de statuts plausible')
 
+async function loadLinks(realm, region) {
+  return readJson(path.join(directory, manifest.files.statusLinks[realm][region].file))
+}
+
 async function loadStatuses(realm, region) {
-  const links = await readJson(path.join(directory, manifest.files.statusLinks[realm][region].file))
+  const links = await loadLinks(realm, region)
   return links.map(([cdRef, definitionId, scopeCode, scopeLabel]) => {
     const definition = definitions[definitionId]
     assert.ok(definition, `définition #${definitionId} disponible`)
@@ -58,6 +63,17 @@ async function loadStatuses(realm, region) {
       ...(scopeLabel ? { scopeLabel } : {}),
     }
   })
+}
+
+const regionalCoverage = []
+for (const region of manifest.regions) {
+  const [floraLinks, faunaLinks] = await Promise.all([
+    loadLinks('flora', region.code),
+    loadLinks('fauna', region.code),
+  ])
+  const nonNational = [...floraLinks, ...faunaLinks].filter((link) => link[2] !== 0).length
+  assert.ok(nonNational > 0, `${region.name}: au moins un statut régional ou partiel`)
+  regionalCoverage.push({ code: region.code, name: region.name, nonNational })
 }
 
 const lotus = flora.find((taxon) => taxon.cdRef === 106634)
@@ -106,8 +122,12 @@ const alcedoNationalProtection = findStatus(
 )
 assert.ok(alcedoNationalProtection, 'Alcedo atthis: protection nationale disponible en Centre-Val de Loire')
 
-console.log('Validation métier des jeux officiels compacts: OK')
+console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- définitions de statut: ${definitions.length.toLocaleString('fr-FR')}`)
+console.log('- couverture régionale non nationale:')
+for (const region of regionalCoverage) {
+  console.log(`  ${region.code} ${region.name}: ${region.nonNational.toLocaleString('fr-FR')} relations`)
+}
 console.log('- cas sentinelles: Lotus angustissimus, Aconitum napellus, Alcedo atthis')

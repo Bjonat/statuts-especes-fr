@@ -70,12 +70,15 @@ jobs:
           node - <<'NODE'
           const fs = require('fs')
           const manifest = JSON.parse(fs.readFileSync('public/data/manifest.json', 'utf8'))
-          const regions = ['CVL', 'NAQ', 'OCC']
+          const regions = ['ARA', 'BFC', 'BRE', 'CVL', 'COR', 'GES', 'HDF', 'IDF', 'NOR', 'NAQ', 'OCC', 'PDL', 'PAC']
           const realms = ['flora', 'fauna']
+          const manifestRegions = new Set(manifest.regions?.map((region) => region.code))
           const valid = manifest.schemaVersion === 3
             && manifest.official === true
             && manifest.taxrefVersion === '18'
             && manifest.bdcVersion === '18'
+            && manifestRegions.size === regions.length
+            && regions.every((region) => manifestRegions.has(region))
             && manifest.files?.statusDefinitions?.file
             && realms.every((realm) => manifest.files?.taxa?.[realm]?.file)
             && realms.every((realm) => regions.every((region) => manifest.files?.statusLinks?.[realm]?.[region]?.file))
@@ -91,7 +94,7 @@ jobs:
       - name: Upload generated dataset
         uses: actions/upload-artifact@v4
         with:
-          name: official-dataset-v18-compact
+          name: official-dataset-v18-metropole
           path: public/data/
           if-no-files-found: error
           retention-days: 7
