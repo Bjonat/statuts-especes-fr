@@ -1,9 +1,22 @@
+import fs from 'node:fs'
 import XLSX from 'xlsx'
 
 const filePath = process.argv[2]
 if (!filePath) throw new Error('Usage: node inspect-znieff.mjs <fichier.xls>')
 
-const workbook = XLSX.readFile(filePath, { cellDates: false })
+const buffer = fs.readFileSync(filePath)
+console.log(`Fichier: ${buffer.length.toLocaleString('fr-FR')} octets`)
+console.log(`Signature hex: ${buffer.subarray(0, 16).toString('hex')}`)
+
+let workbook
+try {
+  workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false })
+} catch (error) {
+  const preview = buffer.subarray(0, 800).toString('utf8').replace(/\s+/g, ' ').trim()
+  console.error(`Aperçu brut: ${preview}`)
+  throw error
+}
+
 console.log(`Onglets (${workbook.SheetNames.length}) : ${workbook.SheetNames.join(' | ')}`)
 
 for (const sheetName of workbook.SheetNames) {
