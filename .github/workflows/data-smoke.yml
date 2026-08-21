@@ -56,6 +56,9 @@ jobs:
           test -n "$BDC_FILE"
           echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
 
+      - name: Diagnose official source volumes
+        run: node data-pipeline/analyze.mjs --taxref "$TAXREF_FILE" --bdc "$BDC_FILE"
+
       - name: Run pipeline tests
         run: node --test data-pipeline/*.test.mjs
 
