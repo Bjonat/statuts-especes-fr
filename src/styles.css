@@ -1,0 +1,311 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #20231f;
+  background: #f6f6f1;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #f6f6f1;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+select {
+  cursor: pointer;
+}
+
+.shell {
+  width: min(100% - 24px, 680px);
+  margin: 0 auto;
+  padding: 20px 0 40px;
+}
+
+.shell--centered {
+  min-height: 100vh;
+  display: grid;
+  align-items: center;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #dedfd8;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 8px 26px rgba(30, 35, 28, 0.05);
+}
+
+.hero {
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #687064;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 10px;
+  font-size: clamp(1.8rem, 8vw, 2.6rem);
+  line-height: 1.08;
+}
+
+h2 {
+  font-size: 1.05rem;
+  margin-bottom: 10px;
+}
+
+.intro {
+  color: #5e655a;
+  line-height: 1.5;
+  margin-bottom: 22px;
+}
+
+.realm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.realm-card {
+  min-height: 132px;
+  border: 1px solid #cfd2c8;
+  border-radius: 16px;
+  background: #fafbf7;
+  color: #20231f;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  font-size: 1.12rem;
+  font-weight: 750;
+}
+
+.realm-card:focus-visible,
+.realm-card:hover {
+  outline: 3px solid #c9d6be;
+  outline-offset: 2px;
+}
+
+.realm-icon {
+  font-size: 2rem;
+}
+
+.topbar {
+  min-height: 48px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.link-button {
+  border: 0;
+  background: transparent;
+  padding: 10px 0;
+  color: #34422f;
+  font-weight: 700;
+}
+
+.offline-badge {
+  font-size: 0.78rem;
+  color: #566151;
+  background: #e9eee4;
+  border-radius: 999px;
+  padding: 6px 9px;
+  white-space: nowrap;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.field-label--spaced {
+  margin-top: 18px;
+}
+
+.field-control {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid #bfc4b8;
+  border-radius: 12px;
+  background: #fff;
+  color: #20231f;
+  padding: 11px 12px;
+}
+
+.field-control:focus {
+  outline: 3px solid #d5dfcd;
+  border-color: #6d8064;
+}
+
+.search-input {
+  font-size: 1.05rem;
+}
+
+.field-hint {
+  margin: 7px 0 0;
+  color: #73796e;
+  font-size: 0.82rem;
+}
+
+.results {
+  margin-top: 12px;
+  border-top: 1px solid #ecece7;
+}
+
+.result-row {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #ecece7;
+  background: transparent;
+  padding: 14px 2px;
+  text-align: left;
+  display: grid;
+  gap: 3px;
+}
+
+.result-row:hover,
+.result-row:focus-visible {
+  background: #f6f8f3;
+  outline: none;
+}
+
+.result-main {
+  font-weight: 750;
+}
+
+.result-scientific,
+.result-family {
+  color: #646b60;
+  font-size: 0.88rem;
+}
+
+.result-family {
+  font-size: 0.78rem;
+}
+
+.empty-state {
+  color: #73796e;
+  line-height: 1.45;
+  margin: 14px 0 4px;
+}
+
+.warning {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: #fff3d8;
+  border: 1px solid #eed69c;
+  color: #604c1d;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.taxon-card .scientific-name {
+  margin-bottom: 5px;
+  color: #495046;
+  font-size: 1.08rem;
+}
+
+.taxon-meta {
+  color: #73796e;
+  font-size: 0.82rem;
+}
+
+.divider {
+  height: 1px;
+  background: #e5e6df;
+  margin: 18px 0;
+}
+
+.status-list {
+  margin: 0;
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid #ecece7;
+}
+
+.status-row dt {
+  color: #535a50;
+}
+
+.status-row dd {
+  margin: 0;
+  font-weight: 800;
+  text-align: right;
+}
+
+.sources-details {
+  margin-top: 20px;
+  border-top: 1px solid #e5e6df;
+  padding-top: 14px;
+}
+
+.sources-details summary {
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.source-row {
+  margin-top: 12px;
+  padding: 11px;
+  background: #f7f8f4;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.84rem;
+}
+
+.source-row span {
+  color: #666d62;
+}
+
+@media (max-width: 430px) {
+  .shell {
+    width: min(100% - 16px, 680px);
+    padding-top: 10px;
+  }
+
+  .panel {
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .realm-card {
+    min-height: 118px;
+  }
+}
