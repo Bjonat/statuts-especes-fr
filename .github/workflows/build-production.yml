@@ -2,6 +2,14 @@ name: Build production bundle
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-production.yml'
+      - 'src/**'
+      - 'data-pipeline/**'
+      - 'vite.config.ts'
+      - 'package.json'
 
 jobs:
   build-production:
@@ -76,9 +84,10 @@ jobs:
         run: |
           node - <<'NODE'
           const fs = require('fs')
+          const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'))
           const manifest = JSON.parse(fs.readFileSync('public/data/manifest.json', 'utf8'))
           const metadata = {
-            applicationVersion: process.env.npm_package_version ?? '0.1.0',
+            applicationVersion: packageJson.version,
             repositorySha: process.env.GITHUB_SHA,
             builtAt: new Date().toISOString(),
             datasetVersion: manifest.datasetVersion,
