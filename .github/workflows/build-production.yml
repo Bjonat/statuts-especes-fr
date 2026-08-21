@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/build-production.yml'
       - 'index.html'
+      - 'public/**'
       - 'src/**'
       - 'data-pipeline/**'
       - 'vite.config.ts'
@@ -107,6 +108,7 @@ jobs:
           test -f dist/index.html
           test -f dist/manifest.webmanifest
           test -f dist/sw.js
+          test -f dist/icon.svg
           test -f dist/data/manifest.json
           test -f dist/build-info.json
           node - <<'NODE'
@@ -123,6 +125,10 @@ jobs:
           if (webManifest.start_url !== './' || webManifest.scope !== './') {
             throw new Error(`PWA non portable: start_url=${webManifest.start_url}, scope=${webManifest.scope}`)
           }
+          const iconSizes = new Set((webManifest.icons ?? []).map((icon) => icon.sizes))
+          if (!iconSizes.has('192x192') || !iconSizes.has('512x512')) {
+            throw new Error('Le manifeste PWA doit déclarer des icônes 192x192 et 512x512 pour l’installation')
+          }
 
           const registrationFiles = ['dist/index.html', 'dist/registerSW.js'].filter((file) => fs.existsSync(file))
           for (const file of registrationFiles) {
@@ -132,7 +138,7 @@ jobs:
             }
           }
 
-          console.log(`Bundle FTP portable : ${dataManifest.regions.length} régions, dataset ${dataManifest.datasetVersion}`)
+          console.log(`Bundle FTP installable : ${dataManifest.regions.length} régions, dataset ${dataManifest.datasetVersion}`)
           NODE
           du -sh dist
 
