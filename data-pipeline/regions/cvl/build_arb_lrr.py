@@ -34,6 +34,9 @@ SOURCES = {
         "version": "2022",
         "publicationYear": 2022,
         "minimumRows": 60,
+        "expectedRows": 68,
+        "expectedCategories": {"RE": 2, "CR": 4, "CR*": 1, "EN": 6, "VU": 6, "NT": 6, "LC": 41, "NA": 2},
+        "taxrefOrder": "Odonata",
         "producer": "Observatoire régional de la biodiversité / ARB Centre-Val de Loire / CSRPN Centre-Val de Loire",
     },
     "papillons": {
@@ -41,7 +44,11 @@ SOURCES = {
         "name": "Liste rouge des Papillons de jour et Zygènes Centre-Val de Loire",
         "version": "2024",
         "publicationYear": 2024,
-        "minimumRows": 130,
+        "minimumRows": 140,
+        "expectedRows": 147,
+        "expectedCategories": {"RE": 13, "CR": 12, "CR*": 3, "EN": 18, "VU": 11, "NT": 16, "LC": 60, "DD": 5, "NA": 6, "NE": 3},
+        "taxrefOrder": "Lepidoptera",
+        "textMode": "raw",
         "producer": "Observatoire régional de la biodiversité / ARB Centre-Val de Loire / CSRPN Centre-Val de Loire",
     },
     "coleopteres": {
@@ -52,6 +59,7 @@ SOURCES = {
         "minimumRows": 47,
         "expectedRows": 47,
         "expectedCategories": {"RE": 15, "CR": 7, "EN": 4, "VU": 1, "NT": 4, "LC": 14, "DD": 2},
+        "taxrefOrder": "Coleoptera",
         "producer": "Laboratoire d'Éco-entomologie / DREAL Centre-Val de Loire / CSRPN Centre-Val de Loire",
     },
 }
@@ -86,6 +94,7 @@ def taxref_lookup(path: Path):
     accepted: defaultdict[str, set[int]] = defaultdict(set)
     exact: defaultdict[str, set[int]] = defaultdict(set)
     bare: defaultdict[str, set[int]] = defaultdict(set)
+    order_by_ref: dict[int, str] = {}
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
         for row in reader:
@@ -95,6 +104,9 @@ def taxref_lookup(path: Path):
             if not cd_ref_raw.isdigit():
                 continue
             cd_ref = int(cd_ref_raw)
+            order = header_value(row, "ORDRE")
+            if order:
+                order_by_ref[cd_ref] = order
             cd_nom_raw = header_value(row, "CD_NOM")
             is_accepted = cd_nom_raw.isdigit() and int(cd_nom_raw) == cd_ref
             for field in ("LB_NOM", "NOM_COMPLET", "NOM_VALIDE"):
@@ -108,7 +120,7 @@ def taxref_lookup(path: Path):
             lb_nom = header_value(row, "LB_NOM")
             if lb_nom:
                 bare[core_name(lb_nom)].add(cd_ref)
-    return accepted, exact, bare
+    return accepted, exact, bare, order_by_ref
 
 
 def resolve_taxon(name: str, accepted, exact, bare):
@@ -134,10 +146,12 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def pdf_text(path: Path) -> str:
+def pdf_text(path: Path, mode: str = "layout") -> str:
+    if mode not in {"layout", "raw"}:
+        raise ValueError(f"mode pdftotext inconnu: {mode}")
     try:
         result = subprocess.run(
-            ["pdftotext", "-layout", str(path), "-"],
+            ["pdftotext", f"-{mode}", str(path), "-"],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -198,13 +212,41 @@ def parse_beetle_rows(text: str):
     return rows, []
 
 
-def build_one(kind: str, pdf_path: Path, accepted, exact, bare, checked_at: str):
+def filter_expected_order(rows, expected_order: str | None, accepted, exact, bare, order_by_ref):
+    if not expected_order:
+        return rows, []
+    kept = []
+    excluded = []
+    for name, category in rows:
+        cd_ref, _ = resolve_taxon(name, accepted, exact, bare)
+        if cd_ref is not None and normalize(order_by_ref.get(cd_ref)) != normalize(expected_order):
+            excluded.append({
+                "taxon": name,
+                "category": category,
+                "cdRef": cd_ref,
+                "taxrefOrder": order_by_ref.get(cd_ref),
+            })
+            continue
+        kept.append((name, category))
+    return kept, excluded
+
+
+def build_one(kind: str, pdf_path: Path, accepted, exact, bare, order_by_ref, checked_at: str):
     metadata = SOURCES[kind]
-    text = pdf_text(pdf_path)
+    text = pdf_text(pdf_path, metadata.get("textMode", "layout"))
     if kind == "coleopteres":
         rows, suspicious = parse_beetle_rows(text)
     else:
         rows, suspicious = parse_grouped_rows(text)
+
+    rows, excluded_wrong_order = filter_expected_order(
+        rows,
+        metadata.get("taxrefOrder"),
+        accepted,
+        exact,
+        bare,
+        order_by_ref,
+    )
 
     if len(rows) < metadata["minimumRows"]:
         raise RuntimeError(
@@ -220,6 +262,7 @@ def build_one(kind: str, pdf_path: Path, accepted, exact, bare, checked_at: str)
         "core": 0,
         "unmatched": 0,
         "ambiguous": 0,
+        "excludedWrongOrder": len(excluded_wrong_order),
         "categories": {},
     }
     unresolved = []
@@ -252,6 +295,7 @@ def build_one(kind: str, pdf_path: Path, accepted, exact, bare, checked_at: str)
     stats["matchRate"] = round(match_rate, 6)
     stats["categories"] = dict(sorted(categories.items()))
     stats["unresolvedSample"] = unresolved[:50]
+    stats["excludedWrongOrderSample"] = excluded_wrong_order[:20]
     stats["suspiciousUnparsedLines"] = suspicious
 
     if "expectedRows" in metadata and len(rows) != metadata["expectedRows"]:
@@ -299,7 +343,7 @@ def main():
     parser.add_argument("--min-match-rate", type=float, default=0.97)
     args = parser.parse_args()
 
-    accepted, exact, bare = taxref_lookup(Path(args.taxref))
+    accepted, exact, bare, order_by_ref = taxref_lookup(Path(args.taxref))
     output_dir = Path(args.out_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -310,7 +354,7 @@ def main():
     }
     total = 0
     for kind, pdf_path in inputs.items():
-        package = build_one(kind, pdf_path, accepted, exact, bare, args.checked_at)
+        package = build_one(kind, pdf_path, accepted, exact, bare, order_by_ref, args.checked_at)
         diagnostics = package["diagnostics"]
         print(json.dumps({"source": package["source"]["id"], **diagnostics}, ensure_ascii=False, indent=2))
         if diagnostics["matchRate"] < args.min_match_rate:
