@@ -1,0 +1,71 @@
+name: Data source smoke test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-official-catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 \
+            https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip \
+            -o "$RUNNER_TEMP/taxref.zip" \
+          || curl --fail --location --retry 3 \
+            https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip \
+            -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download BDC Statuts v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bdc"
+          curl --fail --location --retry 3 \
+            https://assets.patrinat.fr/files/referentiel/BDC.zip \
+            -o "$RUNNER_TEMP/bdc.zip" \
+          || curl --fail --location --retry 3 \
+            https://geonature.fr/data/inpn/taxonomie/BDC-STATUTS-v18.zip \
+            -o "$RUNNER_TEMP/bdc.zip"
+          unzip -q "$RUNNER_TEMP/bdc.zip" -d "$RUNNER_TEMP/bdc"
+
+          BDC_FILE=''
+          while IFS= read -r candidate; do
+            header="$(head -n 1 "$candidate" | tr '[:upper:]' '[:lower:]')"
+            if grep -q 'cd_ref' <<< "$header" && grep -q 'cd_type_statut' <<< "$header"; then
+              BDC_FILE="$candidate"
+              break
+            fi
+          done < <(find "$RUNNER_TEMP/bdc" -type f -iname '*.csv')
+
+          test -n "$BDC_FILE"
+          echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
+
+      - name: Run pipeline tests
+        run: node --test data-pipeline/*.test.mjs
+
+      - name: Build official catalog
+        run: node data-pipeline/build.mjs --taxref "$TAXREF_FILE" --bdc "$BDC_FILE" --out public/data
+
+      - name: Validate generated manifest
+        run: |
+          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('public/data/manifest.json','utf8')); if(m.taxrefVersion!=='18'||m.bdcVersion!=='18'||!m.catalogFile) process.exit(1); console.log(m)"
+          du -h public/data/*
+
+      - name: Upload generated dataset
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-dataset-v18
+          path: public/data/
+          if-no-files-found: error
+          retention-days: 7
