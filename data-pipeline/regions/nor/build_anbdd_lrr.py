@@ -14,6 +14,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 REALM_BY_KINGDOM = {"animalia": "fauna", "plantae": "flora"}
+VALID_LRR_CATEGORY = re.compile(r"^(?:EX|EW|RE|CR\*?|EN|VU|NT|LC|DD|NE|NA[A-Z]?)$")
 
 SOURCES = [
     {
@@ -154,7 +155,7 @@ def read_source_rows(path: Path, source):
         rows = []
         for values in sheet.iter_rows(min_row=header_row + 1, values_only=True):
             category = str(values[category_index] or "").strip().upper()
-            if not category:
+            if not VALID_LRR_CATEGORY.fullmatch(category):
                 continue
             code = as_int(values[code_index])
             name = str(values[name_index] or "").strip() if name_index is not None else ""
