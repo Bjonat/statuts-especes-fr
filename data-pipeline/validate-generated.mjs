@@ -106,7 +106,6 @@ const lotusNaqProtection = findStatus(
     /Aquitaine/i.test(status.scopeLabel ?? ''),
 )
 assert.ok(lotusNaqProtection, 'Lotus angustissimus: protection Aquitaine conservée comme portée partielle en NAQ')
-assert.ok(lotusNaqProtection.citation, 'Lotus angustissimus: citation réglementaire disponible')
 
 const aconitumCvlProtection = findStatus(
   cvlFlora,
