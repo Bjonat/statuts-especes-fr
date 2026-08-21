@@ -1,10 +1,82 @@
 export const REGIONS = [
   {
+    code: 'ARA',
+    name: 'Auvergne-Rhône-Alpes',
+    inseeCode: '84',
+    departments: ['01', '03', '07', '15', '26', '38', '42', '43', '63', '69', '73', '74'],
+    legacyRegions: [
+      { code: '83', name: 'Auvergne', coversWholeRegion: false },
+      { code: '82', name: 'Rhône-Alpes', coversWholeRegion: false },
+    ],
+  },
+  {
+    code: 'BFC',
+    name: 'Bourgogne-Franche-Comté',
+    inseeCode: '27',
+    departments: ['21', '25', '39', '58', '70', '71', '89', '90'],
+    legacyRegions: [
+      { code: '26', name: 'Bourgogne', coversWholeRegion: false },
+      { code: '43', name: 'Franche-Comté', coversWholeRegion: false },
+    ],
+  },
+  {
+    code: 'BRE',
+    name: 'Bretagne',
+    inseeCode: '53',
+    departments: ['22', '29', '35', '56'],
+    legacyRegions: [{ code: '53', name: 'Bretagne', coversWholeRegion: true }],
+  },
+  {
     code: 'CVL',
     name: 'Centre-Val de Loire',
     inseeCode: '24',
     departments: ['18', '28', '36', '37', '41', '45'],
     legacyRegions: [{ code: '24', name: 'Centre', coversWholeRegion: true }],
+  },
+  {
+    code: 'COR',
+    name: 'Corse',
+    inseeCode: '94',
+    departments: ['2A', '2B'],
+    legacyRegions: [{ code: '94', name: 'Corse', coversWholeRegion: true }],
+  },
+  {
+    code: 'GES',
+    name: 'Grand Est',
+    inseeCode: '44',
+    departments: ['08', '10', '51', '52', '54', '55', '57', '67', '68', '88'],
+    legacyRegions: [
+      { code: '21', name: 'Champagne-Ardenne', coversWholeRegion: false },
+      { code: '41', name: 'Lorraine', coversWholeRegion: false },
+      { code: '42', name: 'Alsace', coversWholeRegion: false },
+    ],
+  },
+  {
+    code: 'HDF',
+    name: 'Hauts-de-France',
+    inseeCode: '32',
+    departments: ['02', '59', '60', '62', '80'],
+    legacyRegions: [
+      { code: '31', name: 'Nord-Pas-de-Calais', coversWholeRegion: false },
+      { code: '22', name: 'Picardie', coversWholeRegion: false },
+    ],
+  },
+  {
+    code: 'IDF',
+    name: 'Île-de-France',
+    inseeCode: '11',
+    departments: ['75', '77', '78', '91', '92', '93', '94', '95'],
+    legacyRegions: [{ code: '11', name: 'Île-de-France', coversWholeRegion: true }],
+  },
+  {
+    code: 'NOR',
+    name: 'Normandie',
+    inseeCode: '28',
+    departments: ['14', '27', '50', '61', '76'],
+    legacyRegions: [
+      { code: '25', name: 'Basse-Normandie', coversWholeRegion: false },
+      { code: '23', name: 'Haute-Normandie', coversWholeRegion: false },
+    ],
   },
   {
     code: 'NAQ',
@@ -26,6 +98,20 @@ export const REGIONS = [
       { code: '73', name: 'Midi-Pyrénées', coversWholeRegion: false },
       { code: '91', name: 'Languedoc-Roussillon', coversWholeRegion: false },
     ],
+  },
+  {
+    code: 'PDL',
+    name: 'Pays de la Loire',
+    inseeCode: '52',
+    departments: ['44', '49', '53', '72', '85'],
+    legacyRegions: [{ code: '52', name: 'Pays de la Loire', coversWholeRegion: true }],
+  },
+  {
+    code: 'PAC',
+    name: "Provence-Alpes-Côte d'Azur",
+    inseeCode: '93',
+    departments: ['04', '05', '06', '13', '83', '84'],
+    legacyRegions: [{ code: '93', name: "Provence-Alpes-Côte d'Azur", coversWholeRegion: true }],
   },
 ]
 
