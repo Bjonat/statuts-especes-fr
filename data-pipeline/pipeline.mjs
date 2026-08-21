@@ -152,8 +152,7 @@ export function statusCategory(cdTypeStatut) {
 
 function statusValue(row) {
   const code = String(row.code_statut || '').trim()
-  const label = String(row.label_statut || '').trim()
-  if (code && label && code.toLowerCase() !== label.toLowerCase()) return `${code} — ${label}`
+  const label = String(row.label_statut || '').replace(/[—–]/g, '-').trim()
   return code || label || 'Oui'
 }
 
@@ -171,11 +170,9 @@ export async function buildStatuses(bdcPath, knownTaxa) {
       if (!scope) continue
 
       const category = statusCategory(row.cd_type_statut)
-      const label = String(row.lb_type_statut || row.regroupement_type || row.cd_type_statut || 'Statut').trim()
+      const label = String(row.lb_type_statut || row.regroupement_type || row.cd_type_statut || 'Statut').replace(/[—–]/g, '-').trim()
       const value = statusValue(row)
-      const citation = String(row.full_citation || '').trim() || undefined
-      const documentUrl = String(row.doc_url || '').trim() || undefined
-      const dedupeKey = [cdRef, region.code, category, label, value, row.cd_sig, row.cd_doc].join('|')
+      const dedupeKey = [cdRef, region.code, category, label, value, row.cd_sig].join('|')
       if (seen.has(dedupeKey)) continue
       seen.add(dedupeKey)
 
@@ -188,8 +185,6 @@ export async function buildStatuses(bdcPath, knownTaxa) {
         sourceId: 'bdc-v18',
         scope: scope.scope,
         scopeLabel: scope.scopeLabel,
-        citation,
-        documentUrl,
       })
     }
   }
