@@ -67,7 +67,20 @@ jobs:
 
       - name: Validate generated manifest
         run: |
-          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('public/data/manifest.json','utf8')); if(m.taxrefVersion!=='18'||m.bdcVersion!=='18'||!m.catalogFile) process.exit(1); console.log(m)"
+          node - <<'NODE'
+          const fs = require('fs')
+          const manifest = JSON.parse(fs.readFileSync('public/data/manifest.json', 'utf8'))
+          const regions = ['CVL', 'NAQ', 'OCC']
+          const realms = ['flora', 'fauna']
+          const valid = manifest.schemaVersion === 2
+            && manifest.official === true
+            && manifest.taxrefVersion === '18'
+            && manifest.bdcVersion === '18'
+            && realms.every((realm) => manifest.files?.taxa?.[realm]?.file)
+            && realms.every((realm) => regions.every((region) => manifest.files?.statuses?.[realm]?.[region]?.file))
+          if (!valid) process.exit(1)
+          console.log(manifest)
+          NODE
           du -h public/data/*
 
       - name: Upload generated dataset
