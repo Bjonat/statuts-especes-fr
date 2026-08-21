@@ -22,6 +22,22 @@ npm run data:build -- \
 
 Le manifeste `public/data/manifest.json` référence huit jeux versionnés : deux catalogues taxonomiques (Faune/Flore) et six jeux de statuts (Faune/Flore × CVL/NAQ/OCC).
 
+## Validation métier des jeux générés
+
+Les tests unitaires vérifient le parseur, les filtres taxonomiques et les règles territoriales. Après génération d'un jeu officiel, un second niveau contrôle des **cas sentinelles de terrain** :
+
+```bash
+node data-pipeline/validate-generated.mjs --dir public/data
+```
+
+Les sentinelles actuelles sont :
+
+- `Lotus angustissimus` (`CD_REF 106634`) : présence dans le catalogue, LRR Centre-Val de Loire = LC et protection de l'ancienne Aquitaine conservée comme portée partielle en Nouvelle-Aquitaine ;
+- `Aconitum napellus` s. l. (`CD_REF 80037`) : protection régionale Centre ;
+- `Alcedo atthis` (`CD_REF 3571`) : présence côté faune et protection nationale.
+
+`data-smoke.yml` exécute cette validation directement sur les archives officielles téléchargées au moment du run. Une évolution de TAXREF ou de la BDC ne peut donc pas être considérée compatible uniquement parce que le JSON se construit : les cas métier doivent continuer à produire les résultats attendus.
+
 ## Filtre taxonomique
 
 Le besoin métier est la recherche d'une espèce observée. Le pipeline conserve donc les rangs espèce/infraspécifiques utiles (`ES`, `SSES`, `VAR`, `SVAR`, `FO`, `CAR`, `RACE`, `AGES`) et retire genres, familles, ordres et autres rangs supraspécifiques du catalogue de recherche.
@@ -49,4 +65,14 @@ La BDC fournit notamment : listes rouges nationales/régionales, protections, d�
 
 Les indicateurs régionaux non homogènes — par exemple certaines classes de rareté ou de responsabilité — seront intégrés par des adaptateurs séparés uniquement lorsqu'une source institutionnelle actuelle et traçable est disponible.
 
-Le premier territoire complémentaire étudié est **Centre-Val de Loire** ; la DREAL publie notamment des listes rouges régionales et un tableur des espèces/habitats déterminants ZNIEFF actualisé en avril 2026.
+## Audit des sources régionales
+
+Le premier territoire complémentaire étudié est **Centre-Val de Loire**.
+
+Voir [`../docs/data-sources-cvl.md`](../docs/data-sources-cvl.md) pour l'audit détaillé :
+
+- liste DREAL des espèces/habitats déterminants ZNIEFF actualisée le 02/04/2026 ;
+- millésimes réels des listes rouges par groupe ;
+- catalogue de rareté CBNBP de 2016 identifié comme trop ancien pour être présenté comme une donnée « à jour » sans avertissement explicite.
+
+La prochaine ingestion régionale prioritaire est la liste ZNIEFF DREAL 2026.
