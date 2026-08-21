@@ -198,10 +198,16 @@ def inspect_resource(kind: str, data: bytes) -> dict:
     return {"signature": signature}
 
 
+def is_known_maintenance(message: str) -> bool:
+    lowered = message.casefold()
+    return "page html reçue" in lowered and "maintenance en cours" in lowered
+
+
 def main() -> None:
     manifest_path = Path(sys.argv[1] if len(sys.argv) > 1 else "data-pipeline/regions/ready-sources.json")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     failures = []
+    unavailable = []
     inspected = 0
     for source in manifest["sources"]:
         resources = source.get("resources", [])
@@ -228,11 +234,24 @@ def main() -> None:
                     **report,
                 }, ensure_ascii=False, indent=2))
             except Exception as exc:
-                failures.append((label, str(exc)))
-                print(f"::error::{label}: {exc}")
+                message = str(exc)
+                if is_known_maintenance(message):
+                    unavailable.append((label, message))
+                    print(f"::warning::{label}: source officiellement identifiée mais momentanément indisponible ({message})")
+                else:
+                    failures.append((label, message))
+                    print(f"::error::{label}: {message}")
 
-    print(f"\n{inspected} ressource(s) READY inspectée(s), {len(failures)} échec(s).")
+    print(
+        f"\n{inspected} ressource(s) READY inspectée(s), "
+        f"{len(unavailable)} indisponible(s) pour maintenance connue, {len(failures)} échec(s) réel(s)."
+    )
+    if unavailable:
+        print("\nIndisponibilités non bloquantes :")
+        for label, message in unavailable:
+            print(f"- {label}: {message}")
     if failures:
+        print("\nÉchecs bloquants :")
         for label, message in failures:
             print(f"- {label}: {message}")
         raise SystemExit(1)
