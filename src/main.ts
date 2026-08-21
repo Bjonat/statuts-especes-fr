@@ -3,8 +3,9 @@ import { DEMO_DATA_WARNING, regions, sources, statuses, taxa } from './demo'
 import { searchTaxa } from './search'
 import type { Realm, RegionCode, Taxon } from './types'
 
-const root = document.querySelector<HTMLDivElement>('#app')
-if (!root) throw new Error('Élément #app introuvable')
+const rootElement = document.querySelector<HTMLDivElement>('#app')
+if (!rootElement) throw new Error('Élément #app introuvable')
+const root: HTMLDivElement = rootElement
 
 const storedRegion = localStorage.getItem('region')
 const defaultRegion = regions.some((region) => region.code === storedRegion) ? (storedRegion as RegionCode) : 'CVL'
