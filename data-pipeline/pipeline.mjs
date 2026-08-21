@@ -129,10 +129,10 @@ export function statusCategory(cdTypeStatut) {
   const code = String(cdTypeStatut ?? '').trim().toUpperCase()
   if (code === 'LRN') return 'red_list_national'
   if (code === 'LRR') return 'red_list_regional'
+  if (code.startsWith('PNA')) return 'pna'
   if (code === 'PN' || code.startsWith('PN')) return 'protection_national'
   if (code === 'PR' || code.startsWith('PR')) return 'protection_regional'
   if (code.includes('ZDET') || code.includes('ZNIEFF')) return 'znieff'
-  if (code.startsWith('PNA')) return 'pna'
   return 'other'
 }
 
