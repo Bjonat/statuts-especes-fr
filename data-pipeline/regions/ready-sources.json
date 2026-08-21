@@ -40,15 +40,25 @@
       "categories": ["znieff"],
       "realms": ["flora", "fauna"],
       "landingPage": "https://data.bretagne-environnement.fr/datasets/especes-determinantes-pour-les-znieff-en-bretagne",
-      "resourceDiscovery": "data.gouv.fr resource CSV"
+      "resources": [
+        {
+          "kind": "csv",
+          "url": "https://www.data.gouv.fr/api/1/datasets/r/4ada0b2b-d56e-44a9-8532-9ca2335c625b"
+        }
+      ]
     },
     {
       "id": "oeb-bretagne-lrr",
       "region": "BRE",
       "categories": ["red_list_regional"],
       "realms": ["flora", "fauna"],
-      "landingPage": "https://bretagne-environnement.fr/thematique/patrimoine-naturel/article/indicateurs-risque-regional-disparition-especes-bretonnes",
-      "resourceDiscovery": "OEB open-data dataset"
+      "landingPage": "https://data.bretagne-environnement.fr/datasets/especes-en-listes-rouges-regionales-pour-la-bretagne",
+      "resources": [
+        {
+          "kind": "csv",
+          "url": "https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96"
+        }
+      ]
     },
     {
       "id": "dreal-cvl-lrr",
