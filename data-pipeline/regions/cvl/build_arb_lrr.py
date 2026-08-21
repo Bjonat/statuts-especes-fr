@@ -16,6 +16,9 @@ UICN = r"(?:RE|CR\*?|EN|VU|NT|LC|DD|NA|NE)"
 SCIENTIFIC_ROW = re.compile(
     rf"(?P<name>[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+(?:\s+[a-zà-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+){{1,3}})\s+(?P<category>{UICN})(?=\s|$)"
 )
+BEETLE_ROW = re.compile(
+    rf"^\s*(?P<name>[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+\s+[a-zà-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+)\s+.+\s+(?P<category>RE|CR|EN|VU|NT|LC|DD)\s*$"
+)
 BINOMIAL = re.compile(
     r"[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+(?:\s+[a-zà-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+){1,3}"
 )
@@ -31,6 +34,7 @@ SOURCES = {
         "version": "2022",
         "publicationYear": 2022,
         "minimumRows": 60,
+        "producer": "Observatoire régional de la biodiversité / ARB Centre-Val de Loire / CSRPN Centre-Val de Loire",
     },
     "papillons": {
         "id": "arb-cvl-lrr-papillons-2024",
@@ -38,6 +42,17 @@ SOURCES = {
         "version": "2024",
         "publicationYear": 2024,
         "minimumRows": 130,
+        "producer": "Observatoire régional de la biodiversité / ARB Centre-Val de Loire / CSRPN Centre-Val de Loire",
+    },
+    "coleopteres": {
+        "id": "ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025",
+        "name": "Liste rouge des Coléoptères aquatiques Centre-Val de Loire",
+        "version": "2025",
+        "publicationYear": 2025,
+        "minimumRows": 47,
+        "expectedRows": 47,
+        "expectedCategories": {"RE": 15, "CR": 7, "EN": 4, "VU": 1, "NT": 4, "LC": 14, "DD": 2},
+        "producer": "Laboratoire d'Éco-entomologie / DREAL Centre-Val de Loire / CSRPN Centre-Val de Loire",
     },
 }
 
@@ -146,7 +161,7 @@ def table_section(text: str) -> str:
     return text[index:]
 
 
-def parse_rows(text: str):
+def parse_grouped_rows(text: str):
     rows = []
     seen = set()
     suspicious = []
@@ -166,9 +181,31 @@ def parse_rows(text: str):
     return rows, suspicious[:50]
 
 
+def parse_beetle_rows(text: str):
+    rows = []
+    seen = set()
+    for raw_line in text.splitlines():
+        match = BEETLE_ROW.match(raw_line)
+        if not match:
+            continue
+        name = re.sub(r"\s+", " ", match.group("name")).strip()
+        category = match.group("category")
+        key = (normalize(name), category)
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append((name, category))
+    return rows, []
+
+
 def build_one(kind: str, pdf_path: Path, accepted, exact, bare, checked_at: str):
     metadata = SOURCES[kind]
-    rows, suspicious = parse_rows(pdf_text(pdf_path))
+    text = pdf_text(pdf_path)
+    if kind == "coleopteres":
+        rows, suspicious = parse_beetle_rows(text)
+    else:
+        rows, suspicious = parse_grouped_rows(text)
+
     if len(rows) < metadata["minimumRows"]:
         raise RuntimeError(
             f"{kind}: seulement {len(rows)} lignes UICN extraites; minimum attendu {metadata['minimumRows']}"
@@ -217,13 +254,20 @@ def build_one(kind: str, pdf_path: Path, accepted, exact, bare, checked_at: str)
     stats["unresolvedSample"] = unresolved[:50]
     stats["suspiciousUnparsedLines"] = suspicious
 
+    if "expectedRows" in metadata and len(rows) != metadata["expectedRows"]:
+        raise RuntimeError(f"{kind}: {len(rows)} lignes extraites au lieu de {metadata['expectedRows']}")
+    if "expectedCategories" in metadata and stats["categories"] != metadata["expectedCategories"]:
+        raise RuntimeError(
+            f"{kind}: distribution UICN inattendue: {stats['categories']} != {metadata['expectedCategories']}"
+        )
+
     covered_refs = sorted({status["cdRef"] for status in statuses})
     package = {
         "schemaVersion": 1,
         "source": {
             "id": metadata["id"],
             "name": metadata["name"],
-            "producer": "Observatoire régional de la biodiversité / ARB Centre-Val de Loire / CSRPN Centre-Val de Loire",
+            "producer": metadata["producer"],
             "version": metadata["version"],
             "publicationYear": metadata["publicationYear"],
             "official": True,
@@ -249,6 +293,7 @@ def main():
     parser.add_argument("--taxref", required=True)
     parser.add_argument("--odonates", required=True)
     parser.add_argument("--papillons", required=True)
+    parser.add_argument("--coleopteres", required=True)
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--checked-at", default=date.today().isoformat())
     parser.add_argument("--min-match-rate", type=float, default=0.97)
@@ -261,6 +306,7 @@ def main():
     inputs = {
         "odonates": Path(args.odonates),
         "papillons": Path(args.papillons),
+        "coleopteres": Path(args.coleopteres),
     }
     total = 0
     for kind, pdf_path in inputs.items():
