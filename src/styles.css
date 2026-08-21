@@ -6,9 +6,7 @@
   text-rendering: optimizeLegibility;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
@@ -17,20 +15,9 @@ body {
   background: #f6f6f1;
 }
 
-button,
-input,
-select {
-  font: inherit;
-}
-
-button,
-select {
-  cursor: pointer;
-}
-
-a {
-  color: #405b37;
-}
+button, input, select { font: inherit; }
+button, select { cursor: pointer; }
+a { color: #405b37; }
 
 .shell {
   width: min(100% - 24px, 680px);
@@ -45,20 +32,14 @@ a {
 }
 
 .panel {
-  background: #ffffff;
+  background: #fff;
   border: 1px solid #dedfd8;
   border-radius: 18px;
   padding: 20px;
   box-shadow: 0 8px 26px rgba(30, 35, 28, 0.05);
 }
 
-.hero {
-  text-align: center;
-}
-
-.home-status {
-  margin-top: 16px;
-}
+.hero { text-align: center; }
 
 .eyebrow {
   margin: 0 0 8px;
@@ -69,21 +50,18 @@ a {
   color: #687064;
 }
 
-h1,
-h2,
-p {
-  margin-top: 0;
-}
+h1, h2, p { margin-top: 0; }
 
 h1 {
   margin-bottom: 10px;
   font-size: clamp(1.8rem, 8vw, 2.6rem);
   line-height: 1.08;
+  overflow-wrap: anywhere;
 }
 
 h2 {
-  font-size: 1.05rem;
-  margin-bottom: 10px;
+  font-size: 1.08rem;
+  margin-bottom: 8px;
 }
 
 .intro {
@@ -118,8 +96,15 @@ h2 {
   outline-offset: 2px;
 }
 
-.realm-icon {
-  font-size: 2rem;
+.realm-icon { font-size: 2rem; }
+
+.home-actions {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .topbar {
@@ -131,30 +116,79 @@ h2 {
   gap: 12px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
 .link-button {
   border: 0;
   background: transparent;
   padding: 10px 0;
   color: #34422f;
   font-weight: 700;
+  white-space: nowrap;
 }
 
-.primary-button {
-  min-height: 46px;
+.primary-button,
+.install-button {
+  min-height: 42px;
   border: 1px solid #516849;
   border-radius: 11px;
-  padding: 10px 16px;
+  padding: 9px 14px;
   background: #566f4e;
   color: #fff;
   font-weight: 750;
 }
 
+.install-button {
+  min-height: 34px;
+  padding: 6px 11px;
+  font-size: 0.8rem;
+}
+
+.install-button:hover,
+.install-button:focus-visible,
+.primary-button:hover,
+.primary-button:focus-visible {
+  outline: 3px solid #c9d6be;
+  outline-offset: 2px;
+}
+
 .offline-badge {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: #566151;
   background: #e9eee4;
   border-radius: 999px;
   padding: 6px 9px;
+  white-space: nowrap;
+}
+
+.install-help {
+  margin: 0 0 12px;
+  padding: 11px 12px;
+  border: 1px solid #cbd6c3;
+  border-radius: 12px;
+  background: #f0f5ec;
+  color: #394334;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.install-help-close {
+  border: 0;
+  background: transparent;
+  color: #405b37;
+  padding: 0;
+  font-weight: 750;
   white-space: nowrap;
 }
 
@@ -171,9 +205,7 @@ h2 {
   font-weight: 750;
 }
 
-.field-label--spaced {
-  margin-top: 18px;
-}
+.field-label--spaced { margin-top: 18px; }
 
 .field-control {
   width: 100%;
@@ -190,9 +222,7 @@ h2 {
   border-color: #6d8064;
 }
 
-.search-input {
-  font-size: 1.05rem;
-}
+.search-input { font-size: 1.05rem; }
 
 .field-hint {
   margin: 7px 0 0;
@@ -222,9 +252,7 @@ h2 {
   outline: none;
 }
 
-.result-main {
-  font-weight: 750;
-}
+.result-main { font-weight: 750; }
 
 .result-scientific,
 .result-family {
@@ -232,9 +260,7 @@ h2 {
   font-size: 0.88rem;
 }
 
-.result-family {
-  font-size: 0.78rem;
-}
+.result-family { font-size: 0.78rem; }
 
 .empty-state {
   color: #73796e;
@@ -260,6 +286,7 @@ h2 {
 }
 
 .taxon-meta {
+  margin-bottom: 0;
   color: #73796e;
   font-size: 0.82rem;
 }
@@ -267,24 +294,28 @@ h2 {
 .divider {
   height: 1px;
   background: #e5e6df;
-  margin: 18px 0;
+  margin: 18px 0 20px;
 }
 
 .status-list {
   margin: 0;
+  border-top: 1px solid #ecece7;
 }
 
 .status-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px 12px;
-  align-items: center;
-  padding: 11px 0;
+  grid-template-columns: minmax(0, 1fr) minmax(70px, auto);
+  gap: 8px 20px;
+  align-items: start;
+  padding: 13px 0;
   border-bottom: 1px solid #ecece7;
 }
 
 .status-row dt {
+  min-width: 0;
   color: #535a50;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .status-row dt small {
@@ -297,48 +328,41 @@ h2 {
 }
 
 .status-row dd {
+  min-width: 0;
   margin: 0;
   font-weight: 800;
   text-align: right;
-}
-
-.status-source {
-  grid-column: 1 / -1;
-  margin: 0;
-  color: #747a70;
-  font-size: 0.76rem;
   line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-.sources-details {
-  margin-top: 20px;
-  border-top: 1px solid #e5e6df;
+.source-summary {
+  margin: 18px 0 0;
   padding-top: 14px;
+  border-top: 1px solid #e5e6df;
+  color: #6a7166;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
-.sources-details summary {
-  font-weight: 750;
-  cursor: pointer;
-}
+@media (max-width: 520px) {
+  .topbar { align-items: flex-start; }
 
-.source-row {
-  margin-top: 12px;
-  padding: 11px;
-  background: #f7f8f4;
-  border-radius: 10px;
-  display: grid;
-  gap: 4px;
-  font-size: 0.84rem;
-}
+  .topbar-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
 
-.source-row span {
-  color: #666d62;
-}
+  .status-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
 
-.source-row a,
-.status-source a {
-  font-weight: 700;
-  text-underline-offset: 2px;
+  .status-row dd {
+    text-align: left;
+    font-size: 1rem;
+  }
 }
 
 @media (max-width: 430px) {
@@ -352,7 +376,14 @@ h2 {
     padding: 16px;
   }
 
-  .realm-card {
-    min-height: 118px;
+  .realm-card { min-height: 118px; }
+
+  .offline-badge {
+    white-space: normal;
+    text-align: center;
+  }
+
+  .install-help {
+    flex-direction: column;
   }
 }
