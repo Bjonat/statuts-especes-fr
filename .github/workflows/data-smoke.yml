@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'data-pipeline/**'
+      - 'package.json'
       - '.github/workflows/data-smoke.yml'
 
 jobs:
@@ -14,6 +15,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Download TAXREF v18
         shell: bash
@@ -55,6 +64,19 @@ jobs:
 
           test -n "$BDC_FILE"
           echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
+
+      - name: Download ZNIEFF Centre-Val de Loire 2026
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://www.centre-val-de-loire.developpement-durable.gouv.fr/IMG/xls/listes_dz_cvl_actual_avril_2026.xls \
+            -o "$RUNNER_TEMP/znieff-cvl-2026.xls"
+          test -s "$RUNNER_TEMP/znieff-cvl-2026.xls"
+          echo "CVL_ZNIEFF_FILE=$RUNNER_TEMP/znieff-cvl-2026.xls" >> "$GITHUB_ENV"
+
+      - name: Inspect ZNIEFF Centre-Val de Loire 2026
+        run: node data-pipeline/regions/cvl/inspect-znieff.mjs "$CVL_ZNIEFF_FILE"
 
       - name: Diagnose official source volumes
         run: node data-pipeline/analyze.mjs --taxref "$TAXREF_FILE" --bdc "$BDC_FILE"
