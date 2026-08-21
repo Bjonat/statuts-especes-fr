@@ -38,7 +38,7 @@ npm test
 npm run build
 ```
 
-Tant qu'aucun catalogue officiel n'est généré dans `public/data`, l'application utilise des fixtures clairement marquées comme données de démonstration non utilisables pour une décision terrain.
+Tant qu'aucun jeu officiel n'est généré dans `public/data`, l'application utilise des fixtures clairement marquées comme données de démonstration non utilisables pour une décision terrain.
 
 ## Données officielles
 
@@ -47,34 +47,46 @@ Le pipeline utilise actuellement :
 - **TAXREF v18** — PatriNat / INPN ;
 - **Base de connaissance Statuts v18** — PatriNat / SINP.
 
-Les fichiers sources ne sont pas versionnés dans Git. Après téléchargement et extraction des archives officielles :
+Après téléchargement et extraction des archives officielles :
 
 ```bash
 npm run data:build -- \
   --taxref /chemin/TAXREFv18.txt \
-  --bdc /chemin/bdc_statuts_18.csv
+  --bdc /chemin/bdc_18_01.csv
 ```
 
-Le pipeline produit :
+Les fichiers sources bruts ne sont pas versionnés dans Git.
 
-- `public/data/manifest.json`, petit fichier vérifié au démarrage ;
-- `public/data/catalog-<hash>.json`, catalogue immuable contenant taxons, synonymes, statuts et provenance.
+Le pipeline produit un **manifeste léger** et des jeux immuables fractionnés :
 
-Le gros catalogue est mis en cache localement et n'est pas re-téléchargé tant que le manifeste ne référence pas une nouvelle version.
+```text
+public/data/
+├── manifest.json
+├── taxa-flora-<hash>.json
+├── taxa-fauna-<hash>.json
+├── statuses-flora-cvl-<hash>.json
+├── statuses-flora-naq-<hash>.json
+├── statuses-flora-occ-<hash>.json
+├── statuses-fauna-cvl-<hash>.json
+├── statuses-fauna-naq-<hash>.json
+└── statuses-fauna-occ-<hash>.json
+```
 
-Voir [`data-pipeline/README.md`](data-pipeline/README.md) pour les règles de normalisation et d'applicabilité territoriale.
+L'application ne charge en mémoire que le règne choisi et les statuts de la région sélectionnée. Lorsqu'une nouvelle version est disponible, les jeux sont mis en cache pour le mode hors ligne sans interrompre la recherche en cours.
 
 ## Architecture
 
 ```text
 TAXREF v18 ───────┐
-                  ├─ data-pipeline ─► catalogue versionné ─► PWA offline
+                  ├─ data-pipeline ─► manifeste + jeux fractionnés ─► PWA offline
 BDC Statuts v18 ──┤
                   │
 Référentiels ─────┘
 régionaux
 ```
 
-Le code applicatif et les données sont découplés. Les fichiers sources hétérogènes sont normalisés hors application ; le téléphone ne connaît qu'un format local stable.
+Le code applicatif et les données sont découplés. Pour le MVP métropolitain, le pipeline conserve les rangs espèce/infraspécifiques et élimine le bruit supraspécifique. Un taxon normalement exclu par son statut biogéographique est néanmoins conservé s'il possède un statut BDC applicable à l'une des régions supportées.
 
 Une attention particulière est portée aux anciennes régions : un statut applicable à l'ancienne Aquitaine n'est jamais affiché comme applicable à toute la Nouvelle-Aquitaine. Tant que la localisation n'est connue qu'au niveau régional, ces cas sont signalés comme **portée partielle**.
+
+Voir [`data-pipeline/README.md`](data-pipeline/README.md) pour les règles de normalisation et de validation des référentiels.
