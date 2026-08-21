@@ -14,6 +14,8 @@ export interface Taxon {
   vernacularNames: string[]
   synonyms: string[]
   family?: string
+  rank?: string
+  biogeographicStatus?: string
   sourceId?: string
 }
 
@@ -63,4 +65,24 @@ export interface Catalog {
   taxa: Taxon[]
   statuses: TaxonStatus[]
   sources: SourceDataset[]
+}
+
+export interface DatasetFile {
+  file: string
+  count: number
+}
+
+export interface DataManifest {
+  schemaVersion: 2
+  generatedAt: string
+  datasetVersion: string
+  official: true
+  taxrefVersion: string
+  bdcVersion: string
+  regions: Region[]
+  sources: SourceDataset[]
+  files: {
+    taxa: Record<Realm, DatasetFile>
+    statuses: Record<Realm, Record<RegionCode, DatasetFile>>
+  }
 }
