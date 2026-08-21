@@ -123,6 +123,22 @@ jobs:
           python data-pipeline/regions/inspect_workbook.py "$NAQ_ZNIEFF_FILE"
           python data-pipeline/regions/inspect_workbook.py "$NAQ_EEE_FILE"
 
+      - name: Download regional Bretagne sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://www.data.gouv.fr/api/1/datasets/r/4ada0b2b-d56e-44a9-8532-9ca2335c625b \
+            -o "$RUNNER_TEMP/bre-znieff.csv"
+          curl --fail --location --retry 3 \
+            https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96 \
+            -o "$RUNNER_TEMP/bre-lrr.csv"
+          grep -q 'CD_NOM' "$RUNNER_TEMP/bre-znieff.csv"
+          grep -q 'RESULTAT_EVALUATION' "$RUNNER_TEMP/bre-lrr.csv"
+          sha256sum "$RUNNER_TEMP/bre-znieff.csv" "$RUNNER_TEMP/bre-lrr.csv"
+          echo "BRE_ZNIEFF_FILE=$RUNNER_TEMP/bre-znieff.csv" >> "$GITHUB_ENV"
+          echo "BRE_LRR_FILE=$RUNNER_TEMP/bre-lrr.csv" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         shell: bash
         run: |
@@ -135,6 +151,12 @@ jobs:
               --workbook "$NAQ_ZNIEFF_FILE" \
               --out "$REGIONAL_DIR/naq-znieff-flora.json"
           fi
+          python data-pipeline/regions/bre/build_oeb.py \
+            --taxref "$TAXREF_FILE" \
+            --znieff "$BRE_ZNIEFF_FILE" \
+            --lrr "$BRE_LRR_FILE" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
           echo "REGIONAL_DIR=$REGIONAL_DIR" >> "$GITHUB_ENV"
 
       - name: Diagnose official source volumes
@@ -159,8 +181,14 @@ jobs:
             && manifest.files?.statusDefinitions?.file && realms.every((realm) => manifest.files?.taxa?.[realm]?.file)
             && realms.every((realm) => regions.every((region) => manifest.files?.statusLinks?.[realm]?.[region]?.file))
           if (!valid) process.exit(1)
-          if (process.env.NAQ_REGIONAL_AVAILABLE === 'true' && !manifest.sources.some((source) => source.id === 'obv-na-znieff-flore-2019-v1.2')) {
-            throw new Error('Source régionale ZNIEFF NAQ absente du manifeste enrichi')
+          const required = [
+            'oeb-bretagne-znieff-csv-2026-01-29',
+            'oeb-bretagne-lrr-csv-2026-01-29',
+          ]
+          if (process.env.NAQ_REGIONAL_AVAILABLE === 'true') required.push('obv-na-znieff-flore-2019-v1.2')
+          const ids = new Set(manifest.sources.map((source) => source.id))
+          for (const id of required) {
+            if (!ids.has(id)) throw new Error(`Source régionale absente du manifeste enrichi : ${id}`)
           }
           console.log(manifest)
           NODE
