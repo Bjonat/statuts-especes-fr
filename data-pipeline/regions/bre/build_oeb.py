@@ -141,6 +141,19 @@ def finalize_diagnostics(stats):
     return stats
 
 
+def targeted_replacements(statuses, category: str):
+    replacements = []
+    for realm in ("flora", "fauna"):
+        refs = sorted({status["cdRef"] for status in statuses if status.get("_realm") == realm})
+        if refs:
+            replacements.append({"region": "BRE", "category": category, "realm": realm, "cdRefs": refs})
+    return replacements
+
+
+def clean_statuses(statuses):
+    return [{key: value for key, value in status.items() if key != "_realm"} for status in statuses]
+
+
 def build_znieff(rows, by_cd_nom, accepted_names, csv_path: Path, checked_at: str):
     stats = diagnostics_template()
     statuses = []
@@ -190,11 +203,14 @@ def build_znieff(rows, by_cd_nom, accepted_names, csv_path: Path, checked_at: st
             "value": "Oui",
             "sourceId": "oeb-bretagne-znieff-csv-2026-01-29",
             "scope": "regional",
+            "_realm": realm,
         })
 
     finalize_diagnostics(stats)
     stats["years"] = sorted(years)
     stats["groups"] = sorted(groups)
+    replacements = targeted_replacements(statuses, "znieff")
+    public_statuses = clean_statuses(statuses)
     return {
         "schemaVersion": 1,
         "source": {
@@ -207,11 +223,8 @@ def build_znieff(rows, by_cd_nom, accepted_names, csv_path: Path, checked_at: st
             "checkedAt": checked_at,
             "sha256": sha256(csv_path),
         },
-        "replaces": [
-            {"region": "BRE", "category": "znieff", "realm": "flora"},
-            {"region": "BRE", "category": "znieff", "realm": "fauna"},
-        ],
-        "statuses": sorted(statuses, key=lambda status: (status["cdRef"], status["category"])),
+        "replaces": replacements,
+        "statuses": sorted(public_statuses, key=lambda status: (status["cdRef"], status["category"])),
         "diagnostics": stats,
     }
 
@@ -268,12 +281,15 @@ def build_lrr(rows, by_cd_nom, accepted_names, csv_path: Path, checked_at: str):
             "value": result,
             "sourceId": "oeb-bretagne-lrr-csv-2026-01-29",
             "scope": "regional",
+            "_realm": realm,
         })
 
     finalize_diagnostics(stats)
     stats["years"] = dict(sorted(years.items()))
     stats["groups"] = dict(sorted(groups.items()))
     stats["values"] = dict(sorted(values.items()))
+    replacements = targeted_replacements(statuses, "red_list_regional")
+    public_statuses = clean_statuses(statuses)
     return {
         "schemaVersion": 1,
         "source": {
@@ -286,11 +302,8 @@ def build_lrr(rows, by_cd_nom, accepted_names, csv_path: Path, checked_at: str):
             "checkedAt": checked_at,
             "sha256": sha256(csv_path),
         },
-        "replaces": [
-            {"region": "BRE", "category": "red_list_regional", "realm": "flora"},
-            {"region": "BRE", "category": "red_list_regional", "realm": "fauna"},
-        ],
-        "statuses": sorted(statuses, key=lambda status: (status["cdRef"], status["value"])),
+        "replaces": replacements,
+        "statuses": sorted(public_statuses, key=lambda status: (status["cdRef"], status["value"])),
         "diagnostics": stats,
     }
 
