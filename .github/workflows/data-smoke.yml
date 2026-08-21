@@ -21,8 +21,15 @@ jobs:
         with:
           node-version: 24
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          python -m pip install --disable-pip-version-check openpyxl xlrd
 
       - name: Download TAXREF v18
         shell: bash
@@ -65,32 +72,46 @@ jobs:
           test -n "$BDC_FILE"
           echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
 
-      - name: Download ZNIEFF Centre-Val de Loire for schema diagnostic
+      - name: Probe ZNIEFF Centre-Val de Loire 2026
         shell: bash
         run: |
           set -euo pipefail
-          TARGET="$RUNNER_TEMP/znieff-cvl.xls"
+          TARGET="$RUNNER_TEMP/znieff-cvl-2026.xls"
           curl --fail --location --retry 3 \
             https://www.centre-val-de-loire.developpement-durable.gouv.fr/IMG/xls/listes_dz_cvl_actual_avril_2026.xls \
             -o "$TARGET"
 
           if head -c 128 "$TARGET" | grep -Eqi '<!doctype html|<html'; then
-            echo '::warning::La DREAL renvoie actuellement une page de maintenance pour le XLS 2026. Utilisation du XLS 2025 uniquement pour diagnostiquer le schéma; aucune donnée 2025 ne sera publiée comme 2026.'
-            curl --fail --location --retry 3 \
-              https://www.centre-val-de-loire.developpement-durable.gouv.fr/IMG/xls/listes_dz_cvl_actual_fevrier_2025.xls \
-              -o "$TARGET"
-            echo 'CVL_ZNIEFF_DIAGNOSTIC_YEAR=2025' >> "$GITHUB_ENV"
+            echo 'CVL_ZNIEFF_AVAILABLE=false' >> "$GITHUB_ENV"
+            echo '::warning::Source ZNIEFF CVL 2026 momentanément indisponible (page de maintenance renvoyée). Enrichissement CVL non publié dans ce run.'
           else
-            echo 'CVL_ZNIEFF_DIAGNOSTIC_YEAR=2026' >> "$GITHUB_ENV"
+            echo 'CVL_ZNIEFF_AVAILABLE=true' >> "$GITHUB_ENV"
+            echo "CVL_ZNIEFF_FILE=$TARGET" >> "$GITHUB_ENV"
           fi
 
-          test -s "$TARGET"
-          echo "CVL_ZNIEFF_FILE=$TARGET" >> "$GITHUB_ENV"
+      - name: Inspect ZNIEFF Centre-Val de Loire 2026
+        if: env.CVL_ZNIEFF_AVAILABLE == 'true'
+        run: python data-pipeline/regions/inspect_workbook.py "$CVL_ZNIEFF_FILE"
 
-      - name: Inspect ZNIEFF Centre-Val de Loire workbook
+      - name: Download ZNIEFF Occitanie
+        shell: bash
         run: |
-          echo "Millésime utilisé pour le diagnostic de schéma: $CVL_ZNIEFF_DIAGNOSTIC_YEAR"
-          node data-pipeline/regions/cvl/inspect-znieff.mjs "$CVL_ZNIEFF_FILE"
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://www.occitanie.developpement-durable.gouv.fr/IMG/xlsx/liste_taxons_det_flore_occitanie_cotation_v13-v16_osmose_public.xlsx \
+            -o "$RUNNER_TEMP/znieff-occ-flore.xlsx"
+          curl --fail --location --retry 3 \
+            https://www.occitanie.developpement-durable.gouv.fr/IMG/xlsx/listes_faune_znieff_20240725.xlsx \
+            -o "$RUNNER_TEMP/znieff-occ-faune.xlsx"
+          test "$(head -c 2 "$RUNNER_TEMP/znieff-occ-flore.xlsx")" = 'PK'
+          test "$(head -c 2 "$RUNNER_TEMP/znieff-occ-faune.xlsx")" = 'PK'
+          echo "OCC_ZNIEFF_FLORA_FILE=$RUNNER_TEMP/znieff-occ-flore.xlsx" >> "$GITHUB_ENV"
+          echo "OCC_ZNIEFF_FAUNA_FILE=$RUNNER_TEMP/znieff-occ-faune.xlsx" >> "$GITHUB_ENV"
+
+      - name: Inspect ZNIEFF Occitanie
+        run: |
+          python data-pipeline/regions/inspect_workbook.py "$OCC_ZNIEFF_FLORA_FILE"
+          python data-pipeline/regions/inspect_workbook.py "$OCC_ZNIEFF_FAUNA_FILE"
 
       - name: Diagnose official source volumes
         run: node data-pipeline/analyze.mjs --taxref "$TAXREF_FILE" --bdc "$BDC_FILE"
