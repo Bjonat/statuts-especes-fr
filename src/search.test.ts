@@ -20,6 +20,11 @@ describe('searchTaxa', () => {
     expect(results[0]?.scientificName.startsWith('Quercus')).toBe(true)
   })
 
+  it('retrouve un taxon avec plusieurs fragments de mots', () => {
+    const results = searchTaxa(taxa, 'flora', 'lot ang')
+    expect(results[0]?.scientificName).toBe('Lotus angustissimus')
+  })
+
   it('tolère une petite faute de frappe', () => {
     const results = searchTaxa(taxa, 'flora', 'angustisimus')
     expect(results.some((taxon) => taxon.scientificName === 'Lotus angustissimus')).toBe(true)
