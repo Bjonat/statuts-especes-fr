@@ -74,6 +74,8 @@ public/data/
 
 L'application ne charge en mémoire que le règne choisi et les statuts de la région sélectionnée. Lorsqu'une nouvelle version est disponible, les jeux sont mis en cache pour le mode hors ligne sans interrompre la recherche en cours.
 
+Le workflow de données vérifie également des **cas sentinelles métier** sur les jeux officiels générés (notamment `Lotus angustissimus`, `Aconitum napellus` et `Alcedo atthis`).
+
 ## Architecture
 
 ```text
@@ -89,4 +91,7 @@ Le code applicatif et les données sont découplés. Pour le MVP métropolitain,
 
 Une attention particulière est portée aux anciennes régions : un statut applicable à l'ancienne Aquitaine n'est jamais affiché comme applicable à toute la Nouvelle-Aquitaine. Tant que la localisation n'est connue qu'au niveau régional, ces cas sont signalés comme **portée partielle**.
 
-Voir [`data-pipeline/README.md`](data-pipeline/README.md) pour les règles de normalisation et de validation des référentiels.
+## Documentation métier
+
+- [`data-pipeline/README.md`](data-pipeline/README.md) — règles de transformation et validation des référentiels ;
+- [`docs/data-sources-cvl.md`](docs/data-sources-cvl.md) — audit de fraîcheur et priorisation des sources Centre-Val de Loire.
