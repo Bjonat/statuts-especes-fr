@@ -1,0 +1,41 @@
+name: CVL butterflies PDF layout probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/cvl-papillons-layout-probe.yml'
+
+jobs:
+  inspect-layout:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PDF text extractor
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
+
+      - name: Download and print final table text
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            'https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/listes%20rouges/LRR-papillons_2024_vf-4.pdf' \
+            -o "$RUNNER_TEMP/papillons.pdf"
+          pdftotext -layout "$RUNNER_TEMP/papillons.pdf" "$RUNNER_TEMP/papillons.txt"
+          start="$(grep -n -i 'Liste par catégories de menace' "$RUNNER_TEMP/papillons.txt" | tail -n 1 | cut -d: -f1)"
+          test -n "$start"
+          end=$((start + 260))
+          echo "TABLE_LINES=$start-$end"
+          sed -n "${start},${end}p" "$RUNNER_TEMP/papillons.txt" | nl -ba
+
+      - name: Print every LC-like row in table
+        shell: bash
+        run: |
+          set -euo pipefail
+          start="$(grep -n -i 'Liste par catégories de menace' "$RUNNER_TEMP/papillons.txt" | tail -n 1 | cut -d: -f1)"
+          tail -n "+$start" "$RUNNER_TEMP/papillons.txt" | grep -n -E '(^|[[:space:]])LC([[:space:]]|$)' || true
