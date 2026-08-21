@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { resolveScope, REGIONS } from './regions.mjs'
-import { buildStatuses, buildTaxa, parseDelimitedLine } from './pipeline.mjs'
+import { buildStatuses, buildTaxa, parseDelimitedLine, statusCategory } from './pipeline.mjs'
 
 test('le parseur conserve les séparateurs présents dans les champs CSV quotés', () => {
   assert.deepEqual(parseDelimitedLine('a;"b;c";"d""e"', ';'), ['a', 'b;c', 'd"e'])
@@ -26,6 +26,11 @@ test('ancienne région Centre couvre entièrement Centre-Val de Loire', () => {
     scope: 'regional',
     scopeLabel: 'Centre-Val de Loire',
   })
+})
+
+test('PNA reste distinct d’une protection nationale', () => {
+  assert.equal(statusCategory('PNA'), 'pna')
+  assert.equal(statusCategory('PN'), 'protection_national')
 })
 
 test('le pipeline rattache les synonymes TAXREF et filtre faune/flore', async () => {
