@@ -38,7 +38,7 @@ jobs:
           test -n "$BDC_FILE"
           echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
 
-      - name: Audit CVL LRR documents and scopes
+      - name: Identify CVL LRR documents and taxonomic coverage
         shell: bash
         run: |
           BDC_FILE="$BDC_FILE" node --input-type=module - <<'NODE'
@@ -46,52 +46,76 @@ jobs:
           import { REGIONS, resolveScope } from './data-pipeline/regions.mjs'
 
           const region = REGIONS.find((item) => item.code === 'CVL')
-          const groups = new Map()
+          const docs = new Map()
           let total = 0
-          let firstKeys = null
 
           for await (const row of rowsFromFile(process.env.BDC_FILE)) {
             if (statusCategory(row.cd_type_statut) !== 'red_list_regional') continue
             const scope = resolveScope(row.cd_sig, region)
             if (!scope) continue
             total += 1
-            if (!firstKeys) firstKeys = Object.keys(row)
             const doc = row.cd_doc || '<sans-cd-doc>'
-            const title = row.lb_doc || row.nom_doc || row.intitule_doc || row.reference_doc || row.lb_type_statut || '<sans-intitulé>'
-            const key = `${doc}|${title}|${row.cd_sig}|${scope.scope}|${scope.scopeLabel ?? ''}`
-            const current = groups.get(key) ?? {
+            const current = docs.get(doc) ?? {
               cdDoc: doc,
-              title,
               cdSig: row.cd_sig,
               scope: scope.scope,
               scopeLabel: scope.scopeLabel ?? null,
+              fullCitation: row.full_citation || null,
+              docUrl: row.doc_url || null,
               count: 0,
-              typeCodes: new Set(),
               statusCodes: new Set(),
+              group1: new Map(),
+              group2: new Map(),
+              orders: new Map(),
+              families: new Map(),
               examples: [],
             }
             current.count += 1
-            current.typeCodes.add(row.cd_type_statut)
+            if (!current.fullCitation && row.full_citation) current.fullCitation = row.full_citation
+            if (!current.docUrl && row.doc_url) current.docUrl = row.doc_url
             if (row.code_statut) current.statusCodes.add(row.code_statut)
-            if (current.examples.length < 4) {
+            for (const [map, value] of [
+              [current.group1, row.group1_inpn],
+              [current.group2, row.group2_inpn],
+              [current.orders, row.ordre],
+              [current.families, row.famille],
+            ]) {
+              if (!value) continue
+              map.set(value, (map.get(value) ?? 0) + 1)
+            }
+            if (current.examples.length < 5) {
               current.examples.push({
                 cdRef: row.cd_ref,
+                scientificName: row.lb_nom,
+                group1: row.group1_inpn,
+                group2: row.group2_inpn,
+                order: row.ordre,
                 codeStatut: row.code_statut,
-                labelStatut: row.label_statut,
               })
             }
-            groups.set(key, current)
+            docs.set(doc, current)
           }
 
-          console.log('BDC_HEADERS=', firstKeys)
-          console.log('CVL_LRR_ROWS=', total)
-          const report = [...groups.values()]
+          const top = (map, max = 12) => [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, max)
+          const report = [...docs.values()]
             .map((item) => ({
-              ...item,
-              typeCodes: [...item.typeCodes].sort(),
+              cdDoc: item.cdDoc,
+              count: item.count,
+              cdSig: item.cdSig,
+              scope: item.scope,
+              scopeLabel: item.scopeLabel,
+              fullCitation: item.fullCitation,
+              docUrl: item.docUrl,
               statusCodes: [...item.statusCodes].sort(),
+              group1: top(item.group1),
+              group2: top(item.group2),
+              orders: top(item.orders),
+              families: top(item.families),
+              examples: item.examples,
             }))
             .sort((a, b) => b.count - a.count || String(a.cdDoc).localeCompare(String(b.cdDoc)))
+
+          console.log('CVL_LRR_ROWS=', total)
           console.log(JSON.stringify(report, null, 2))
           if (!total) throw new Error('Aucune LRR BDC applicable à CVL')
           NODE
