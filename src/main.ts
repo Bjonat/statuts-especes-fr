@@ -1,11 +1,14 @@
 import './styles.css'
-import { DEMO_DATA_WARNING, regions, sources, statuses, taxa } from './demo'
+import { loadCatalog } from './catalog'
 import { searchTaxa } from './search'
 import type { Realm, RegionCode, Taxon } from './types'
 
 const rootElement = document.querySelector<HTMLDivElement>('#app')
 if (!rootElement) throw new Error('Élément #app introuvable')
-const root: HTMLDivElement = rootElement
+const root = rootElement
+
+const catalog = await loadCatalog()
+const { regions, sources, statuses, taxa } = catalog
 
 const storedRegion = localStorage.getItem('region')
 const defaultRegion = regions.some((region) => region.code === storedRegion) ? (storedRegion as RegionCode) : 'CVL'
@@ -33,6 +36,11 @@ function escapeHtml(value: string): string {
     }
     return entities[character]
   })
+}
+
+function renderDataNotice(): string {
+  if (!catalog.warning) return ''
+  return `<aside class="warning" role="note">${escapeHtml(catalog.warning)}</aside>`
 }
 
 function regionOptions(): string {
@@ -71,6 +79,7 @@ function renderRealmChoice(): void {
           </button>
         </div>
       </section>
+      ${renderDataNotice()}
     </main>
   `
 
@@ -135,7 +144,7 @@ function renderSearch(): void {
         </div>
       </section>
 
-      <aside class="warning" role="note">${escapeHtml(DEMO_DATA_WARNING)}</aside>
+      ${renderDataNotice()}
     </main>
   `
 
@@ -171,7 +180,7 @@ function renderDetail(): void {
 
   const region = regions.find((item) => item.code === state.region)
   const taxonStatuses = statuses.filter((status) => status.cdRef === taxon.cdRef && status.region === state.region)
-  const sourceIds = [...new Set(taxonStatuses.map((status) => status.sourceId))]
+  const sourceIds = [...new Set([taxon.sourceId, ...taxonStatuses.map((status) => status.sourceId)].filter(Boolean))] as string[]
   const taxonSources = sources.filter((source) => sourceIds.includes(source.id))
 
   root.innerHTML = `
@@ -197,8 +206,12 @@ function renderDetail(): void {
                   .map(
                     (status) => `
                       <div class="status-row">
-                        <dt>${escapeHtml(status.label)}</dt>
+                        <dt>
+                          ${escapeHtml(status.label)}
+                          ${status.scope === 'partial' && status.scopeLabel ? `<small>Zone partielle : ${escapeHtml(status.scopeLabel)}</small>` : ''}
+                        </dt>
                         <dd>${escapeHtml(status.value)}</dd>
+                        ${status.citation ? `<p class="status-source">${escapeHtml(status.citation)}</p>` : ''}
                       </div>
                     `,
                   )
@@ -224,10 +237,11 @@ function renderDetail(): void {
                   .join('')
               : '<p>Aucune source associée.</p>'
           }
+          <p class="source-row">Catalogue généré le ${escapeHtml(new Date(catalog.generatedAt).toLocaleDateString('fr-FR'))}.</p>
         </details>
       </section>
 
-      <aside class="warning" role="note">${escapeHtml(DEMO_DATA_WARNING)}</aside>
+      ${renderDataNotice()}
     </main>
   `
 
