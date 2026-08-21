@@ -18,6 +18,18 @@ test('le parseur conserve les séparateurs présents dans les champs CSV quotés
   assert.deepEqual(parseDelimitedLine('a;"b;c";"d""e"', ';'), ['a', 'b;c', 'd"e'])
 })
 
+test('les 13 régions métropolitaines et les 96 départements sont couverts', () => {
+  assert.equal(REGIONS.length, 13)
+  assert.deepEqual(
+    REGIONS.map((region) => region.inseeCode).sort(),
+    ['11', '24', '27', '28', '32', '44', '52', '53', '75', '76', '84', '93', '94'],
+  )
+
+  const departments = REGIONS.flatMap((region) => region.departments)
+  assert.equal(departments.length, 96)
+  assert.equal(new Set(departments).size, 96)
+})
+
 test('ancienne Aquitaine est une portée partielle en Nouvelle-Aquitaine', () => {
   const naq = REGIONS.find((region) => region.code === 'NAQ')
   assert.ok(naq)
@@ -27,13 +39,39 @@ test('ancienne Aquitaine est une portée partielle en Nouvelle-Aquitaine', () =>
   })
 })
 
-test('ancienne région Centre couvre entièrement Centre-Val de Loire', () => {
-  const cvl = REGIONS.find((region) => region.code === 'CVL')
-  assert.ok(cvl)
-  assert.deepEqual(resolveScope('INSEER24', cvl), {
-    scope: 'regional',
-    scopeLabel: 'Centre-Val de Loire',
-  })
+test('les régions historiques inchangées restent des portées régionales complètes', () => {
+  for (const [regionCode, legacySig] of [
+    ['CVL', 'INSEER24'],
+    ['BRE', 'INSEER53'],
+    ['IDF', 'INSEER11'],
+    ['PDL', 'INSEER52'],
+    ['PAC', 'INSEER93'],
+    ['COR', 'INSEER94'],
+  ]) {
+    const region = REGIONS.find((item) => item.code === regionCode)
+    assert.ok(region)
+    assert.deepEqual(resolveScope(legacySig, region), {
+      scope: 'regional',
+      scopeLabel: region.name,
+    })
+  }
+})
+
+test('les anciennes composantes des régions fusionnées restent partielles', () => {
+  const cases = [
+    ['ARA', 'INSEER83', 'ancienne région Auvergne'],
+    ['BFC', 'INSEER43', 'ancienne région Franche-Comté'],
+    ['GES', 'INSEER42', 'ancienne région Alsace'],
+    ['HDF', 'INSEER22', 'ancienne région Picardie'],
+    ['NOR', 'INSEER25', 'ancienne région Basse-Normandie'],
+    ['OCC', 'INSEER91', 'ancienne région Languedoc-Roussillon'],
+  ]
+
+  for (const [regionCode, sig, label] of cases) {
+    const region = REGIONS.find((item) => item.code === regionCode)
+    assert.ok(region)
+    assert.deepEqual(resolveScope(sig, region), { scope: 'partial', scopeLabel: label })
+  }
 })
 
 test('PNA reste distinct d’une protection nationale', () => {
@@ -93,7 +131,7 @@ test('le filtre métropolitain conserve par sécurité un taxon absent ayant un 
   )
 })
 
-test('le pipeline distingue statut régional complet et ancienne région partielle', async () => {
+test('le pipeline projette un statut national sur les 13 régions', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'statuts-especes-'))
   const bdc = path.join(directory, 'bdc.csv')
   await fs.writeFile(
@@ -106,14 +144,14 @@ test('le pipeline distingue statut régional complet et ancienne région partiel
     ].join('\n'),
   )
 
-  const taxa = [{ cdRef: 100 }]
-  const statuses = await buildStatuses(bdc, taxa)
+  const statuses = await buildStatuses(bdc, [{ cdRef: 100 }])
+  const national = statuses.filter((status) => status.category === 'red_list_national')
+  assert.equal(national.length, 13)
+  assert.ok(national.every((status) => status.scope === 'national'))
+
   const cvlLrr = statuses.find((status) => status.region === 'CVL' && status.category === 'red_list_regional')
   const naqPr = statuses.find((status) => status.region === 'NAQ' && status.category === 'protection_regional')
-  const occLrn = statuses.find((status) => status.region === 'OCC' && status.category === 'red_list_national')
-
   assert.equal(cvlLrr?.scope, 'regional')
   assert.equal(naqPr?.scope, 'partial')
   assert.equal(naqPr?.scopeLabel, 'ancienne région Aquitaine')
-  assert.equal(occLrn?.scope, 'national')
 })
