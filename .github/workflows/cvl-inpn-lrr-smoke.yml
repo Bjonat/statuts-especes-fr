@@ -1,0 +1,59 @@
+name: CVL INPN regional red lists smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/cvl/**'
+      - '.github/workflows/cvl-inpn-lrr-smoke.yml'
+
+jobs:
+  probe-cvl-inpn-lrr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Probe INPN regional red-list pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cvl-inpn"
+
+          curl --fail --location --retry 3 \
+            'https://inpn.mnhn.fr/espece/listerouge/RG/LRR_odonates_Centre_Val_de_Loire_2022' \
+            -o "$RUNNER_TEMP/cvl-inpn/odonates-2022.html"
+
+          curl --fail --location --retry 3 --get \
+            --data-urlencode 'nom=Liste rouge des Papillons de jour et Zygènes du Centre-Val de Loire' \
+            'https://inpn.mnhn.fr/espece/listerouge/RG/nom' \
+            -o "$RUNNER_TEMP/cvl-inpn/papillons-2024.html"
+
+          curl --fail --location --retry 3 --get \
+            --data-urlencode 'nom=Liste rouge des Coléoptères aquatiques du Centre-Val de Loire' \
+            'https://inpn.mnhn.fr/espece/listerouge/RG/nom' \
+            -o "$RUNNER_TEMP/cvl-inpn/coleopteres-aquatiques-2025.html"
+
+          for file in "$RUNNER_TEMP"/cvl-inpn/*.html; do
+            echo "===== $(basename "$file") ====="
+            wc -c "$file"
+            grep -Eio '<title[^>]*>[^<]+' "$file" | head -n 1 || true
+            if ! grep -Eqi 'CD[_ -]?REF|CD[_ -]?NOM' "$file"; then
+              echo "::warning::$(basename "$file"): identifiant TAXREF non détecté dans la page."
+            fi
+            if ! grep -Eqi 'Catégorie|Categorie' "$file"; then
+              echo "::warning::$(basename "$file"): colonne de catégorie non détectée."
+            fi
+            sha256sum "$file"
+          done
+
+      - name: Validate known Odonates page structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="$RUNNER_TEMP/cvl-inpn/odonates-2022.html"
+          grep -qi 'Centre' "$file"
+          grep -Eqi 'CD[_ -]?REF' "$file"
+          grep -Eqi 'Catégorie|Categorie' "$file"
+          echo 'INPN Odonates CVL 2022: structure exploitable détectée.'
