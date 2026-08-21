@@ -1,7 +1,12 @@
 import './styles.css'
 import { loadDataStore } from './catalog'
 import { searchTaxa } from './search'
-import type { Realm, RegionCode, Taxon, TaxonStatus } from './types'
+import type { Realm, RegionCode, StatusCategory, Taxon, TaxonStatus } from './types'
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
+}
 
 const rootElement = document.querySelector<HTMLDivElement>('#app')
 if (!rootElement) throw new Error('Élément #app introuvable')
@@ -12,6 +17,9 @@ const { regions, sources } = dataStore
 
 const storedRegion = localStorage.getItem('region')
 const defaultRegion = regions.some((region) => region.code === storedRegion) ? (storedRegion as RegionCode) : 'CVL'
+
+let installPrompt: BeforeInstallPromptEvent | null = null
+let iosInstallHelpVisible = false
 
 const state: {
   realm: Realm | null
@@ -35,6 +43,29 @@ const state: {
   offlineReady: dataStore.datasetVersion === 'demo',
 }
 
+const STATUS_LABELS: Partial<Record<StatusCategory, string>> = {
+  red_list_national: 'Liste rouge nationale',
+  red_list_regional: 'Liste rouge régionale',
+  protection_national: 'Protection nationale',
+  protection_regional: 'Protection régionale',
+  znieff: 'Déterminante ZNIEFF',
+  pna: "Plan national d'actions",
+  rarity: 'Rareté',
+  indigenous_status: 'Indigénat',
+}
+
+const STATUS_ORDER: StatusCategory[] = [
+  'protection_national',
+  'protection_regional',
+  'red_list_national',
+  'red_list_regional',
+  'znieff',
+  'pna',
+  'rarity',
+  'indigenous_status',
+  'other',
+]
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (character) => {
     const entities: Record<string, string> = {
@@ -48,24 +79,23 @@ function escapeHtml(value: string): string {
   })
 }
 
-function safeExternalUrl(value?: string): string | null {
-  if (!value) return null
-  try {
-    const url = new URL(value)
-    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null
-  } catch {
-    return null
-  }
+function cleanDisplayText(value: string): string {
+  return value
+    .replace(/&amp;/gi, '&')
+    .replace(/<\/?(?:em|i|strong|b)>/gi, '')
+    .replace(/[—–]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function renderDataNotice(): string {
   if (!dataStore.warning) return ''
-  return `<aside class="warning" role="note">${escapeHtml(dataStore.warning)}</aside>`
+  return `<aside class="warning" role="note">${escapeHtml(cleanDisplayText(dataStore.warning))}</aside>`
 }
 
 function offlineBadgeText(): string {
   if (state.offlineReady) return 'Hors ligne prêt'
-  if (navigator.onLine) return 'Préparation hors ligne…'
+  if (navigator.onLine) return 'Préparation hors ligne...'
   return 'Données hors ligne partielles'
 }
 
@@ -79,6 +109,58 @@ function refreshOfflineBadges(): void {
   })
 }
 
+function isStandalone(): boolean {
+  const navigatorWithStandalone = navigator as Navigator & { standalone?: boolean }
+  return window.matchMedia('(display-mode: standalone)').matches || navigatorWithStandalone.standalone === true
+}
+
+function isIos(): boolean {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent)
+}
+
+function canOfferInstall(): boolean {
+  return !isStandalone() && Boolean(installPrompt || isIos())
+}
+
+function installMarkup(): string {
+  return `
+    <div class="install-area" id="install-area" ${canOfferInstall() ? '' : 'hidden'}>
+      <button class="install-button" id="install-app" type="button">Installer l'application</button>
+      <p class="install-help" id="install-help" ${iosInstallHelpVisible ? '' : 'hidden'}>
+        Sur iPhone ou iPad : Partager &gt; Ajouter à l'écran d'accueil.
+      </p>
+    </div>
+  `
+}
+
+function refreshInstallArea(): void {
+  const area = document.querySelector<HTMLElement>('#install-area')
+  if (!area) return
+  area.hidden = !canOfferInstall()
+
+  const help = document.querySelector<HTMLElement>('#install-help')
+  if (help) help.hidden = !iosInstallHelpVisible
+}
+
+function bindInstallAction(): void {
+  const button = document.querySelector<HTMLButtonElement>('#install-app')
+  button?.addEventListener('click', async () => {
+    if (installPrompt) {
+      const prompt = installPrompt
+      await prompt.prompt()
+      const choice = await prompt.userChoice
+      if (choice.outcome === 'accepted') installPrompt = null
+      refreshInstallArea()
+      return
+    }
+
+    if (isIos()) {
+      iosInstallHelpVisible = !iosInstallHelpVisible
+      refreshInstallArea()
+    }
+  })
+}
+
 function regionOptions(): string {
   return regions
     .map(
@@ -86,6 +168,58 @@ function regionOptions(): string {
         `<option value="${region.code}" ${region.code === state.region ? 'selected' : ''}>${escapeHtml(region.name)}</option>`,
     )
     .join('')
+}
+
+function formatCheckedDate(value?: string): string {
+  const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return 'date inconnue'
+  return `${match[3]}/${match[2]}/${match[1]}`
+}
+
+function sourceSummary(): string {
+  if (!dataStore.official) return 'Sources et versions : données de démonstration'
+
+  const taxref = sources.find((source) => source.id === 'taxref-v18')
+  const bdc = sources.find((source) => source.id === 'bdc-v18')
+  const version = bdc?.version ?? taxref?.version ?? dataStore.datasetVersion
+  const checkedAt = bdc?.checkedAt ?? taxref?.checkedAt
+
+  return `Sources et versions : TAXREF / BDC-Statuts PatriNat-SINP ${version} - vérifié le ${formatCheckedDate(checkedAt)}`
+}
+
+function shortStatusLabel(status: TaxonStatus): string {
+  const mapped = STATUS_LABELS[status.category]
+  if (mapped) return mapped
+
+  const label = cleanDisplayText(status.label)
+  if (/sans objet/i.test(label)) return 'Sans objet'
+  if (/réglement/i.test(label)) return 'Réglementation'
+  if (label.length <= 52) return label
+  return 'Autre statut'
+}
+
+function shortStatusValue(status: TaxonStatus): string {
+  const value = cleanDisplayText(status.value)
+  if (value.length <= 72) return value
+
+  const codeMatch = value.match(/^([A-Z0-9._/-]{1,16})\s+-\s+/)
+  return codeMatch?.[1] ?? 'Oui'
+}
+
+function usefulStatus(status: TaxonStatus): boolean {
+  const label = cleanDisplayText(status.label)
+  const value = cleanDisplayText(status.value)
+  return !/sans objet/i.test(label) && !/sans objet/i.test(value)
+}
+
+function sortedStatuses(statuses: TaxonStatus[]): TaxonStatus[] {
+  return [...statuses]
+    .filter(usefulStatus)
+    .sort((left, right) => {
+      const category = STATUS_ORDER.indexOf(left.category) - STATUS_ORDER.indexOf(right.category)
+      if (category !== 0) return category
+      return shortStatusLabel(left).localeCompare(shortStatusLabel(right), 'fr')
+    })
 }
 
 async function loadRealmData(realm: Realm, region: RegionCode): Promise<void> {
@@ -105,7 +239,7 @@ async function loadRealmData(realm: Realm, region: RegionCode): Promise<void> {
     state.loading = false
     state.error = navigator.onLine
       ? 'Impossible de charger les référentiels locaux. Réessayez.'
-      : 'Ce jeu de données n’est pas encore disponible hors connexion sur cet appareil.'
+      : "Ce jeu de données n'est pas encore disponible hors connexion sur cet appareil."
     render()
   }
 }
@@ -152,6 +286,7 @@ function renderRealmChoice(): void {
             <span>Faune</span>
           </button>
         </div>
+        ${installMarkup()}
         <div class="home-status">${offlineBadge()}</div>
       </section>
       ${renderDataNotice()}
@@ -163,6 +298,7 @@ function renderRealmChoice(): void {
       void chooseRealm(button.dataset.realm as Realm)
     })
   })
+  bindInstallAction()
 }
 
 function renderLoading(): void {
@@ -174,8 +310,8 @@ function renderLoading(): void {
       </header>
       <section class="panel loading-panel" aria-live="polite">
         <p class="eyebrow">${state.realm === 'flora' ? 'Flore' : 'Faune'}</p>
-        <h1>Chargement des données locales…</h1>
-        <p class="intro">Le prochain accès utilisera le cache de l’appareil.</p>
+        <h1>Chargement des données locales...</h1>
+        <p class="intro">Le prochain accès utilisera le cache de l'appareil.</p>
       </section>
     </main>
   `
@@ -237,7 +373,7 @@ function renderSearch(): void {
           class="field-control search-input"
           type="search"
           value="${escapeHtml(state.query)}"
-          placeholder="Ex. chêne, Quercus, martin…"
+          placeholder="Ex. chêne, Quercus, martin..."
           autocomplete="off"
           autocapitalize="none"
           spellcheck="false"
@@ -301,9 +437,7 @@ function renderDetail(): void {
   if (!taxon || !state.realm) return
 
   const region = regions.find((item) => item.code === state.region)
-  const taxonStatuses = state.statuses.filter((status) => status.cdRef === taxon.cdRef)
-  const sourceIds = [...new Set([taxon.sourceId, ...taxonStatuses.map((status) => status.sourceId)].filter(Boolean))] as string[]
-  const taxonSources = sources.filter((source) => sourceIds.includes(source.id))
+  const taxonStatuses = sortedStatuses(state.statuses.filter((status) => status.cdRef === taxon.cdRef))
 
   root.innerHTML = `
     <main class="shell">
@@ -313,10 +447,10 @@ function renderDetail(): void {
       </header>
 
       <section class="panel taxon-card">
-        <p class="eyebrow">${state.realm === 'flora' ? 'Flore' : 'Faune'} · ${escapeHtml(region?.name ?? state.region)}</p>
+        <p class="eyebrow">${state.realm === 'flora' ? 'Flore' : 'Faune'} - ${escapeHtml(region?.name ?? state.region)}</p>
         <h1>${escapeHtml(taxon.vernacularNames[0] ?? taxon.scientificName)}</h1>
         <p class="scientific-name"><i>${escapeHtml(taxon.scientificName)}</i></p>
-        <p class="taxon-meta">${taxon.family ? `${escapeHtml(taxon.family)} · ` : ''}CD_REF ${taxon.cdRef}</p>
+        <p class="taxon-meta">${taxon.family ? `${escapeHtml(taxon.family)} - ` : ''}CD_REF ${taxon.cdRef}</p>
 
         <div class="divider"></div>
 
@@ -325,45 +459,23 @@ function renderDetail(): void {
           taxonStatuses.length
             ? `<dl class="status-list">
                 ${taxonStatuses
-                  .map((status) => {
-                    const documentUrl = safeExternalUrl(status.documentUrl)
-                    return `
+                  .map(
+                    (status) => `
                       <div class="status-row">
                         <dt>
-                          ${escapeHtml(status.label)}
-                          ${status.scope === 'partial' && status.scopeLabel ? `<small>Zone partielle : ${escapeHtml(status.scopeLabel)}</small>` : ''}
+                          ${escapeHtml(shortStatusLabel(status))}
+                          ${status.scope === 'partial' && status.scopeLabel ? `<small>Portée : ${escapeHtml(cleanDisplayText(status.scopeLabel))}</small>` : ''}
                         </dt>
-                        <dd>${escapeHtml(status.value)}</dd>
-                        ${status.citation ? `<p class="status-source">${escapeHtml(status.citation)}${documentUrl ? ` · <a href="${escapeHtml(documentUrl)}" target="_blank" rel="noopener noreferrer">source</a>` : ''}</p>` : ''}
+                        <dd>${escapeHtml(shortStatusValue(status))}</dd>
                       </div>
-                    `
-                  })
+                    `,
+                  )
                   .join('')}
               </dl>`
             : '<p class="empty-state">Aucun statut disponible pour ce taxon et cette région dans les référentiels chargés.</p>'
         }
 
-        <details class="sources-details">
-          <summary>Sources et versions</summary>
-          ${
-            taxonSources.length
-              ? taxonSources
-                  .map((source) => {
-                    const sourceUrl = safeExternalUrl(source.url)
-                    return `
-                      <div class="source-row">
-                        <strong>${escapeHtml(source.name)}</strong>
-                        <span>${escapeHtml(source.producer)} · ${escapeHtml(source.version)}</span>
-                        <span>${source.official ? 'Source officielle' : 'Source de démonstration'}${source.checkedAt ? ` · vérifiée le ${escapeHtml(source.checkedAt)}` : ''}</span>
-                        ${sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Ouvrir la source</a>` : ''}
-                      </div>
-                    `
-                  })
-                  .join('')
-              : '<p>Aucune source associée.</p>'
-          }
-          <p class="source-row">Jeu généré le ${escapeHtml(new Date(dataStore.generatedAt).toLocaleDateString('fr-FR'))}.</p>
-        </details>
+        <p class="source-summary">${escapeHtml(sourceSummary())}</p>
       </section>
 
       ${renderDataNotice()}
@@ -399,6 +511,18 @@ function render(): void {
 
   renderSearch()
 }
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault()
+  installPrompt = event as BeforeInstallPromptEvent
+  refreshInstallArea()
+})
+
+window.addEventListener('appinstalled', () => {
+  installPrompt = null
+  iosInstallHelpVisible = false
+  refreshInstallArea()
+})
 
 window.addEventListener('online', refreshOfflineBadges)
 window.addEventListener('offline', refreshOfflineBadges)
