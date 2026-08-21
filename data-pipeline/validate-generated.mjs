@@ -96,13 +96,20 @@ const cvlFauna = await loadStatuses('fauna', 'CVL')
 const naqZnieffSourceId = 'obv-na-znieff-flore-2019-v1.2'
 if (manifest.sources.some((source) => source.id === naqZnieffSourceId)) {
   const naqZnieff = naqFlora.filter((status) => status.category === 'znieff')
-  assert.ok(naqZnieff.length >= 1_200, 'ZNIEFF flore NAQ régional: volume plausible >= 1 200 statuts')
-  assert.ok(
-    naqZnieff.every((status) => status.sourceId === naqZnieffSourceId),
-    'ZNIEFF flore NAQ: aucune relation BDC résiduelle quand le référentiel régional est chargé',
+  const regionalNaqZnieff = naqZnieff.filter((status) => status.sourceId === naqZnieffSourceId)
+  const coveredCdRefs = new Set(regionalNaqZnieff.map((status) => status.cdRef))
+  const residualBdcOnCoveredTaxa = naqZnieff.filter(
+    (status) => status.sourceId !== naqZnieffSourceId && coveredCdRefs.has(status.cdRef),
+  )
+
+  assert.ok(regionalNaqZnieff.length >= 1_200, 'ZNIEFF flore NAQ régional: volume plausible >= 1 200 statuts')
+  assert.equal(
+    residualBdcOnCoveredTaxa.length,
+    0,
+    'ZNIEFF flore NAQ: aucun statut BDC résiduel pour les CD_REF couverts par le référentiel régional',
   )
   assert.ok(
-    naqZnieff.some((status) => status.scope === 'partial' && status.scopeLabel),
+    regionalNaqZnieff.some((status) => status.scope === 'partial' && status.scopeLabel),
     'ZNIEFF flore NAQ: les restrictions biogéographiques/départementales sont conservées',
   )
 }
