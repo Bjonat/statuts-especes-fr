@@ -88,12 +88,34 @@ jobs:
           echo "NAQ_ZNIEFF_FILE=$RUNNER_TEMP/znieff-naq-flore.xlsx" >> "$GITHUB_ENV"
           echo "REGIONAL_DIR=$RUNNER_TEMP/regional-packages" >> "$GITHUB_ENV"
 
+      - name: Download regional Bretagne sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://www.data.gouv.fr/api/1/datasets/r/4ada0b2b-d56e-44a9-8532-9ca2335c625b \
+            -o "$RUNNER_TEMP/bre-znieff.csv"
+          curl --fail --location --retry 3 \
+            https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96 \
+            -o "$RUNNER_TEMP/bre-lrr.csv"
+          grep -q 'CD_NOM' "$RUNNER_TEMP/bre-znieff.csv"
+          grep -q 'RESULTAT_EVALUATION' "$RUNNER_TEMP/bre-lrr.csv"
+          sha256sum "$RUNNER_TEMP/bre-znieff.csv" "$RUNNER_TEMP/bre-lrr.csv"
+          echo "BRE_ZNIEFF_FILE=$RUNNER_TEMP/bre-znieff.csv" >> "$GITHUB_ENV"
+          echo "BRE_LRR_FILE=$RUNNER_TEMP/bre-lrr.csv" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         run: |
           python data-pipeline/regions/naq/build_znieff.py \
             --taxref "$TAXREF_FILE" \
             --workbook "$NAQ_ZNIEFF_FILE" \
             --out "$REGIONAL_DIR/naq-znieff-flora.json" \
+            --min-match-rate 0.97
+          python data-pipeline/regions/bre/build_oeb.py \
+            --taxref "$TAXREF_FILE" \
+            --znieff "$BRE_ZNIEFF_FILE" \
+            --lrr "$BRE_LRR_FILE" \
+            --out-dir "$REGIONAL_DIR" \
             --min-match-rate 0.97
 
       - name: Run tests
@@ -108,8 +130,14 @@ jobs:
           node - <<'NODE'
           const fs = require('fs')
           const manifest = JSON.parse(fs.readFileSync('public/data/manifest.json', 'utf8'))
-          if (!manifest.sources.some((source) => source.id === 'obv-na-znieff-flore-2019-v1.2')) {
-            throw new Error('Le bundle de production doit inclure la source ZNIEFF flore Nouvelle-Aquitaine')
+          const required = [
+            'obv-na-znieff-flore-2019-v1.2',
+            'oeb-bretagne-znieff-csv-2026-01-29',
+            'oeb-bretagne-lrr-csv-2026-01-29',
+          ]
+          const ids = new Set(manifest.sources.map((source) => source.id))
+          for (const id of required) {
+            if (!ids.has(id)) throw new Error(`Le bundle de production doit inclure la source régionale ${id}`)
           }
           NODE
 
@@ -132,7 +160,7 @@ jobs:
             bdcVersion: manifest.bdcVersion,
             regionalSources: manifest.sources
               .filter((source) => !['taxref-v18', 'bdc-v18'].includes(source.id))
-              .map((source) => ({ id: source.id, version: source.version, checkedAt: source.checkedAt })),
+              .map((source) => ({ id: source.id, version: source.version, checkedAt: source.checkedAt, sha256: source.sha256 })),
             regions: manifest.regions.map((region) => region.code),
           }
           fs.writeFileSync('dist/build-info.json', `${JSON.stringify(metadata, null, 2)}\n`)
@@ -153,8 +181,14 @@ jobs:
           const fs = require('fs')
           const dataManifest = JSON.parse(fs.readFileSync('dist/data/manifest.json', 'utf8'))
           if (dataManifest.official !== true || dataManifest.regions.length !== 13) process.exit(1)
-          if (!dataManifest.sources.some((source) => source.id === 'obv-na-znieff-flore-2019-v1.2')) {
-            throw new Error('Le bundle FTP a perdu l’enrichissement ZNIEFF Nouvelle-Aquitaine')
+          const required = [
+            'obv-na-znieff-flore-2019-v1.2',
+            'oeb-bretagne-znieff-csv-2026-01-29',
+            'oeb-bretagne-lrr-csv-2026-01-29',
+          ]
+          const ids = new Set(dataManifest.sources.map((source) => source.id))
+          for (const id of required) {
+            if (!ids.has(id)) throw new Error(`Le bundle FTP a perdu l’enrichissement régional ${id}`)
           }
 
           const html = fs.readFileSync('dist/index.html', 'utf8')
