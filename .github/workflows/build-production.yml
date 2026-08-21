@@ -104,6 +104,24 @@ jobs:
           echo "BRE_ZNIEFF_FILE=$RUNNER_TEMP/bre-znieff.csv" >> "$GITHUB_ENV"
           echo "BRE_LRR_FILE=$RUNNER_TEMP/bre-lrr.csv" >> "$GITHUB_ENV"
 
+      - name: Download regional Normandie LRR sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nor-lrr"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2025/01/LR_Oiseaux_Nicheurs-_Normandie_2024_telechargement.xlsx' -o "$RUNNER_TEMP/nor-lrr/oiseaux-2024.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/05/LR_RHOPALO_tableau-de-synthese_ANBDD.xlsx' -o "$RUNNER_TEMP/nor-lrr/rhopaloceres.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/11/Tableau_Liste_Rouge_Mammiferes_Normandie_2022-VF.xlsx' -o "$RUNNER_TEMP/nor-lrr/mammiferes-2022.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2023/05/Liste_Rouge_ORTHO_Normandie_ANBDD_2022.xlsx' -o "$RUNNER_TEMP/nor-lrr/orthopteres-2022.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/09/Tableau-LR-Amphibiens-Normandie-2022.xlsx' -o "$RUNNER_TEMP/nor-lrr/amphibiens-2022.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/09/LR_ODONATES_tableau-de-synthese_pour_ANBDD_VF.xlsx' -o "$RUNNER_TEMP/nor-lrr/odonates.xlsx"
+          curl --fail --location --retry 3 'https://www.anbdd.fr/publication/liste-rouge-des-reptiles-de-normandie/tableau-lr-reptiles-normandie-2022/' -o "$RUNNER_TEMP/nor-lrr/reptiles-2022.xlsx"
+          for file in "$RUNNER_TEMP"/nor-lrr/*.xlsx; do
+            test "$(head -c 2 "$file")" = 'PK'
+          done
+          sha256sum "$RUNNER_TEMP"/nor-lrr/*.xlsx
+          echo "NOR_LRR_DIR=$RUNNER_TEMP/nor-lrr" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         run: |
           python data-pipeline/regions/naq/build_znieff.py \
@@ -115,6 +133,11 @@ jobs:
             --taxref "$TAXREF_FILE" \
             --znieff "$BRE_ZNIEFF_FILE" \
             --lrr "$BRE_LRR_FILE" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
+          python data-pipeline/regions/nor/build_anbdd_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$NOR_LRR_DIR" \
             --out-dir "$REGIONAL_DIR" \
             --min-match-rate 0.97
 
@@ -134,6 +157,13 @@ jobs:
             'obv-na-znieff-flore-2019-v1.2',
             'oeb-bretagne-znieff-csv-2026-01-29',
             'oeb-bretagne-lrr-csv-2026-01-29',
+            'anbdd-normandie-lrr-oiseaux-nicheurs-2024',
+            'anbdd-normandie-lrr-mammiferes-2022',
+            'anbdd-normandie-lrr-amphibiens-2022',
+            'anbdd-normandie-lrr-reptiles-2022',
+            'anbdd-normandie-lrr-odonates-2022',
+            'anbdd-normandie-lrr-orthopteres-2022',
+            'anbdd-normandie-lrr-rhopaloceres-2022',
           ]
           const ids = new Set(manifest.sources.map((source) => source.id))
           for (const id of required) {
@@ -185,6 +215,13 @@ jobs:
             'obv-na-znieff-flore-2019-v1.2',
             'oeb-bretagne-znieff-csv-2026-01-29',
             'oeb-bretagne-lrr-csv-2026-01-29',
+            'anbdd-normandie-lrr-oiseaux-nicheurs-2024',
+            'anbdd-normandie-lrr-mammiferes-2022',
+            'anbdd-normandie-lrr-amphibiens-2022',
+            'anbdd-normandie-lrr-reptiles-2022',
+            'anbdd-normandie-lrr-odonates-2022',
+            'anbdd-normandie-lrr-orthopteres-2022',
+            'anbdd-normandie-lrr-rhopaloceres-2022',
           ]
           const ids = new Set(dataManifest.sources.map((source) => source.id))
           for (const id of required) {
