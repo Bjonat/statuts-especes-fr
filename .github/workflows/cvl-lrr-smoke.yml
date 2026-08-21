@@ -1,0 +1,59 @@
+name: CVL regional red lists smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/cvl/**'
+      - '.github/workflows/cvl-lrr-smoke.yml'
+
+jobs:
+  probe-cvl-lrr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download ARB CVL red-list publications
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cvl-lrr"
+          curl --fail --location --retry 3 \
+            'https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/2025-01/LRodonatesRCVL2022-VF2ok.pdf' \
+            -o "$RUNNER_TEMP/cvl-lrr/odonates-2022.pdf"
+          curl --fail --location --retry 3 \
+            'https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/listes%20rouges/LRR-papillons_2024_vf-4.pdf' \
+            -o "$RUNNER_TEMP/cvl-lrr/papillons-2024.pdf"
+          for file in "$RUNNER_TEMP"/cvl-lrr/*.pdf; do
+            test "$(head -c 4 "$file")" = '%PDF' || { echo "::error::PDF invalide: $file"; exit 1; }
+          done
+          sha256sum "$RUNNER_TEMP"/cvl-lrr/*.pdf
+          echo "CVL_LRR_DIR=$RUNNER_TEMP/cvl-lrr" >> "$GITHUB_ENV"
+
+      - name: Extract table text
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v pdftotext
+          for file in "$CVL_LRR_DIR"/*.pdf; do
+            txt="${file%.pdf}.txt"
+            pdftotext -layout "$file" "$txt"
+            test -s "$txt"
+            echo "===== $(basename "$txt") ====="
+            grep -n -i -E 'Liste par catégories|Liste des espèces par catégories' "$txt" | head -n 3 || true
+            tail -n 260 "$txt" | head -n 80
+          done
+
+      - name: Validate expected scientific names and UICN categories
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'Sympetrum depressiusculum' "$CVL_LRR_DIR/odonates-2022.txt"
+          grep -q 'Coenagrion ornatum' "$CVL_LRR_DIR/odonates-2022.txt"
+          grep -q 'Euphydryas maturna' "$CVL_LRR_DIR/papillons-2024.txt"
+          grep -q 'Thymelicus lineola' "$CVL_LRR_DIR/papillons-2024.txt"
+          grep -Eqi '\b(RE|CR\*?|EN|VU|NT|LC|DD|NA|NE)\b' "$CVL_LRR_DIR/odonates-2022.txt"
+          grep -Eqi '\b(RE|CR\*?|EN|VU|NT|LC|DD|NA|NE)\b' "$CVL_LRR_DIR/papillons-2024.txt"
+          echo 'ARB CVL: PDF officiels accessibles et tableaux textuels détectés.'
