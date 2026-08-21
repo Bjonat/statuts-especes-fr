@@ -1,0 +1,126 @@
+name: Build production bundle
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-production.yml'
+      - 'src/**'
+      - 'data-pipeline/**'
+      - 'vite.config.ts'
+      - 'package.json'
+
+jobs:
+  build-production:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 \
+            https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip \
+            -o "$RUNNER_TEMP/taxref.zip" \
+          || curl --fail --location --retry 3 \
+            https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip \
+            -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download BDC Statuts v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bdc"
+          curl --fail --location --retry 3 \
+            https://assets.patrinat.fr/files/referentiel/BDC.zip \
+            -o "$RUNNER_TEMP/bdc.zip" \
+          || curl --fail --location --retry 3 \
+            https://geonature.fr/data/inpn/taxonomie/BDC-STATUTS-v18.zip \
+            -o "$RUNNER_TEMP/bdc.zip"
+          unzip -q "$RUNNER_TEMP/bdc.zip" -d "$RUNNER_TEMP/bdc"
+
+          BDC_FILE=''
+          while IFS= read -r candidate; do
+            header="$(head -n 1 "$candidate" | tr '[:upper:]' '[:lower:]')"
+            if grep -q 'cd_ref' <<< "$header" && grep -q 'cd_type_statut' <<< "$header"; then
+              BDC_FILE="$candidate"
+              break
+            fi
+          done < <(find "$RUNNER_TEMP/bdc" -type f -iname '*.csv')
+
+          test -n "$BDC_FILE"
+          echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Generate official metropolitan dataset
+        run: npm run data:build -- --taxref "$TAXREF_FILE" --bdc "$BDC_FILE" --out public/data
+
+      - name: Validate official dataset
+        run: node data-pipeline/validate-generated.mjs --dir public/data
+
+      - name: Build PWA
+        run: npm run build
+
+      - name: Write build metadata
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs')
+          const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+          const manifest = JSON.parse(fs.readFileSync('public/data/manifest.json', 'utf8'))
+          const metadata = {
+            applicationVersion: packageJson.version,
+            repositorySha: process.env.GITHUB_SHA,
+            builtAt: new Date().toISOString(),
+            datasetVersion: manifest.datasetVersion,
+            taxrefVersion: manifest.taxrefVersion,
+            bdcVersion: manifest.bdcVersion,
+            regions: manifest.regions.map((region) => region.code),
+          }
+          fs.writeFileSync('dist/build-info.json', `${JSON.stringify(metadata, null, 2)}\n`)
+          console.log(metadata)
+          NODE
+
+      - name: Validate deployable bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist/index.html
+          test -f dist/manifest.webmanifest
+          test -f dist/sw.js
+          test -f dist/data/manifest.json
+          test -f dist/build-info.json
+          node - <<'NODE'
+          const fs = require('fs')
+          const manifest = JSON.parse(fs.readFileSync('dist/data/manifest.json', 'utf8'))
+          if (manifest.official !== true || manifest.regions.length !== 13) process.exit(1)
+          console.log(`Bundle prêt : ${manifest.regions.length} régions, dataset ${manifest.datasetVersion}`)
+          NODE
+          du -sh dist
+
+      - name: Upload deployable PWA
+        uses: actions/upload-artifact@v4
+        with:
+          name: statuts-especes-fr-production
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6
