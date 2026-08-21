@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-production.yml'
+      - 'index.html'
       - 'src/**'
       - 'data-pipeline/**'
       - 'vite.config.ts'
@@ -110,9 +111,28 @@ jobs:
           test -f dist/build-info.json
           node - <<'NODE'
           const fs = require('fs')
-          const manifest = JSON.parse(fs.readFileSync('dist/data/manifest.json', 'utf8'))
-          if (manifest.official !== true || manifest.regions.length !== 13) process.exit(1)
-          console.log(`Bundle prêt : ${manifest.regions.length} régions, dataset ${manifest.datasetVersion}`)
+          const dataManifest = JSON.parse(fs.readFileSync('dist/data/manifest.json', 'utf8'))
+          if (dataManifest.official !== true || dataManifest.regions.length !== 13) process.exit(1)
+
+          const html = fs.readFileSync('dist/index.html', 'utf8')
+          if (/(?:src|href)=["']\/(?!\/)/i.test(html)) {
+            throw new Error('index.html contient encore un chemin absolu racine incompatible avec un sous-dossier FTP')
+          }
+
+          const webManifest = JSON.parse(fs.readFileSync('dist/manifest.webmanifest', 'utf8'))
+          if (webManifest.start_url !== './' || webManifest.scope !== './') {
+            throw new Error(`PWA non portable: start_url=${webManifest.start_url}, scope=${webManifest.scope}`)
+          }
+
+          const registrationFiles = ['dist/index.html', 'dist/registerSW.js'].filter((file) => fs.existsSync(file))
+          for (const file of registrationFiles) {
+            const content = fs.readFileSync(file, 'utf8')
+            if (/serviceWorker\.register\(["']\//.test(content)) {
+              throw new Error(`${file} enregistre le service worker depuis la racine du domaine`)
+            }
+          }
+
+          console.log(`Bundle FTP portable : ${dataManifest.regions.length} régions, dataset ${dataManifest.datasetVersion}`)
           NODE
           du -sh dist
 

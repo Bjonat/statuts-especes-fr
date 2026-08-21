@@ -2,9 +2,13 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Le chemin public exact du FTP n'est pas connu au build. Un base relatif
+  // permet au même dist/ de fonctionner à la racine ou dans un sous-dossier.
+  base: './',
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
+      scope: './',
       includeAssets: [],
       manifest: {
         name: 'Statuts espèces FR',
@@ -13,7 +17,8 @@ export default defineConfig({
         theme_color: '#f6f6f1',
         background_color: '#f6f6f1',
         display: 'standalone',
-        start_url: '/',
+        start_url: './',
+        scope: './',
         lang: 'fr',
       },
       workbox: {
