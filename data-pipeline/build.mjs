@@ -1,7 +1,13 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { buildSources, buildStatuses, buildTaxa, publicRegions } from './pipeline.mjs'
+import {
+  buildSources,
+  buildStatuses,
+  buildTaxa,
+  filterTaxaForMetropolitanRegions,
+  publicRegions,
+} from './pipeline.mjs'
 
 function parseArgs(argv) {
   const args = {}
@@ -14,52 +20,112 @@ function parseArgs(argv) {
   return args
 }
 
+function hashContent(content) {
+  return crypto.createHash('sha256').update(content).digest('hex').slice(0, 12)
+}
+
+async function writeDataset(outputDirectory, prefix, rows) {
+  const json = `${JSON.stringify(rows)}\n`
+  const hash = hashContent(json)
+  const file = `${prefix}-${hash}.json`
+  const filePath = path.join(outputDirectory, file)
+  await fs.writeFile(filePath, json, 'utf8')
+  const stats = await fs.stat(filePath)
+  console.log(`  ${file}: ${rows.length.toLocaleString('fr-FR')} lignes, ${(stats.size / 1024 / 1024).toFixed(1)} Mio`)
+  return { file, count: rows.length }
+}
+
+async function clearGeneratedDatasets(outputDirectory) {
+  try {
+    const entries = await fs.readdir(outputDirectory)
+    await Promise.all(
+      entries
+        .filter((entry) => /^(?:catalog|taxa|statuses)-.*\.json$/.test(entry))
+        .map((entry) => fs.rm(path.join(outputDirectory, entry))),
+    )
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
+}
+
 const args = parseArgs(process.argv.slice(2))
 const taxrefPath = args.taxref
 const bdcPath = args.bdc
 const outputDirectory = args.out ?? 'public/data'
 
 if (!taxrefPath || !bdcPath) {
-  throw new Error('Usage: node data-pipeline/build.mjs --taxref <TAXREFv18.txt> --bdc <bdc_statuts_18.csv> [--out public/data]')
+  throw new Error('Usage: node data-pipeline/build.mjs --taxref <TAXREFv18.txt> --bdc <bdc.csv> [--out public/data]')
 }
 
 console.log('Lecture de TAXREF v18…')
-const taxa = await buildTaxa(taxrefPath)
-console.log(`${taxa.length.toLocaleString('fr-FR')} taxons acceptés faune/flore retenus.`)
+const searchableTaxa = await buildTaxa(taxrefPath)
+console.log(`${searchableTaxa.length.toLocaleString('fr-FR')} taxons de rang espèce/infraspécifique retenus avant filtre territorial.`)
 
 console.log('Lecture de la BDC Statuts v18…')
-const statuses = await buildStatuses(bdcPath, taxa)
+let statuses = await buildStatuses(bdcPath, searchableTaxa)
 console.log(`${statuses.length.toLocaleString('fr-FR')} relations taxon × territoire × statut retenues.`)
 
-const generatedAt = new Date().toISOString()
-const sources = buildSources(generatedAt.slice(0, 10))
-const catalog = {
-  schemaVersion: 1,
-  generatedAt,
-  official: true,
-  regions: publicRegions(),
-  taxa,
-  statuses,
-  sources,
+const taxa = filterTaxaForMetropolitanRegions(searchableTaxa, statuses)
+const keptRefs = new Set(taxa.map((taxon) => taxon.cdRef))
+statuses = statuses.filter((status) => keptRefs.has(status.cdRef))
+console.log(`${taxa.length.toLocaleString('fr-FR')} taxons conservés après filtre métropolitain sécurisé.`)
+
+const realmByRef = new Map(taxa.map((taxon) => [taxon.cdRef, taxon.realm]))
+const taxaByRealm = {
+  flora: taxa.filter((taxon) => taxon.realm === 'flora'),
+  fauna: taxa.filter((taxon) => taxon.realm === 'fauna'),
+}
+const regions = publicRegions()
+const statusesByRealmRegion = {
+  flora: Object.fromEntries(regions.map((region) => [region.code, []])),
+  fauna: Object.fromEntries(regions.map((region) => [region.code, []])),
 }
 
-const catalogJson = `${JSON.stringify(catalog)}\n`
-const hash = crypto.createHash('sha256').update(catalogJson).digest('hex').slice(0, 12)
-const catalogFile = `catalog-${hash}.json`
-const manifest = {
-  schemaVersion: 1,
-  generatedAt,
-  datasetVersion: hash,
-  catalogFile,
-  taxrefVersion: '18',
-  bdcVersion: '18',
-  sources,
+for (const status of statuses) {
+  const realm = realmByRef.get(status.cdRef)
+  if (!realm) continue
+  statusesByRealmRegion[realm][status.region].push(status)
 }
 
 await fs.mkdir(outputDirectory, { recursive: true })
-await fs.writeFile(path.join(outputDirectory, catalogFile), catalogJson, 'utf8')
-await fs.writeFile(path.join(outputDirectory, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+await clearGeneratedDatasets(outputDirectory)
 
-const stats = await fs.stat(path.join(outputDirectory, catalogFile))
-console.log(`Catalogue écrit dans ${path.join(outputDirectory, catalogFile)} (${(stats.size / 1024 / 1024).toFixed(1)} Mio).`)
-console.log(`Manifest écrit dans ${path.join(outputDirectory, 'manifest.json')}.`)
+console.log('Écriture des jeux offline fractionnés…')
+const files = {
+  taxa: {
+    flora: await writeDataset(outputDirectory, 'taxa-flora', taxaByRealm.flora),
+    fauna: await writeDataset(outputDirectory, 'taxa-fauna', taxaByRealm.fauna),
+  },
+  statuses: {
+    flora: {},
+    fauna: {},
+  },
+}
+
+for (const realm of ['flora', 'fauna']) {
+  for (const region of regions) {
+    files.statuses[realm][region.code] = await writeDataset(
+      outputDirectory,
+      `statuses-${realm}-${region.code.toLowerCase()}`,
+      statusesByRealmRegion[realm][region.code],
+    )
+  }
+}
+
+const generatedAt = new Date().toISOString()
+const sources = buildSources(generatedAt.slice(0, 10))
+const datasetVersion = hashContent(JSON.stringify(files))
+const manifest = {
+  schemaVersion: 2,
+  generatedAt,
+  datasetVersion,
+  official: true,
+  taxrefVersion: '18',
+  bdcVersion: '18',
+  regions,
+  sources,
+  files,
+}
+
+await fs.writeFile(path.join(outputDirectory, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+console.log(`Manifest v2 écrit dans ${path.join(outputDirectory, 'manifest.json')} (${datasetVersion}).`)
