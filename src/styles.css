@@ -253,7 +253,7 @@ h2 {
 .status-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 6px 12px;
   align-items: center;
   padding: 11px 0;
   border-bottom: 1px solid #ecece7;
@@ -263,10 +263,27 @@ h2 {
   color: #535a50;
 }
 
+.status-row dt small {
+  display: block;
+  margin-top: 4px;
+  color: #7a6650;
+  font-size: 0.74rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .status-row dd {
   margin: 0;
   font-weight: 800;
   text-align: right;
+}
+
+.status-source {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #747a70;
+  font-size: 0.76rem;
+  line-height: 1.4;
 }
 
 .sources-details {
