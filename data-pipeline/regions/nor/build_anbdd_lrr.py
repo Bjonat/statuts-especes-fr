@@ -121,7 +121,7 @@ def as_int(value: object) -> int | None:
 
 def find_header_row(sheet, source):
     required_categories = {normalize(value) for value in source["category_headers"]}
-    for row_index, values in enumerate(sheet.iter_rows(min_row=1, max_row=min(sheet.max_row, 12), values_only=True), start=1):
+    for row_index, values in enumerate(sheet.iter_rows(min_row=1, max_row=12, values_only=True), start=1):
         headers = [normalize(value) for value in values]
         has_category = any(header in required_categories for header in headers)
         has_code = any(normalize(candidate) in headers for candidate in CODE_HEADERS)
@@ -270,6 +270,7 @@ def build_package(source, rows, input_dir: Path, by_cd_nom, by_name, checked_at:
     stats["matchRate"] = round(stats["matched"] / candidates, 6) if candidates else 1.0
     stats["values"] = dict(sorted(values.items()))
     file_path = input_dir / source["filename"]
+    covered_refs = sorted({status["cdRef"] for status in statuses})
     return {
         "schemaVersion": 1,
         "source": {
@@ -283,7 +284,7 @@ def build_package(source, rows, input_dir: Path, by_cd_nom, by_name, checked_at:
             "sha256": sha256(file_path),
         },
         "replaces": [
-            {"region": "NOR", "category": "red_list_regional", "realm": "fauna"},
+            {"region": "NOR", "category": "red_list_regional", "realm": "fauna", "cdRefs": covered_refs},
         ],
         "statuses": sorted(statuses, key=lambda status: (status["cdRef"], status["value"])),
         "diagnostics": stats,
