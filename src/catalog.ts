@@ -1,58 +1,146 @@
-import { DEMO_DATA_WARNING, regions, sources, statuses, taxa } from './demo'
-import type { Catalog } from './types'
+import { DEMO_DATA_WARNING, regions as demoRegions, sources as demoSources, statuses as demoStatuses, taxa as demoTaxa } from './demo'
+import type { DataManifest, Realm, Region, RegionCode, SourceDataset, Taxon, TaxonStatus } from './types'
 
-interface DataManifest {
-  schemaVersion: 1
-  catalogFile: string
+export interface DataStore {
+  official: boolean
+  warning?: string
+  generatedAt: string
+  datasetVersion: string
+  regions: Region[]
+  sources: SourceDataset[]
+  loadTaxa(realm: Realm): Promise<Taxon[]>
+  loadStatuses(realm: Realm, region: RegionCode): Promise<TaxonStatus[]>
+  primeOffline(): Promise<void>
 }
 
-const demoCatalog: Catalog = {
-  schemaVersion: 1,
-  generatedAt: '2026-08-21T00:00:00.000Z',
-  official: false,
-  warning: DEMO_DATA_WARNING,
-  regions,
-  taxa,
-  statuses,
-  sources,
+function isDatasetFile(value: unknown): value is { file: string; count: number } {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as { file?: unknown; count?: unknown }
+  return typeof candidate.file === 'string' && /^[a-z0-9-]+-[a-f0-9]+\.json$/i.test(candidate.file) && typeof candidate.count === 'number'
 }
 
 function isManifest(value: unknown): value is DataManifest {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<DataManifest>
-  return candidate.schemaVersion === 1 && typeof candidate.catalogFile === 'string' && /^catalog-[a-f0-9]+\.json$/.test(candidate.catalogFile)
-}
+  if (
+    candidate.schemaVersion !== 2 ||
+    candidate.official !== true ||
+    typeof candidate.generatedAt !== 'string' ||
+    typeof candidate.datasetVersion !== 'string' ||
+    !Array.isArray(candidate.regions) ||
+    !Array.isArray(candidate.sources) ||
+    !candidate.files
+  ) {
+    return false
+  }
 
-function isCatalog(value: unknown): value is Catalog {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<Catalog>
-  return (
-    candidate.schemaVersion === 1 &&
-    typeof candidate.generatedAt === 'string' &&
-    typeof candidate.official === 'boolean' &&
-    Array.isArray(candidate.regions) &&
-    Array.isArray(candidate.taxa) &&
-    Array.isArray(candidate.statuses) &&
-    Array.isArray(candidate.sources)
+  const taxa = candidate.files.taxa
+  const statuses = candidate.files.statuses
+  if (!taxa || !statuses || !isDatasetFile(taxa.flora) || !isDatasetFile(taxa.fauna)) return false
+
+  const regionCodes: RegionCode[] = ['CVL', 'NAQ', 'OCC']
+  return (['flora', 'fauna'] as Realm[]).every((realm) =>
+    regionCodes.every((region) => isDatasetFile(statuses[realm]?.[region])),
   )
 }
 
-export async function loadCatalog(): Promise<Catalog> {
+async function fetchArray<T>(file: string): Promise<T[]> {
+  const url = new URL(`data/${file}`, document.baseURI)
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`Jeu de données indisponible : ${file}`)
+  const data: unknown = await response.json()
+  if (!Array.isArray(data)) throw new Error(`Format de données invalide : ${file}`)
+  return data as T[]
+}
+
+function createDemoStore(): DataStore {
+  return {
+    official: false,
+    warning: DEMO_DATA_WARNING,
+    generatedAt: '2026-08-21T00:00:00.000Z',
+    datasetVersion: 'demo',
+    regions: demoRegions,
+    sources: demoSources,
+    async loadTaxa(realm) {
+      return demoTaxa.filter((taxon) => taxon.realm === realm)
+    },
+    async loadStatuses(realm, region) {
+      const refs = new Set(demoTaxa.filter((taxon) => taxon.realm === realm).map((taxon) => taxon.cdRef))
+      return demoStatuses.filter((status) => status.region === region && refs.has(status.cdRef))
+    },
+    async primeOffline() {},
+  }
+}
+
+function createOfficialStore(manifest: DataManifest): DataStore {
+  const taxaCache = new Map<Realm, Taxon[]>()
+  const statusCache = new Map<string, TaxonStatus[]>()
+
+  async function loadTaxa(realm: Realm): Promise<Taxon[]> {
+    const cached = taxaCache.get(realm)
+    if (cached) return cached
+    const rows = await fetchArray<Taxon>(manifest.files.taxa[realm].file)
+    taxaCache.set(realm, rows)
+    return rows
+  }
+
+  async function loadStatuses(realm: Realm, region: RegionCode): Promise<TaxonStatus[]> {
+    const key = `${realm}:${region}`
+    const cached = statusCache.get(key)
+    if (cached) return cached
+    const rows = await fetchArray<TaxonStatus>(manifest.files.statuses[realm][region].file)
+    statusCache.set(key, rows)
+    return rows
+  }
+
+  async function primeOffline(): Promise<void> {
+    if (!navigator.onLine || !('caches' in window)) return
+    if (localStorage.getItem('offlineDatasetVersion') === manifest.datasetVersion) return
+
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+    if (connection?.saveData) return
+
+    const files = [
+      manifest.files.taxa.flora.file,
+      manifest.files.taxa.fauna.file,
+      ...(['flora', 'fauna'] as Realm[]).flatMap((realm) =>
+        (['CVL', 'NAQ', 'OCC'] as RegionCode[]).map((region) => manifest.files.statuses[realm][region].file),
+      ),
+    ]
+
+    const cache = await caches.open('statuts-data-catalogs')
+    for (const file of files) {
+      const url = new URL(`data/${file}`, document.baseURI).toString()
+      if (await cache.match(url)) continue
+      const response = await fetch(url)
+      if (!response.ok) return
+      await cache.put(url, response.clone())
+    }
+
+    localStorage.setItem('offlineDatasetVersion', manifest.datasetVersion)
+  }
+
+  return {
+    official: true,
+    generatedAt: manifest.generatedAt,
+    datasetVersion: manifest.datasetVersion,
+    regions: manifest.regions,
+    sources: manifest.sources,
+    loadTaxa,
+    loadStatuses,
+    primeOffline,
+  }
+}
+
+export async function loadDataStore(): Promise<DataStore> {
   try {
     const manifestUrl = new URL('data/manifest.json', document.baseURI)
     const manifestResponse = await fetch(manifestUrl, { cache: 'no-cache' })
-    if (!manifestResponse.ok) return demoCatalog
+    if (!manifestResponse.ok) return createDemoStore()
 
     const manifestData: unknown = await manifestResponse.json()
-    if (!isManifest(manifestData)) return demoCatalog
-
-    const catalogUrl = new URL(`data/${manifestData.catalogFile}`, document.baseURI)
-    const catalogResponse = await fetch(catalogUrl)
-    if (!catalogResponse.ok) return demoCatalog
-
-    const catalogData: unknown = await catalogResponse.json()
-    return isCatalog(catalogData) ? catalogData : demoCatalog
+    return isManifest(manifestData) ? createOfficialStore(manifestData) : createDemoStore()
   } catch {
-    return demoCatalog
+    return createDemoStore()
   }
 }
