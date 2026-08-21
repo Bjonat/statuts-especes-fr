@@ -17,12 +17,21 @@ export function validateRegionalPackage(pkg, fileName = '<regional>') {
     throw new Error(`${fileName}: replaces/statuses doivent être des tableaux`)
   }
 
-  const replacementKeys = new Set()
   for (const replacement of pkg.replaces) {
     if (!replacement?.region || !replacement?.category || !REALMS.has(replacement?.realm)) {
       throw new Error(`${fileName}: règle de remplacement invalide`)
     }
-    replacementKeys.add(replacementKey(replacement.region, replacement.category, replacement.realm))
+    if (replacement.cdRefs !== undefined) {
+      if (!Array.isArray(replacement.cdRefs) || replacement.cdRefs.length === 0) {
+        throw new Error(`${fileName}: cdRefs de remplacement doit être un tableau non vide`)
+      }
+      const refs = new Set()
+      for (const cdRef of replacement.cdRefs) {
+        if (!Number.isInteger(cdRef) || cdRef <= 0) throw new Error(`${fileName}: CD_REF de remplacement invalide`)
+        if (refs.has(cdRef)) throw new Error(`${fileName}: CD_REF de remplacement dupliqué`)
+        refs.add(cdRef)
+      }
+    }
   }
 
   for (const status of pkg.statuses) {
@@ -58,17 +67,19 @@ export function mergeRegionalPackages(baseStatuses, taxa, packages) {
   if (!packages.length) return { statuses: baseStatuses, sources: [], diagnostics: [] }
 
   const realmByRef = new Map(taxa.map((taxon) => [taxon.cdRef, taxon.realm]))
-  const replacementKeys = new Set()
-  for (const pkg of packages) {
-    for (const replacement of pkg.replaces) {
-      replacementKeys.add(replacementKey(replacement.region, replacement.category, replacement.realm))
-    }
-  }
+  const replacementRules = packages.flatMap((pkg) =>
+    pkg.replaces.map((replacement) => ({
+      key: replacementKey(replacement.region, replacement.category, replacement.realm),
+      cdRefs: replacement.cdRefs ? new Set(replacement.cdRefs) : null,
+    })),
+  )
 
   const statuses = baseStatuses.filter((status) => {
     const realm = realmByRef.get(status.cdRef)
     if (!realm) return true
-    return !replacementKeys.has(replacementKey(status.region, status.category, realm))
+    const key = replacementKey(status.region, status.category, realm)
+    const shouldReplace = replacementRules.some((rule) => rule.key === key && (!rule.cdRefs || rule.cdRefs.has(status.cdRef)))
+    return !shouldReplace
   })
 
   const diagnostics = []
