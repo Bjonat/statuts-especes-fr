@@ -32,6 +32,10 @@ a {
   color: #405b37;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .shell {
   width: min(100% - 24px, 680px);
   margin: 0 auto;
@@ -79,11 +83,12 @@ h1 {
   margin-bottom: 10px;
   font-size: clamp(1.8rem, 8vw, 2.6rem);
   line-height: 1.08;
+  overflow-wrap: anywhere;
 }
 
 h2 {
   font-size: 1.05rem;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .intro {
@@ -120,6 +125,31 @@ h2 {
 
 .realm-icon {
   font-size: 2rem;
+}
+
+.install-area {
+  margin-top: 18px;
+}
+
+.install-button {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #516849;
+  border-radius: 11px;
+  padding: 10px 16px;
+  background: #566f4e;
+  color: #fff;
+  font-weight: 750;
+}
+
+.install-help {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f2f5ee;
+  color: #566151;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .topbar {
@@ -260,6 +290,7 @@ h2 {
 }
 
 .taxon-meta {
+  margin-bottom: 0;
   color: #73796e;
   font-size: 0.82rem;
 }
@@ -276,15 +307,22 @@ h2 {
 
 .status-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px 12px;
-  align-items: center;
-  padding: 11px 0;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(0, 1.1fr);
+  gap: 8px 22px;
+  align-items: start;
+  padding: 13px 0;
   border-bottom: 1px solid #ecece7;
 }
 
+.status-row:first-child {
+  border-top: 1px solid #ecece7;
+}
+
 .status-row dt {
+  min-width: 0;
   color: #535a50;
+  font-weight: 650;
+  line-height: 1.4;
 }
 
 .status-row dt small {
@@ -297,48 +335,32 @@ h2 {
 }
 
 .status-row dd {
+  min-width: 0;
   margin: 0;
   font-weight: 800;
-  text-align: right;
-}
-
-.status-source {
-  grid-column: 1 / -1;
-  margin: 0;
-  color: #747a70;
-  font-size: 0.76rem;
   line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
 }
 
-.sources-details {
-  margin-top: 20px;
-  border-top: 1px solid #e5e6df;
+.source-summary {
+  margin: 18px 0 0;
   padding-top: 14px;
+  border-top: 1px solid #e5e6df;
+  color: #6b7167;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
-.sources-details summary {
-  font-weight: 750;
-  cursor: pointer;
-}
+@media (max-width: 520px) {
+  .status-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
 
-.source-row {
-  margin-top: 12px;
-  padding: 11px;
-  background: #f7f8f4;
-  border-radius: 10px;
-  display: grid;
-  gap: 4px;
-  font-size: 0.84rem;
-}
-
-.source-row span {
-  color: #666d62;
-}
-
-.source-row a,
-.status-source a {
-  font-weight: 700;
-  text-underline-offset: 2px;
+  .status-row dd {
+    font-size: 1rem;
+  }
 }
 
 @media (max-width: 430px) {
@@ -354,5 +376,13 @@ h2 {
 
   .realm-card {
     min-height: 118px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .offline-badge {
+    margin-top: 5px;
   }
 }
