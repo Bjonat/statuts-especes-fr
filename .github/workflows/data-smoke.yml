@@ -30,6 +30,8 @@ jobs:
         run: |
           npm install
           python -m pip install --disable-pip-version-check openpyxl xlrd
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
 
       - name: Download TAXREF v18
         shell: bash
@@ -163,6 +165,24 @@ jobs:
           sha256sum "$RUNNER_TEMP/idf-statuts.csv"
           echo "IDF_SOURCE=$RUNNER_TEMP/idf-statuts.csv" >> "$GITHUB_ENV"
 
+      - name: Download regional Centre-Val de Loire LRR sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cvl-lrr"
+          curl --fail --location --retry 3 \
+            'https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/2025-01/LRodonatesRCVL2022-VF2ok.pdf' \
+            -o "$RUNNER_TEMP/cvl-lrr/odonates-2022.pdf"
+          curl --fail --location --retry 3 \
+            'https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/listes%20rouges/LRR-papillons_2024_vf-4.pdf' \
+            -o "$RUNNER_TEMP/cvl-lrr/papillons-2024.pdf"
+          curl --fail --location --retry 3 \
+            'https://www.laboratoireecoentomologie.com/wp-content/uploads/2026/02/Chapelin-Viscardi-et-al.-2025.-LRR-CVdL-Gyrins-dytiques-donacies.pdf' \
+            -o "$RUNNER_TEMP/cvl-lrr/coleopteres-2025.pdf"
+          for file in "$RUNNER_TEMP"/cvl-lrr/*.pdf; do test "$(head -c 4 "$file")" = '%PDF'; done
+          sha256sum "$RUNNER_TEMP"/cvl-lrr/*.pdf
+          echo "CVL_LRR_DIR=$RUNNER_TEMP/cvl-lrr" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         shell: bash
         run: |
@@ -175,6 +195,7 @@ jobs:
           python data-pipeline/regions/bre/build_oeb.py --taxref "$TAXREF_FILE" --znieff "$BRE_ZNIEFF_FILE" --lrr "$BRE_LRR_FILE" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/nor/build_anbdd_lrr.py --taxref "$TAXREF_FILE" --input-dir "$NOR_LRR_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/idf/build_geonat_znieff.py --taxref "$TAXREF_FILE" --source "$IDF_SOURCE" --out "$REGIONAL_DIR/idf-znieff.json" --min-match-rate 0.97
+          python data-pipeline/regions/cvl/build_arb_lrr.py --taxref "$TAXREF_FILE" --odonates "$CVL_LRR_DIR/odonates-2022.pdf" --papillons "$CVL_LRR_DIR/papillons-2024.pdf" --coleopteres "$CVL_LRR_DIR/coleopteres-2025.pdf" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           echo "REGIONAL_DIR=$REGIONAL_DIR" >> "$GITHUB_ENV"
 
       - name: Diagnose official source volumes
@@ -205,6 +226,8 @@ jobs:
             'anbdd-normandie-lrr-amphibiens-2022', 'anbdd-normandie-lrr-reptiles-2022',
             'anbdd-normandie-lrr-odonates-2022', 'anbdd-normandie-lrr-orthopteres-2022',
             'anbdd-normandie-lrr-rhopaloceres-2022', 'arb-idf-geonat-statuts-znieff-2026',
+            'arb-cvl-lrr-odonates-2022', 'arb-cvl-lrr-papillons-2024',
+            'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
           ]
           if (process.env.NAQ_REGIONAL_AVAILABLE === 'true') required.push('obv-na-znieff-flore-2019-v1.2')
           const ids = new Set(manifest.sources.map((source) => source.id))
