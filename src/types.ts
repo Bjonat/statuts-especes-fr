@@ -57,8 +57,6 @@ export interface TaxonStatus {
   sourceId: string
   scope?: StatusScope
   scopeLabel?: string
-  citation?: string
-  documentUrl?: string
 }
 
 export interface StatusDefinition {
@@ -66,8 +64,6 @@ export interface StatusDefinition {
   label: string
   value: string
   sourceId: string
-  citation?: string
-  documentUrl?: string
 }
 
 export type StatusScopeCode = 0 | 1 | 2
@@ -80,7 +76,6 @@ export interface SourceDataset {
   version: string
   publicationYear?: number
   official: boolean
-  url?: string
   checkedAt?: string
 }
 
