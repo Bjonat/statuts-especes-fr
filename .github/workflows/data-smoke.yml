@@ -83,6 +83,9 @@ jobs:
           NODE
           du -h public/data/*
 
+      - name: Validate field sentinel cases
+        run: node data-pipeline/validate-generated.mjs --dir public/data
+
       - name: Upload generated dataset
         uses: actions/upload-artifact@v4
         with:
