@@ -7,7 +7,6 @@ import hashlib
 import json
 import re
 import subprocess
-import tempfile
 import unicodedata
 from collections import defaultdict
 from datetime import date
@@ -15,7 +14,10 @@ from pathlib import Path
 
 UICN = r"(?:RE|CR\*?|EN|VU|NT|LC|DD|NA|NE)"
 SCIENTIFIC_ROW = re.compile(
-    rf"(?P<name>[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+(?:\s+[a-zà-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+){{1,3}})\s+(?P<category>{UICN})\b"
+    rf"(?P<name>[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+(?:\s+[a-zà-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+){{1,3}})\s+(?P<category>{UICN})(?=\s|$)"
+)
+BINOMIAL = re.compile(
+    r"[A-ZÀ-ÖØ-Þ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+(?:\s+[a-zà-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'’.-]+){1,3}"
 )
 RANK_MARKERS = {
     "subsp.", "subsp", "ssp.", "ssp", "var.", "var", "f.", "f", "fo.", "fo",
@@ -66,6 +68,7 @@ def header_value(row: dict[str, str], *names: str) -> str:
 
 
 def taxref_lookup(path: Path):
+    accepted: defaultdict[str, set[int]] = defaultdict(set)
     exact: defaultdict[str, set[int]] = defaultdict(set)
     bare: defaultdict[str, set[int]] = defaultdict(set)
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -77,17 +80,26 @@ def taxref_lookup(path: Path):
             if not cd_ref_raw.isdigit():
                 continue
             cd_ref = int(cd_ref_raw)
+            cd_nom_raw = header_value(row, "CD_NOM")
+            is_accepted = cd_nom_raw.isdigit() and int(cd_nom_raw) == cd_ref
             for field in ("LB_NOM", "NOM_COMPLET", "NOM_VALIDE"):
                 label = header_value(row, field)
-                if label:
-                    exact[normalize(label)].add(cd_ref)
+                if not label:
+                    continue
+                key = normalize(label)
+                exact[key].add(cd_ref)
+                if is_accepted:
+                    accepted[key].add(cd_ref)
             lb_nom = header_value(row, "LB_NOM")
             if lb_nom:
                 bare[core_name(lb_nom)].add(cd_ref)
-    return exact, bare
+    return accepted, exact, bare
 
 
-def resolve_taxon(name: str, exact, bare):
+def resolve_taxon(name: str, accepted, exact, bare):
+    candidates = accepted.get(normalize(name), set())
+    if len(candidates) == 1:
+        return next(iter(candidates)), "accepted"
     candidates = exact.get(normalize(name), set())
     if len(candidates) == 1:
         return next(iter(candidates)), "exact"
@@ -137,23 +149,26 @@ def table_section(text: str) -> str:
 def parse_rows(text: str):
     rows = []
     seen = set()
-    for line in table_section(text).splitlines():
+    suspicious = []
+    for raw_line in table_section(text).splitlines():
+        line = re.sub(r"\s+$", "", raw_line)
         match = SCIENTIFIC_ROW.search(line)
-        if not match:
+        if match:
+            name = re.sub(r"\s+", " ", match.group("name")).strip()
+            category = match.group("category")
+            key = (normalize(name), category)
+            if key not in seen:
+                seen.add(key)
+                rows.append((name, category))
             continue
-        name = re.sub(r"\s+", " ", match.group("name")).strip()
-        category = match.group("category")
-        key = (normalize(name), category)
-        if key in seen:
-            continue
-        seen.add(key)
-        rows.append((name, category))
-    return rows
+        if BINOMIAL.search(line) and re.search(rf"\b{UICN}\b", line):
+            suspicious.append(re.sub(r"\s+", " ", line).strip())
+    return rows, suspicious[:50]
 
 
-def build_one(kind: str, taxref_path: Path, pdf_path: Path, exact, bare, checked_at: str):
+def build_one(kind: str, pdf_path: Path, accepted, exact, bare, checked_at: str):
     metadata = SOURCES[kind]
-    rows = parse_rows(pdf_text(pdf_path))
+    rows, suspicious = parse_rows(pdf_text(pdf_path))
     if len(rows) < metadata["minimumRows"]:
         raise RuntimeError(
             f"{kind}: seulement {len(rows)} lignes UICN extraites; minimum attendu {metadata['minimumRows']}"
@@ -163,6 +178,7 @@ def build_one(kind: str, taxref_path: Path, pdf_path: Path, exact, bare, checked
     seen_statuses = set()
     stats = {
         "rowsParsed": len(rows),
+        "accepted": 0,
         "exact": 0,
         "core": 0,
         "unmatched": 0,
@@ -174,7 +190,7 @@ def build_one(kind: str, taxref_path: Path, pdf_path: Path, exact, bare, checked
 
     for taxon_name, category in rows:
         categories[category] += 1
-        cd_ref, mode = resolve_taxon(taxon_name, exact, bare)
+        cd_ref, mode = resolve_taxon(taxon_name, accepted, exact, bare)
         stats[mode] += 1
         if cd_ref is None:
             unresolved.append({"taxon": taxon_name, "category": category, "reason": mode})
@@ -193,12 +209,13 @@ def build_one(kind: str, taxref_path: Path, pdf_path: Path, exact, bare, checked
             "scope": "regional",
         })
 
-    matched = stats["exact"] + stats["core"]
+    matched = stats["accepted"] + stats["exact"] + stats["core"]
     match_rate = matched / len(rows) if rows else 0
     stats["matched"] = matched
     stats["matchRate"] = round(match_rate, 6)
     stats["categories"] = dict(sorted(categories.items()))
     stats["unresolvedSample"] = unresolved[:50]
+    stats["suspiciousUnparsedLines"] = suspicious
 
     covered_refs = sorted({status["cdRef"] for status in statuses})
     package = {
@@ -237,7 +254,7 @@ def main():
     parser.add_argument("--min-match-rate", type=float, default=0.97)
     args = parser.parse_args()
 
-    exact, bare = taxref_lookup(Path(args.taxref))
+    accepted, exact, bare = taxref_lookup(Path(args.taxref))
     output_dir = Path(args.out_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -247,7 +264,7 @@ def main():
     }
     total = 0
     for kind, pdf_path in inputs.items():
-        package = build_one(kind, Path(args.taxref), pdf_path, exact, bare, args.checked_at)
+        package = build_one(kind, pdf_path, accepted, exact, bare, args.checked_at)
         diagnostics = package["diagnostics"]
         print(json.dumps({"source": package["source"]["id"], **diagnostics}, ensure_ascii=False, indent=2))
         if diagnostics["matchRate"] < args.min_match_rate:
