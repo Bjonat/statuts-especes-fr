@@ -18,6 +18,28 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,json}'],
+        globIgnores: ['data/catalog-*.json'],
+        runtimeCaching: [
+          {
+            urlPattern: /\/data\/manifest\.json$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'statuts-data-manifest',
+              networkTimeoutSeconds: 3,
+            },
+          },
+          {
+            urlPattern: /\/data\/catalog-[a-f0-9]+\.json$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'statuts-data-catalogs',
+              expiration: {
+                maxEntries: 3,
+                maxAgeSeconds: 60 * 60 * 24 * 365,
+              },
+            },
+          },
+        ],
       },
     }),
   ],
