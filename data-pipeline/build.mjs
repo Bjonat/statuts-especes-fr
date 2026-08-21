@@ -9,6 +9,7 @@ import {
   filterTaxaForMetropolitanRegions,
   publicRegions,
 } from './pipeline.mjs'
+import { loadRegionalPackages, mergeRegionalPackages } from './regional.mjs'
 
 function parseArgs(argv) {
   const args = {}
@@ -53,9 +54,10 @@ const args = parseArgs(process.argv.slice(2))
 const taxrefPath = args.taxref
 const bdcPath = args.bdc
 const outputDirectory = args.out ?? 'public/data'
+const regionalDirectory = args['regional-dir']
 
 if (!taxrefPath || !bdcPath) {
-  throw new Error('Usage: node data-pipeline/build.mjs --taxref <TAXREFv18.txt> --bdc <bdc.csv> [--out public/data]')
+  throw new Error('Usage: node data-pipeline/build.mjs --taxref <TAXREFv18.txt> --bdc <bdc.csv> [--regional-dir <dossier>] [--out public/data]')
 }
 
 console.log('Lecture de TAXREF v18…')
@@ -64,7 +66,17 @@ console.log(`${searchableTaxa.length.toLocaleString('fr-FR')} taxons de rang esp
 
 console.log('Lecture de la BDC Statuts v18…')
 let statuses = await buildStatuses(bdcPath, searchableTaxa)
-console.log(`${statuses.length.toLocaleString('fr-FR')} relations taxon × territoire × statut retenues.`)
+console.log(`${statuses.length.toLocaleString('fr-FR')} relations taxon × territoire × statut BDC retenues.`)
+
+const regionalPackages = await loadRegionalPackages(regionalDirectory)
+const regionalMerge = mergeRegionalPackages(statuses, searchableTaxa, regionalPackages)
+statuses = regionalMerge.statuses
+for (const diagnostic of regionalMerge.diagnostics) {
+  console.log(`Source régionale ${diagnostic.sourceId}: ${diagnostic.imported.toLocaleString('fr-FR')} statuts importés, ${diagnostic.unknownRefs.toLocaleString('fr-FR')} CD_REF inconnus.`)
+}
+if (regionalPackages.length) {
+  console.log(`${regionalPackages.length.toLocaleString('fr-FR')} paquet(s) régional(aux) appliqué(s).`)
+}
 
 const taxa = filterTaxaForMetropolitanRegions(searchableTaxa, statuses)
 const keptRefs = new Set(taxa.map((taxon) => taxon.cdRef))
@@ -118,7 +130,7 @@ for (const realm of ['flora', 'fauna']) {
 }
 
 const generatedAt = new Date().toISOString()
-const sources = buildSources(generatedAt.slice(0, 10))
+const sources = [...buildSources(generatedAt.slice(0, 10)), ...regionalMerge.sources]
 const datasetVersion = hashContent(JSON.stringify(files))
 const manifest = {
   schemaVersion: 3,
