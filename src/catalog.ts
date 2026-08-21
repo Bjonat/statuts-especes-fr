@@ -10,7 +10,7 @@ export interface DataStore {
   sources: SourceDataset[]
   loadTaxa(realm: Realm): Promise<Taxon[]>
   loadStatuses(realm: Realm, region: RegionCode): Promise<TaxonStatus[]>
-  primeOffline(): Promise<void>
+  primeOffline(): Promise<boolean>
 }
 
 function isDatasetFile(value: unknown): value is { file: string; count: number } {
@@ -68,7 +68,9 @@ function createDemoStore(): DataStore {
       const refs = new Set(demoTaxa.filter((taxon) => taxon.realm === realm).map((taxon) => taxon.cdRef))
       return demoStatuses.filter((status) => status.region === region && refs.has(status.cdRef))
     },
-    async primeOffline() {},
+    async primeOffline() {
+      return true
+    },
   }
 }
 
@@ -93,12 +95,12 @@ function createOfficialStore(manifest: DataManifest): DataStore {
     return rows
   }
 
-  async function primeOffline(): Promise<void> {
-    if (!navigator.onLine || !('caches' in window)) return
-    if (localStorage.getItem('offlineDatasetVersion') === manifest.datasetVersion) return
+  async function primeOffline(): Promise<boolean> {
+    if (localStorage.getItem('offlineDatasetVersion') === manifest.datasetVersion) return true
+    if (!navigator.onLine || !('caches' in window)) return false
 
     const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
-    if (connection?.saveData) return
+    if (connection?.saveData) return false
 
     const files = [
       manifest.files.taxa.flora.file,
@@ -113,11 +115,12 @@ function createOfficialStore(manifest: DataManifest): DataStore {
       const url = new URL(`data/${file}`, document.baseURI).toString()
       if (await cache.match(url)) continue
       const response = await fetch(url)
-      if (!response.ok) return
+      if (!response.ok) return false
       await cache.put(url, response.clone())
     }
 
     localStorage.setItem('offlineDatasetVersion', manifest.datasetVersion)
+    return true
   }
 
   return {
