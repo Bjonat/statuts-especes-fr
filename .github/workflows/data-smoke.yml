@@ -123,14 +123,28 @@ jobs:
           python data-pipeline/regions/inspect_workbook.py "$NAQ_ZNIEFF_FILE"
           python data-pipeline/regions/inspect_workbook.py "$NAQ_EEE_FILE"
 
+      - name: Build regional packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          REGIONAL_DIR="$RUNNER_TEMP/regional-packages"
+          mkdir -p "$REGIONAL_DIR"
+          if [ "${NAQ_REGIONAL_AVAILABLE:-false}" = 'true' ]; then
+            python data-pipeline/regions/naq/build_znieff.py \
+              --taxref "$TAXREF_FILE" \
+              --workbook "$NAQ_ZNIEFF_FILE" \
+              --out "$REGIONAL_DIR/naq-znieff-flora.json"
+          fi
+          echo "REGIONAL_DIR=$REGIONAL_DIR" >> "$GITHUB_ENV"
+
       - name: Diagnose official source volumes
         run: node data-pipeline/analyze.mjs --taxref "$TAXREF_FILE" --bdc "$BDC_FILE"
 
       - name: Run pipeline tests
         run: node --test data-pipeline/*.test.mjs
 
-      - name: Build official catalog
-        run: node data-pipeline/build.mjs --taxref "$TAXREF_FILE" --bdc "$BDC_FILE" --out public/data
+      - name: Build enriched official catalog
+        run: node data-pipeline/build.mjs --taxref "$TAXREF_FILE" --bdc "$BDC_FILE" --regional-dir "$REGIONAL_DIR" --out public/data
 
       - name: Validate generated manifest
         run: |
@@ -145,6 +159,9 @@ jobs:
             && manifest.files?.statusDefinitions?.file && realms.every((realm) => manifest.files?.taxa?.[realm]?.file)
             && realms.every((realm) => regions.every((region) => manifest.files?.statusLinks?.[realm]?.[region]?.file))
           if (!valid) process.exit(1)
+          if (process.env.NAQ_REGIONAL_AVAILABLE === 'true' && !manifest.sources.some((source) => source.id === 'obv-na-znieff-flore-2019-v1.2')) {
+            throw new Error('Source régionale ZNIEFF NAQ absente du manifeste enrichi')
+          }
           console.log(manifest)
           NODE
           du -h public/data/*
