@@ -7,6 +7,7 @@ on:
     paths:
       - 'data-pipeline/regions/nor/**'
       - 'data-pipeline/regions/inspect_workbook.py'
+      - 'data-pipeline/regional.mjs'
       - '.github/workflows/normandie-lrr-smoke.yml'
 
 jobs:
@@ -16,6 +17,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -23,6 +29,18 @@ jobs:
 
       - name: Install workbook readers
         run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
 
       - name: Download official ANBDD tables
         shell: bash
@@ -49,3 +67,41 @@ jobs:
             echo "===== $file ====="
             python data-pipeline/regions/inspect_workbook.py "$file"
           done
+
+      - name: Build normalized Normandie packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nor-packages"
+          python data-pipeline/regions/nor/build_anbdd_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$NOR_LRR_DIR" \
+            --out-dir "$RUNNER_TEMP/nor-packages" \
+            --min-match-rate 0.97
+          echo "NOR_PACKAGES_DIR=$RUNNER_TEMP/nor-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional package contract
+        shell: bash
+        run: |
+          REGIONAL_DIR="$NOR_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 7) throw new Error(`7 paquets Normandie attendus, reçu ${packages.length}`)
+          const statuses = packages.reduce((sum, pkg) => sum + pkg.statuses.length, 0)
+          if (statuses < 500) throw new Error(`Volume LRR Normandie anormalement faible: ${statuses}`)
+          for (const pkg of packages) {
+            if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${pkg.source.id}`)
+            if (pkg.replaces.length !== 1 || pkg.replaces[0].region !== 'NOR' || pkg.replaces[0].category !== 'red_list_regional' || pkg.replaces[0].realm !== 'fauna') {
+              throw new Error(`Override Normandie invalide: ${pkg.source.id}`)
+            }
+          }
+          console.log({ packages: packages.length, statuses })
+          NODE
+
+      - name: Upload normalized packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nor-lrr-regional-packages
+          path: ${{ env.NOR_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7
