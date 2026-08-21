@@ -1,0 +1,61 @@
+name: IDF regional source smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/idf/**'
+      - '.github/workflows/idf-regional-smoke.yml'
+
+jobs:
+  probe-idf-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download GeoNat IDF status table
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://geonature.arb-idf.fr/geonature/api/media/exports/schedules/Statuts_des_taxons_STyt8fLcp03L11.csv'
+          curl --fail --location --retry 3 "$URL" -o "$RUNNER_TEMP/idf-statuts.csv"
+          test -s "$RUNNER_TEMP/idf-statuts.csv"
+          head -n 3 "$RUNNER_TEMP/idf-statuts.csv"
+          sha256sum "$RUNNER_TEMP/idf-statuts.csv"
+          file "$RUNNER_TEMP/idf-statuts.csv"
+          echo "IDF_SOURCE=$RUNNER_TEMP/idf-statuts.csv" >> "$GITHUB_ENV"
+
+      - name: Validate expected columns
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv, os
+          from pathlib import Path
+          path = Path(os.environ['IDF_SOURCE'])
+          data = path.read_bytes()
+          text = None
+          for enc in ('utf-8-sig', 'utf-8', 'cp1252', 'latin1'):
+              try:
+                  text = data.decode(enc)
+                  break
+              except UnicodeDecodeError:
+                  pass
+          if text is None:
+              raise SystemExit('CSV non décodable')
+          sample = text[:20000]
+          try:
+              dialect = csv.Sniffer().sniff(sample, delimiters=';\t,|')
+              delimiter = dialect.delimiter
+          except csv.Error:
+              delimiter = ';'
+          reader = csv.DictReader(text.splitlines(), delimiter=delimiter)
+          headers = reader.fieldnames or []
+          print({'delimiter': delimiter, 'headers': headers, 'rows_sample': [next(reader, None) for _ in range(3)]})
+          normalized = {h.strip().casefold().replace('_', '').replace(' ', '') for h in headers if h}
+          if not any('detznieff' in h for h in normalized):
+              raise SystemExit('Colonne DetZnieff absente')
+          if not any(h in normalized for h in {'cdnom', 'cdref'}):
+              raise SystemExit('Identifiant TAXREF absent')
+          PY
