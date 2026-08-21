@@ -2,8 +2,8 @@ name: Data source smoke test
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/data-pipeline]
+  pull_request:
+    branches: [main]
     paths:
       - 'data-pipeline/**'
       - '.github/workflows/data-smoke.yml'
