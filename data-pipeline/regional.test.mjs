@@ -4,6 +4,7 @@ import { mergeRegionalPackages, validateRegionalPackage } from './regional.mjs'
 
 const taxa = [
   { cdRef: 100, realm: 'flora' },
+  { cdRef: 101, realm: 'flora' },
   { cdRef: 200, realm: 'fauna' },
 ]
 
@@ -56,6 +57,41 @@ test('une liste régionale autoritaire remplace la même catégorie BDC pour son
   assert.equal(merged.statuses.some((status) => status.cdRef === 100 && status.category === 'znieff' && status.sourceId === 'dreal-occ-znieff-2024'), true)
   assert.equal(merged.statuses.some((status) => status.cdRef === 200 && status.category === 'znieff' && status.sourceId === 'bdc-v18'), true)
   assert.equal(merged.statuses.some((status) => status.cdRef === 100 && status.category === 'red_list_regional'), true)
+})
+
+test('un override ciblé ne retire BDC que pour les CD_REF explicitement couverts', () => {
+  const base = [
+    { cdRef: 100, region: 'OCC', category: 'red_list_regional', label: 'LRR BDC', value: 'VU', sourceId: 'bdc-v18', scope: 'regional' },
+    { cdRef: 101, region: 'OCC', category: 'red_list_regional', label: 'LRR BDC', value: 'LC', sourceId: 'bdc-v18', scope: 'regional' },
+  ]
+  const pkg = packageFixture({
+    replaces: [{ region: 'OCC', category: 'red_list_regional', realm: 'flora', cdRefs: [100] }],
+    statuses: [{
+      cdRef: 100,
+      region: 'OCC',
+      category: 'red_list_regional',
+      label: 'Liste rouge régionale',
+      value: 'EN',
+      sourceId: 'dreal-occ-znieff-2024',
+      scope: 'regional',
+    }],
+  })
+
+  const merged = mergeRegionalPackages(base, taxa, [pkg])
+  assert.equal(merged.statuses.some((status) => status.cdRef === 100 && status.sourceId === 'bdc-v18'), false)
+  assert.equal(merged.statuses.some((status) => status.cdRef === 100 && status.value === 'EN'), true)
+  assert.equal(merged.statuses.some((status) => status.cdRef === 101 && status.sourceId === 'bdc-v18'), true)
+})
+
+test('les CD_REF ciblés doivent être valides, non vides et non dupliqués', () => {
+  assert.throws(
+    () => validateRegionalPackage(packageFixture({ replaces: [{ region: 'OCC', category: 'znieff', realm: 'flora', cdRefs: [] }] })),
+    /tableau non vide/,
+  )
+  assert.throws(
+    () => validateRegionalPackage(packageFixture({ replaces: [{ region: 'OCC', category: 'znieff', realm: 'flora', cdRefs: [100, 100] }] })),
+    /dupliqué/,
+  )
 })
 
 test('les CD_REF régionaux inconnus sont comptés et ignorés sans polluer le catalogue', () => {
