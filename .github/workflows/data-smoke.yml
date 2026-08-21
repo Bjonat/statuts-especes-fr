@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'data-pipeline/**'
+      - 'package.json'
       - '.github/workflows/data-smoke.yml'
 
 jobs:
@@ -15,17 +16,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          python -m pip install --disable-pip-version-check openpyxl xlrd
+
       - name: Download TAXREF v18
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/taxref"
-          curl --fail --location --retry 3 \
-            https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip \
-            -o "$RUNNER_TEMP/taxref.zip" \
-          || curl --fail --location --retry 3 \
-            https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip \
-            -o "$RUNNER_TEMP/taxref.zip"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
           unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
           TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
           test -n "$TAXREF_FILE"
@@ -36,25 +48,94 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/bdc"
-          curl --fail --location --retry 3 \
-            https://assets.patrinat.fr/files/referentiel/BDC.zip \
-            -o "$RUNNER_TEMP/bdc.zip" \
-          || curl --fail --location --retry 3 \
-            https://geonature.fr/data/inpn/taxonomie/BDC-STATUTS-v18.zip \
-            -o "$RUNNER_TEMP/bdc.zip"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/BDC.zip -o "$RUNNER_TEMP/bdc.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/BDC-STATUTS-v18.zip -o "$RUNNER_TEMP/bdc.zip"
           unzip -q "$RUNNER_TEMP/bdc.zip" -d "$RUNNER_TEMP/bdc"
-
           BDC_FILE=''
           while IFS= read -r candidate; do
             header="$(head -n 1 "$candidate" | tr '[:upper:]' '[:lower:]')"
-            if grep -q 'cd_ref' <<< "$header" && grep -q 'cd_type_statut' <<< "$header"; then
-              BDC_FILE="$candidate"
-              break
-            fi
+            if grep -q 'cd_ref' <<< "$header" && grep -q 'cd_type_statut' <<< "$header"; then BDC_FILE="$candidate"; break; fi
           done < <(find "$RUNNER_TEMP/bdc" -type f -iname '*.csv')
-
           test -n "$BDC_FILE"
           echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
+
+      - name: Probe ZNIEFF Centre-Val de Loire 2026
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="$RUNNER_TEMP/znieff-cvl-2026.xls"
+          curl --fail --location --retry 3 https://www.centre-val-de-loire.developpement-durable.gouv.fr/IMG/xls/listes_dz_cvl_actual_avril_2026.xls -o "$TARGET"
+          if head -c 128 "$TARGET" | grep -Eqi '<!doctype html|<html'; then
+            echo 'CVL_ZNIEFF_AVAILABLE=false' >> "$GITHUB_ENV"
+            echo '::warning::Source ZNIEFF CVL 2026 momentanément indisponible (page de maintenance renvoyée).'
+          else
+            echo 'CVL_ZNIEFF_AVAILABLE=true' >> "$GITHUB_ENV"
+            echo "CVL_ZNIEFF_FILE=$TARGET" >> "$GITHUB_ENV"
+          fi
+
+      - name: Inspect ZNIEFF Centre-Val de Loire 2026
+        if: env.CVL_ZNIEFF_AVAILABLE == 'true'
+        run: python data-pipeline/regions/inspect_workbook.py "$CVL_ZNIEFF_FILE"
+
+      - name: Probe ZNIEFF Occitanie
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLORA="$RUNNER_TEMP/znieff-occ-flore.xlsx"
+          FAUNA="$RUNNER_TEMP/znieff-occ-faune.xlsx"
+          curl --fail --location --retry 3 https://www.occitanie.developpement-durable.gouv.fr/IMG/xlsx/liste_taxons_det_flore_occitanie_cotation_v13-v16_osmose_public.xlsx -o "$FLORA"
+          curl --fail --location --retry 3 https://www.occitanie.developpement-durable.gouv.fr/IMG/xlsx/listes_faune_znieff_20240725.xlsx -o "$FAUNA"
+          if [ "$(head -c 2 "$FLORA")" = 'PK' ] && [ "$(head -c 2 "$FAUNA")" = 'PK' ]; then
+            echo 'OCC_ZNIEFF_AVAILABLE=true' >> "$GITHUB_ENV"
+            echo "OCC_ZNIEFF_FLORA_FILE=$FLORA" >> "$GITHUB_ENV"
+            echo "OCC_ZNIEFF_FAUNA_FILE=$FAUNA" >> "$GITHUB_ENV"
+          else
+            echo 'OCC_ZNIEFF_AVAILABLE=false' >> "$GITHUB_ENV"
+            echo '::warning::Sources ZNIEFF Occitanie momentanément indisponibles (page de maintenance renvoyée).'
+          fi
+
+      - name: Inspect ZNIEFF Occitanie
+        if: env.OCC_ZNIEFF_AVAILABLE == 'true'
+        run: |
+          python data-pipeline/regions/inspect_workbook.py "$OCC_ZNIEFF_FLORA_FILE"
+          python data-pipeline/regions/inspect_workbook.py "$OCC_ZNIEFF_FAUNA_FILE"
+
+      - name: Probe regional sources Nouvelle-Aquitaine
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZNIEFF="$RUNNER_TEMP/znieff-naq-flore.xlsx"
+          EEE="$RUNNER_TEMP/eee-naq-2022.xlsx"
+          curl --fail --location --retry 3 https://obv-na.fr/ofsa/ressources/4_ref_bioeval/CBN_2019-Liste_ED_ZNIEFF_flore_Nouvelle-Aquitaine_v1.2_tb.xlsx -o "$ZNIEFF"
+          curl --fail --location --retry 3 https://obv-na.fr/ofsa/ressources/5_ref_eee/CBNSA_2022-Liste_hierarchisee_PEE_NA_v1.0.xlsx -o "$EEE"
+          if [ "$(head -c 2 "$ZNIEFF")" = 'PK' ] && [ "$(head -c 2 "$EEE")" = 'PK' ]; then
+            echo 'NAQ_REGIONAL_AVAILABLE=true' >> "$GITHUB_ENV"
+            echo "NAQ_ZNIEFF_FILE=$ZNIEFF" >> "$GITHUB_ENV"
+            echo "NAQ_EEE_FILE=$EEE" >> "$GITHUB_ENV"
+          else
+            echo 'NAQ_REGIONAL_AVAILABLE=false' >> "$GITHUB_ENV"
+            echo '::warning::Sources régionales OBV Nouvelle-Aquitaine indisponibles pour ce run.'
+          fi
+
+      - name: Inspect regional sources Nouvelle-Aquitaine
+        if: env.NAQ_REGIONAL_AVAILABLE == 'true'
+        run: |
+          python data-pipeline/regions/inspect_workbook.py "$NAQ_ZNIEFF_FILE"
+          python data-pipeline/regions/inspect_workbook.py "$NAQ_EEE_FILE"
+
+      - name: Build regional packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          REGIONAL_DIR="$RUNNER_TEMP/regional-packages"
+          mkdir -p "$REGIONAL_DIR"
+          if [ "${NAQ_REGIONAL_AVAILABLE:-false}" = 'true' ]; then
+            python data-pipeline/regions/naq/build_znieff.py \
+              --taxref "$TAXREF_FILE" \
+              --workbook "$NAQ_ZNIEFF_FILE" \
+              --out "$REGIONAL_DIR/naq-znieff-flora.json"
+          fi
+          echo "REGIONAL_DIR=$REGIONAL_DIR" >> "$GITHUB_ENV"
 
       - name: Diagnose official source volumes
         run: node data-pipeline/analyze.mjs --taxref "$TAXREF_FILE" --bdc "$BDC_FILE"
@@ -62,8 +143,8 @@ jobs:
       - name: Run pipeline tests
         run: node --test data-pipeline/*.test.mjs
 
-      - name: Build official catalog
-        run: node data-pipeline/build.mjs --taxref "$TAXREF_FILE" --bdc "$BDC_FILE" --out public/data
+      - name: Build enriched official catalog
+        run: node data-pipeline/build.mjs --taxref "$TAXREF_FILE" --bdc "$BDC_FILE" --regional-dir "$REGIONAL_DIR" --out public/data
 
       - name: Validate generated manifest
         run: |
@@ -73,16 +154,14 @@ jobs:
           const regions = ['ARA', 'BFC', 'BRE', 'CVL', 'COR', 'GES', 'HDF', 'IDF', 'NOR', 'NAQ', 'OCC', 'PDL', 'PAC']
           const realms = ['flora', 'fauna']
           const manifestRegions = new Set(manifest.regions?.map((region) => region.code))
-          const valid = manifest.schemaVersion === 3
-            && manifest.official === true
-            && manifest.taxrefVersion === '18'
-            && manifest.bdcVersion === '18'
-            && manifestRegions.size === regions.length
-            && regions.every((region) => manifestRegions.has(region))
-            && manifest.files?.statusDefinitions?.file
-            && realms.every((realm) => manifest.files?.taxa?.[realm]?.file)
+          const valid = manifest.schemaVersion === 3 && manifest.official === true && manifest.taxrefVersion === '18' && manifest.bdcVersion === '18'
+            && manifestRegions.size === regions.length && regions.every((region) => manifestRegions.has(region))
+            && manifest.files?.statusDefinitions?.file && realms.every((realm) => manifest.files?.taxa?.[realm]?.file)
             && realms.every((realm) => regions.every((region) => manifest.files?.statusLinks?.[realm]?.[region]?.file))
           if (!valid) process.exit(1)
+          if (process.env.NAQ_REGIONAL_AVAILABLE === 'true' && !manifest.sources.some((source) => source.id === 'obv-na-znieff-flore-2019-v1.2')) {
+            throw new Error('Source régionale ZNIEFF NAQ absente du manifeste enrichi')
+          }
           console.log(manifest)
           NODE
           du -h public/data/*

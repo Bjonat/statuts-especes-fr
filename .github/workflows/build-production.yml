@@ -25,8 +25,15 @@ jobs:
         with:
           node-version: 24
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          python -m pip install --disable-pip-version-check openpyxl
 
       - name: Download TAXREF v18
         shell: bash
@@ -69,14 +76,42 @@ jobs:
           test -n "$BDC_FILE"
           echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
 
+      - name: Download regional ZNIEFF flora Nouvelle-Aquitaine
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/regional-packages"
+          curl --fail --location --retry 3 \
+            https://obv-na.fr/ofsa/ressources/4_ref_bioeval/CBN_2019-Liste_ED_ZNIEFF_flore_Nouvelle-Aquitaine_v1.2_tb.xlsx \
+            -o "$RUNNER_TEMP/znieff-naq-flore.xlsx"
+          test "$(head -c 2 "$RUNNER_TEMP/znieff-naq-flore.xlsx")" = 'PK'
+          echo "NAQ_ZNIEFF_FILE=$RUNNER_TEMP/znieff-naq-flore.xlsx" >> "$GITHUB_ENV"
+          echo "REGIONAL_DIR=$RUNNER_TEMP/regional-packages" >> "$GITHUB_ENV"
+
+      - name: Build regional packages
+        run: |
+          python data-pipeline/regions/naq/build_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --workbook "$NAQ_ZNIEFF_FILE" \
+            --out "$REGIONAL_DIR/naq-znieff-flora.json" \
+            --min-match-rate 0.97
+
       - name: Run tests
         run: npm test
 
-      - name: Generate official metropolitan dataset
-        run: npm run data:build -- --taxref "$TAXREF_FILE" --bdc "$BDC_FILE" --out public/data
+      - name: Generate enriched official metropolitan dataset
+        run: npm run data:build -- --taxref "$TAXREF_FILE" --bdc "$BDC_FILE" --regional-dir "$REGIONAL_DIR" --out public/data
 
       - name: Validate official dataset
-        run: node data-pipeline/validate-generated.mjs --dir public/data
+        run: |
+          node data-pipeline/validate-generated.mjs --dir public/data
+          node - <<'NODE'
+          const fs = require('fs')
+          const manifest = JSON.parse(fs.readFileSync('public/data/manifest.json', 'utf8'))
+          if (!manifest.sources.some((source) => source.id === 'obv-na-znieff-flore-2019-v1.2')) {
+            throw new Error('Le bundle de production doit inclure la source ZNIEFF flore Nouvelle-Aquitaine')
+          }
+          NODE
 
       - name: Build PWA
         run: npm run build
@@ -95,6 +130,9 @@ jobs:
             datasetVersion: manifest.datasetVersion,
             taxrefVersion: manifest.taxrefVersion,
             bdcVersion: manifest.bdcVersion,
+            regionalSources: manifest.sources
+              .filter((source) => !['taxref-v18', 'bdc-v18'].includes(source.id))
+              .map((source) => ({ id: source.id, version: source.version, checkedAt: source.checkedAt })),
             regions: manifest.regions.map((region) => region.code),
           }
           fs.writeFileSync('dist/build-info.json', `${JSON.stringify(metadata, null, 2)}\n`)
@@ -115,6 +153,9 @@ jobs:
           const fs = require('fs')
           const dataManifest = JSON.parse(fs.readFileSync('dist/data/manifest.json', 'utf8'))
           if (dataManifest.official !== true || dataManifest.regions.length !== 13) process.exit(1)
+          if (!dataManifest.sources.some((source) => source.id === 'obv-na-znieff-flore-2019-v1.2')) {
+            throw new Error('Le bundle FTP a perdu l’enrichissement ZNIEFF Nouvelle-Aquitaine')
+          }
 
           const html = fs.readFileSync('dist/index.html', 'utf8')
           if (/(?:src|href)=["']\/(?!\/)/i.test(html)) {
@@ -138,7 +179,7 @@ jobs:
             }
           }
 
-          console.log(`Bundle FTP installable : ${dataManifest.regions.length} régions, dataset ${dataManifest.datasetVersion}`)
+          console.log(`Bundle FTP enrichi et installable : ${dataManifest.regions.length} régions, dataset ${dataManifest.datasetVersion}`)
           NODE
           du -sh dist
 

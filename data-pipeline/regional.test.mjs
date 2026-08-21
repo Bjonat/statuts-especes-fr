@@ -1,0 +1,72 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { mergeRegionalPackages, validateRegionalPackage } from './regional.mjs'
+
+const taxa = [
+  { cdRef: 100, realm: 'flora' },
+  { cdRef: 200, realm: 'fauna' },
+]
+
+function packageFixture(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    source: {
+      id: 'dreal-occ-znieff-2024',
+      name: 'Espèces déterminantes ZNIEFF Occitanie',
+      producer: 'DREAL Occitanie / CSRPN',
+      version: '2024',
+      official: true,
+      checkedAt: '2026-08-21',
+    },
+    replaces: [{ region: 'OCC', category: 'znieff', realm: 'flora' }],
+    statuses: [
+      {
+        cdRef: 100,
+        region: 'OCC',
+        category: 'znieff',
+        label: 'Déterminante ZNIEFF',
+        value: 'Oui',
+        sourceId: 'dreal-occ-znieff-2024',
+        scope: 'regional',
+      },
+    ],
+    ...overrides,
+  }
+}
+
+test('un paquet régional officiel valide respecte le contrat commun', () => {
+  assert.equal(validateRegionalPackage(packageFixture()).source.id, 'dreal-occ-znieff-2024')
+})
+
+test('une source régionale non officielle est refusée', () => {
+  const pkg = packageFixture()
+  pkg.source.official = false
+  assert.throws(() => validateRegionalPackage(pkg), /marquée officielle/)
+})
+
+test('une liste régionale autoritaire remplace la même catégorie BDC pour son règne uniquement', () => {
+  const base = [
+    { cdRef: 100, region: 'OCC', category: 'znieff', label: 'ZNIEFF BDC', value: 'Oui', sourceId: 'bdc-v18', scope: 'regional' },
+    { cdRef: 200, region: 'OCC', category: 'znieff', label: 'ZNIEFF BDC', value: 'Oui', sourceId: 'bdc-v18', scope: 'regional' },
+    { cdRef: 100, region: 'OCC', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'LC', sourceId: 'bdc-v18', scope: 'regional' },
+  ]
+
+  const merged = mergeRegionalPackages(base, taxa, [packageFixture()])
+  assert.equal(merged.statuses.some((status) => status.cdRef === 100 && status.category === 'znieff' && status.sourceId === 'bdc-v18'), false)
+  assert.equal(merged.statuses.some((status) => status.cdRef === 100 && status.category === 'znieff' && status.sourceId === 'dreal-occ-znieff-2024'), true)
+  assert.equal(merged.statuses.some((status) => status.cdRef === 200 && status.category === 'znieff' && status.sourceId === 'bdc-v18'), true)
+  assert.equal(merged.statuses.some((status) => status.cdRef === 100 && status.category === 'red_list_regional'), true)
+})
+
+test('les CD_REF régionaux inconnus sont comptés et ignorés sans polluer le catalogue', () => {
+  const pkg = packageFixture({
+    statuses: [
+      ...packageFixture().statuses,
+      { cdRef: 999999, region: 'OCC', category: 'znieff', label: 'Déterminante ZNIEFF', value: 'Oui', sourceId: 'dreal-occ-znieff-2024', scope: 'regional' },
+    ],
+  })
+  const merged = mergeRegionalPackages([], taxa, [pkg])
+  assert.equal(merged.diagnostics[0].imported, 1)
+  assert.equal(merged.diagnostics[0].unknownRefs, 1)
+  assert.equal(merged.statuses.some((status) => status.cdRef === 999999), false)
+})

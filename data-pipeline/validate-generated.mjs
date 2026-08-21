@@ -93,6 +93,20 @@ const cvlFlora = await loadStatuses('flora', 'CVL')
 const naqFlora = await loadStatuses('flora', 'NAQ')
 const cvlFauna = await loadStatuses('fauna', 'CVL')
 
+const naqZnieffSourceId = 'obv-na-znieff-flore-2019-v1.2'
+if (manifest.sources.some((source) => source.id === naqZnieffSourceId)) {
+  const naqZnieff = naqFlora.filter((status) => status.category === 'znieff')
+  assert.ok(naqZnieff.length >= 1_200, 'ZNIEFF flore NAQ régional: volume plausible >= 1 200 statuts')
+  assert.ok(
+    naqZnieff.every((status) => status.sourceId === naqZnieffSourceId),
+    'ZNIEFF flore NAQ: aucune relation BDC résiduelle quand le référentiel régional est chargé',
+  )
+  assert.ok(
+    naqZnieff.some((status) => status.scope === 'partial' && status.scopeLabel),
+    'ZNIEFF flore NAQ: les restrictions biogéographiques/départementales sont conservées',
+  )
+}
+
 const lotusCvlLrr = findStatus(
   cvlFlora,
   106634,
@@ -128,6 +142,9 @@ console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- définitions de statut: ${definitions.length.toLocaleString('fr-FR')}`)
+if (manifest.sources.some((source) => source.id === naqZnieffSourceId)) {
+  console.log('- enrichissement régional: ZNIEFF flore Nouvelle-Aquitaine v1.2 (2019)')
+}
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {
   console.log(`  ${region.code} ${region.name}: ${region.nonNational.toLocaleString('fr-FR')} relations`)
