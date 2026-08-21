@@ -4,7 +4,15 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { resolveScope, REGIONS } from './regions.mjs'
-import { buildStatuses, buildTaxa, parseDelimitedLine, statusCategory } from './pipeline.mjs'
+import {
+  buildStatuses,
+  buildTaxa,
+  filterTaxaForMetropolitanRegions,
+  isMetropolitanBiogeographicStatus,
+  isSearchableRank,
+  parseDelimitedLine,
+  statusCategory,
+} from './pipeline.mjs'
 
 test('le parseur conserve les séparateurs présents dans les champs CSV quotés', () => {
   assert.deepEqual(parseDelimitedLine('a;"b;c";"d""e"', ';'), ['a', 'b;c', 'd"e'])
@@ -33,17 +41,34 @@ test('PNA reste distinct d’une protection nationale', () => {
   assert.equal(statusCategory('PN'), 'protection_national')
 })
 
-test('le pipeline rattache les synonymes TAXREF et filtre faune/flore', async () => {
+test('les rangs supraspécifiques ne sont pas proposés à la recherche', () => {
+  assert.equal(isSearchableRank('ES'), true)
+  assert.equal(isSearchableRank('SSES'), true)
+  assert.equal(isSearchableRank('VAR'), true)
+  assert.equal(isSearchableRank('GN'), false)
+  assert.equal(isSearchableRank('FM'), false)
+})
+
+test('le statut biogéographique métropolitain exclut absence et mention erronée', () => {
+  assert.equal(isMetropolitanBiogeographicStatus('P'), true)
+  assert.equal(isMetropolitanBiogeographicStatus('I'), true)
+  assert.equal(isMetropolitanBiogeographicStatus('A'), false)
+  assert.equal(isMetropolitanBiogeographicStatus('Q'), false)
+  assert.equal(isMetropolitanBiogeographicStatus(''), false)
+})
+
+test('le pipeline rattache les synonymes TAXREF, filtre faune/flore et exclut les genres', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'statuts-especes-'))
   const taxref = path.join(directory, 'taxref.txt')
   await fs.writeFile(
     taxref,
     [
-      'REGNE\tFAMILLE\tCD_NOM\tCD_REF\tLB_NOM\tNOM_VERN',
-      'Plantae\tFagaceae\t100\t100\tQuercus robur\tChêne pédonculé',
-      'Plantae\tFagaceae\t101\t100\tQuercus pedunculata\t',
-      'Animalia\tAlcedinidae\t200\t200\tAlcedo atthis\tMartin-pêcheur d’Europe',
-      'Fungi\tAmanitaceae\t300\t300\tAmanita muscaria\tAmanite tue-mouches',
+      'REGNE\tFAMILLE\tRANG\tFR\tCD_NOM\tCD_REF\tLB_NOM\tNOM_VERN',
+      'Plantae\tFagaceae\tES\tP\t100\t100\tQuercus robur\tChêne pédonculé',
+      'Plantae\tFagaceae\tES\tP\t101\t100\tQuercus pedunculata\t',
+      'Plantae\tFagaceae\tGN\tP\t102\t102\tQuercus\tChênes',
+      'Animalia\tAlcedinidae\tES\tP\t200\t200\tAlcedo atthis\tMartin-pêcheur d’Europe',
+      'Fungi\tAmanitaceae\tES\tP\t300\t300\tAmanita muscaria\tAmanite tue-mouches',
     ].join('\n'),
   )
 
@@ -51,6 +76,21 @@ test('le pipeline rattache les synonymes TAXREF et filtre faune/flore', async ()
   assert.equal(taxa.length, 2)
   assert.deepEqual(taxa.find((taxon) => taxon.cdRef === 100)?.synonyms, ['Quercus pedunculata'])
   assert.equal(taxa.find((taxon) => taxon.cdRef === 200)?.realm, 'fauna')
+  assert.equal(taxa.some((taxon) => taxon.cdRef === 102), false)
+})
+
+test('le filtre métropolitain conserve par sécurité un taxon absent ayant un statut applicable', () => {
+  const taxa = [
+    { cdRef: 100, biogeographicStatus: 'P' },
+    { cdRef: 200, biogeographicStatus: 'A' },
+    { cdRef: 300, biogeographicStatus: 'A' },
+  ]
+  const statuses = [{ cdRef: 200 }]
+
+  assert.deepEqual(
+    filterTaxaForMetropolitanRegions(taxa, statuses).map((taxon) => taxon.cdRef),
+    [100, 200],
+  )
 })
 
 test('le pipeline distingue statut régional complet et ancienne région partielle', async () => {
