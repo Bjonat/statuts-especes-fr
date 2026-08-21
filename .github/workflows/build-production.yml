@@ -122,6 +122,18 @@ jobs:
           sha256sum "$RUNNER_TEMP"/nor-lrr/*.xlsx
           echo "NOR_LRR_DIR=$RUNNER_TEMP/nor-lrr" >> "$GITHUB_ENV"
 
+      - name: Download regional Île-de-France source
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            'https://geonature.arb-idf.fr/geonature/api/media/exports/schedules/Statuts_des_taxons_STyt8fLcp03L11.csv' \
+            -o "$RUNNER_TEMP/idf-statuts.csv"
+          grep -q '"zdet"' "$RUNNER_TEMP/idf-statuts.csv"
+          grep -q '"cd_nom"' "$RUNNER_TEMP/idf-statuts.csv"
+          sha256sum "$RUNNER_TEMP/idf-statuts.csv"
+          echo "IDF_SOURCE=$RUNNER_TEMP/idf-statuts.csv" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         run: |
           python data-pipeline/regions/naq/build_znieff.py \
@@ -139,6 +151,11 @@ jobs:
             --taxref "$TAXREF_FILE" \
             --input-dir "$NOR_LRR_DIR" \
             --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
+          python data-pipeline/regions/idf/build_geonat_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$IDF_SOURCE" \
+            --out "$REGIONAL_DIR/idf-znieff.json" \
             --min-match-rate 0.97
 
       - name: Run tests
@@ -164,6 +181,7 @@ jobs:
             'anbdd-normandie-lrr-odonates-2022',
             'anbdd-normandie-lrr-orthopteres-2022',
             'anbdd-normandie-lrr-rhopaloceres-2022',
+            'arb-idf-geonat-statuts-znieff-2026',
           ]
           const ids = new Set(manifest.sources.map((source) => source.id))
           for (const id of required) {
@@ -222,6 +240,7 @@ jobs:
             'anbdd-normandie-lrr-odonates-2022',
             'anbdd-normandie-lrr-orthopteres-2022',
             'anbdd-normandie-lrr-rhopaloceres-2022',
+            'arb-idf-geonat-statuts-znieff-2026',
           ]
           const ids = new Set(dataManifest.sources.map((source) => source.id))
           for (const id of required) {
