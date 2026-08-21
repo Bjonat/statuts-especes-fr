@@ -1,0 +1,27 @@
+name: Probe READY regional sources
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/REGIONAL_SOURCES.md'
+      - 'data-pipeline/regions/ready-sources.json'
+      - 'data-pipeline/regions/probe_ready_sources.py'
+      - '.github/workflows/ready-sources-probe.yml'
+
+jobs:
+  probe-ready-sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Probe direct READY resources
+        run: python data-pipeline/regions/probe_ready_sources.py
