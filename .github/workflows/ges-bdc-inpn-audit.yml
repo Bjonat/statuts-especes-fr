@@ -1,0 +1,142 @@
+name: Grand Est BDC and INPN audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ges-bdc-inpn-audit.yml'
+
+jobs:
+  audit-ges:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Probe INPN determinant page
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://inpn.mnhn.fr/zone/znieff/especes-determinantes/region/44'
+          curl --location --retry 2 --max-time 60 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
+            -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' \
+            -H 'Accept-Language: fr-FR,fr;q=0.9,en;q=0.5' \
+            -D "$RUNNER_TEMP/inpn.headers" "$url" -o "$RUNNER_TEMP/inpn.html" || true
+          echo '=== INPN HEADERS ==='
+          cat "$RUNNER_TEMP/inpn.headers" || true
+          echo '=== INPN SIZE / HEAD ==='
+          wc -c "$RUNNER_TEMP/inpn.html" || true
+          head -c 1000 "$RUNNER_TEMP/inpn.html" || true
+          echo
+          echo '=== INPN LINKS / ENDPOINT CANDIDATES ==='
+          grep -Eo 'https?://[^"'"' <>]+|href="[^"]+"|src="[^"]+"|[A-Za-z0-9_./?&=-]*(csv|export|download|telecharg)[A-Za-z0-9_./?&=%+-]*' "$RUNNER_TEMP/inpn.html" \
+            | grep -Ei 'csv|export|download|telecharg|especes-determinantes|znieff' \
+            | head -n 200 || true
+
+      - name: Download BDC Statuts v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bdc"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/BDC.zip -o "$RUNNER_TEMP/bdc.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/BDC-STATUTS-v18.zip -o "$RUNNER_TEMP/bdc.zip"
+          unzip -q "$RUNNER_TEMP/bdc.zip" -d "$RUNNER_TEMP/bdc"
+          BDC_FILE=''
+          while IFS= read -r candidate; do
+            header="$(head -n 1 "$candidate" | tr '[:upper:]' '[:lower:]')"
+            if grep -q 'cd_ref' <<< "$header" && grep -q 'cd_type_statut' <<< "$header"; then
+              BDC_FILE="$candidate"
+              break
+            fi
+          done < <(find "$RUNNER_TEMP/bdc" -type f -iname '*.csv')
+          test -n "$BDC_FILE"
+          echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
+
+      - name: Audit Grand Est ZNIEFF rows in BDC
+        shell: bash
+        run: |
+          BDC_FILE="$BDC_FILE" node --input-type=module - <<'NODE'
+          import { rowsFromFile, statusCategory } from './data-pipeline/pipeline.mjs'
+          import { REGIONS, resolveScope } from './data-pipeline/regions.mjs'
+
+          const region = REGIONS.find((item) => item.code === 'GES')
+          const docs = new Map()
+          let total = 0
+          const refs = { regional: new Set(), partial: new Set(), national: new Set() }
+
+          for await (const row of rowsFromFile(process.env.BDC_FILE)) {
+            if (statusCategory(row.cd_type_statut) !== 'znieff') continue
+            const scope = resolveScope(row.cd_sig, region)
+            if (!scope) continue
+            total += 1
+            const cdRef = Number.parseInt(row.cd_ref, 10)
+            if (Number.isFinite(cdRef)) refs[scope.scope]?.add(cdRef)
+            const doc = row.cd_doc || '<sans-cd-doc>'
+            const key = `${doc}|${row.cd_sig}|${scope.scope}|${scope.scopeLabel ?? ''}`
+            const current = docs.get(key) ?? {
+              cdDoc: doc,
+              cdSig: row.cd_sig,
+              scope: scope.scope,
+              scopeLabel: scope.scopeLabel ?? null,
+              fullCitation: row.full_citation || null,
+              docUrl: row.doc_url || null,
+              typeCodes: new Set(),
+              statusCodes: new Set(),
+              groups1: new Map(),
+              groups2: new Map(),
+              orders: new Map(),
+              count: 0,
+              uniqueRefs: new Set(),
+              examples: [],
+            }
+            current.count += 1
+            if (Number.isFinite(cdRef)) current.uniqueRefs.add(cdRef)
+            current.typeCodes.add(row.cd_type_statut)
+            if (row.code_statut) current.statusCodes.add(row.code_statut)
+            if (!current.fullCitation && row.full_citation) current.fullCitation = row.full_citation
+            if (!current.docUrl && row.doc_url) current.docUrl = row.doc_url
+            for (const [map, value] of [[current.groups1,row.group1_inpn],[current.groups2,row.group2_inpn],[current.orders,row.ordre]]) {
+              if (value) map.set(value, (map.get(value) ?? 0) + 1)
+            }
+            if (current.examples.length < 6) current.examples.push({
+              cdRef: row.cd_ref,
+              name: row.lb_nom,
+              group1: row.group1_inpn,
+              group2: row.group2_inpn,
+              order: row.ordre,
+              code: row.code_statut,
+              label: row.label_statut,
+            })
+            docs.set(key, current)
+          }
+
+          const top = (map, max=15) => [...map.entries()].sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0])).slice(0,max)
+          const report = [...docs.values()].map(item => ({
+            cdDoc: item.cdDoc,
+            cdSig: item.cdSig,
+            scope: item.scope,
+            scopeLabel: item.scopeLabel,
+            count: item.count,
+            uniqueRefs: item.uniqueRefs.size,
+            fullCitation: item.fullCitation,
+            docUrl: item.docUrl,
+            typeCodes: [...item.typeCodes].sort(),
+            statusCodes: [...item.statusCodes].sort(),
+            groups1: top(item.groups1),
+            groups2: top(item.groups2),
+            orders: top(item.orders),
+            examples: item.examples,
+          })).sort((a,b)=>b.count-a.count || String(a.cdDoc).localeCompare(String(b.cdDoc)))
+
+          console.log('GES_ZNIEFF_ROWS=', total)
+          console.log('GES_UNIQUE_REFS=', Object.fromEntries(Object.entries(refs).map(([k,v])=>[k,v.size])))
+          console.log(JSON.stringify(report, null, 2))
+          if (!total) throw new Error('Aucun statut ZNIEFF BDC applicable au Grand Est')
+          NODE
