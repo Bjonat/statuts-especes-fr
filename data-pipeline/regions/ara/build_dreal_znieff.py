@@ -59,6 +59,38 @@ def clean(value: object) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def semantic_status_key(value: object) -> str:
+    key = normalize(value)
+    # Le tableur contient des césures typographiques internes issues de la mise
+    # en page (ex. « Complémen-taire »), qui ne sont pas des catégories métier.
+    return (
+        key.replace("complemen-taire", "complementaire")
+        .replace("determi-nante", "determinante")
+        .replace("determi-nant", "determinant")
+    )
+
+
+def canonical_status_value(value: object) -> str:
+    cleaned = clean(value)
+    key = semantic_status_key(cleaned)
+    if key == "complementaire":
+        return "Complémentaire"
+    if key == "determinante":
+        return "Déterminante"
+    if key == "non determinante":
+        return "Non déterminante"
+    # Conserver les conditions métier tout en réparant uniquement les césures
+    # connues du tableur.
+    return (
+        cleaned.replace("Complémen-taire", "Complémentaire")
+        .replace("complémen-taire", "complémentaire")
+        .replace("Détermi-nante", "Déterminante")
+        .replace("détermi-nante", "déterminante")
+        .replace("Détermi-nant", "Déterminant")
+        .replace("détermi-nant", "déterminant")
+    )
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -182,7 +214,7 @@ def resolve_taxon(code: str, scientific_name: str, by_cd_nom, by_name):
 
 
 def classify_status(value: str) -> str:
-    key = normalize(value)
+    key = semantic_status_key(value)
     if not key:
         return "blank"
     if key.startswith("non determinante") or key.startswith("non determinant"):
@@ -197,7 +229,7 @@ def classify_status(value: str) -> str:
 
 
 def compact_zone_label(value: str) -> str:
-    key = normalize(value)
+    key = normalize(value).replace("mediter-raneenne", "mediterraneenne")
     if "massif central" in key:
         return CURRENT_ZONES[0]
     if "plaine rhodanienne" in key:
@@ -233,7 +265,7 @@ def find_header(rows: list[list[str]]) -> tuple[int, int, int | None, int | None
 
 
 def looks_like_zone(value: str) -> bool:
-    key = normalize(value)
+    key = normalize(value).replace("mediter-raneenne", "mediterraneenne")
     return any(token in key for token in ("massif central", "plaine rhodanienne", "alpine", "mediterr", "auvergne", "rhone-alpes"))
 
 
@@ -252,7 +284,7 @@ def status_record(cd_ref: int, realm: str, sheet: str, value: str, zones: list[s
         "region": "ARA",
         "category": "znieff",
         "label": f"Statut ZNIEFF - {sheet}",
-        "value": clean(value),
+        "value": canonical_status_value(value),
         "sourceId": SOURCE_ID,
         "scope": "regional" if is_regional else "partial",
         "_realm": realm,
@@ -318,8 +350,9 @@ def parse_zoned_sheet(sheet: str, rows: list[list[str]], by_cd_nom, by_name, dia
         grouped: dict[str, list[str]] = defaultdict(list)
         for zone, value, kind in zip(zones, raw_values, classes):
             if kind in {"determining", "complementary"}:
-                grouped[value].append(zone)
-                sheet_stats["values"][value] += 1
+                canonical_value = canonical_status_value(value)
+                grouped[canonical_value].append(zone)
+                sheet_stats["values"][canonical_value] += 1
 
         for value, matching_zones in grouped.items():
             statuses.append(status_record(cd_ref, realm, sheet, value, matching_zones, zones))
