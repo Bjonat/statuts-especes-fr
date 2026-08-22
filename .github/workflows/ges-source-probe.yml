@@ -19,144 +19,73 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install workbook inspector
-        run: python -m pip install --disable-pip-version-check openpyxl
-
-      - name: Probe official and focused archive deliveries
+      - name: Inspect ODONAT and CBAL media sources
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import gzip
-          import hashlib
           import json
           import urllib.parse
           import urllib.request
-          from pathlib import Path
-          from openpyxl import load_workbook
 
           UA = 'Mozilla/5.0 (compatible; statuts-especes-fr/1.0; +https://github.com/Bjonat/statuts-especes-fr)'
-          sources = {
-              'fauna': {
-                  'url': 'https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_faunev2_2_juin2026.xlsx',
-                  'collections': ['CC-MAIN-2026-30'],
-              },
-              'flora': {
-                  'url': 'https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_florev1_08_2024_2_.xlsx',
-                  'collections': ['CC-MAIN-2026-30', 'CC-MAIN-2025-05', 'CC-MAIN-2024-51', 'CC-MAIN-2024-46', 'CC-MAIN-2024-42', 'CC-MAIN-2024-38'],
-              },
-          }
 
-          def get(url: str, timeout=35, headers=None) -> bytes:
-              request_headers = {'User-Agent': UA, 'Accept': '*/*'}
-              if headers:
-                  request_headers.update(headers)
-              req = urllib.request.Request(url, headers=request_headers)
-              with urllib.request.urlopen(req, timeout=timeout) as r:
-                  return r.read()
+          def get(url, timeout=60):
+              req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': 'application/json,text/html,*/*'})
+              with urllib.request.urlopen(req, timeout=timeout) as response:
+                  return response.read(), dict(response.headers), response.status
 
-          def is_xlsx(data: bytes) -> bool:
-              return data.startswith(b'PK\x03\x04') and b'[Content_Types].xml' in data[:1000000]
-
-          def commoncrawl_records(collection: str, url: str):
-              index_url = f'https://index.commoncrawl.org/{collection}-index'
-              query = index_url + '?' + urllib.parse.urlencode({'url': url, 'output': 'json'})
-              try:
-                  text = get(query, timeout=35).decode('utf-8', 'replace')
-              except Exception as exc:
-                  return [], repr(exc)
-              records = []
-              for line in text.splitlines():
-                  line = line.strip()
-                  if not line:
-                      continue
+          def wp_media(base, terms):
+              print(f'===== WORDPRESS {base} =====')
+              for term in terms:
+                  url = f'{base}/wp-json/wp/v2/media?' + urllib.parse.urlencode({'search': term, 'per_page': 100})
                   try:
-                      records.append(json.loads(line))
-                  except json.JSONDecodeError:
-                      pass
-              return records, None
+                      data, headers, status = get(url)
+                      print('QUERY', term, 'status=', status, 'bytes=', len(data), 'content-type=', headers.get('Content-Type'))
+                      rows = json.loads(data.decode('utf-8'))
+                      print('COUNT=', len(rows))
+                      for row in rows:
+                          source = row.get('source_url') or ''
+                          title = (row.get('title') or {}).get('rendered') or ''
+                          slug = row.get('slug') or ''
+                          mime = row.get('mime_type') or ''
+                          if any(token in (source + ' ' + title + ' ' + slug).casefold() for token in ('znieff','determin','faune','flore','catalog','statut')):
+                              print(json.dumps({'id':row.get('id'),'date':row.get('date'),'slug':slug,'title':title,'mime':mime,'source_url':source}, ensure_ascii=False))
+                  except Exception as exc:
+                      print('ERROR', term, repr(exc))
 
-          def commoncrawl_body(record: dict) -> bytes:
-              offset = int(record['offset'])
-              length = int(record['length'])
-              warc_url = 'https://data.commoncrawl.org/' + record['filename']
-              compressed = get(
-                  warc_url,
-                  timeout=90,
-                  headers={'Range': f'bytes={offset}-{offset + length - 1}'},
-              )
-              raw = gzip.decompress(compressed)
-              first = raw.find(b'\r\n\r\n')
-              if first < 0:
-                  raise RuntimeError('En-tête WARC introuvable')
-              http = raw[first + 4:]
-              second = http.find(b'\r\n\r\n')
-              if second < 0:
-                  raise RuntimeError('En-tête HTTP introuvable')
-              headers = http[:second].decode('latin1', 'replace').lower()
-              body = http[second + 4:]
-              if 'content-encoding: gzip' in headers:
-                  body = gzip.decompress(body)
-              return body
+          wp_media('https://www.odonat-grandest.fr', ['znieff','determinante','faune','edz'])
+          wp_media('https://www.cbnal.fr', ['znieff','catalogue','tracheophytes','grand est','statut'])
 
-          def inspect(path: Path):
-              wb = load_workbook(path, read_only=True, data_only=True)
-              print('SHEETS=', wb.sheetnames)
-              for ws in wb.worksheets[:12]:
-                  print(f'--- SHEET {ws.title} rows={ws.max_row} cols={ws.max_column} ---')
-                  shown = 0
-                  for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 28), values_only=True):
-                      values = [str(v).strip() if v is not None else '' for v in row[:32]]
-                      if any(values):
-                          print(values)
-                          shown += 1
-                      if shown >= 10:
-                          break
+          print('===== ODONAT OLD XLSX WAYBACK =====')
+          old = 'https://www.odonat-grandest.fr/wp-content/uploads/2024/09/odonatge_znieff_listes_edz_aee_faunev2_1_08_2024.xlsx'
+          cdx = 'https://web.archive.org/cdx/search/cdx?' + urllib.parse.urlencode({
+              'url': old,
+              'output': 'json',
+              'filter': 'statuscode:200',
+              'fl': 'timestamp,original,statuscode,mimetype,digest,length',
+              'collapse': 'digest',
+          })
+          try:
+              data, _, _ = get(cdx, timeout=90)
+              rows = json.loads(data.decode('utf-8'))
+              print(json.dumps(rows, ensure_ascii=False, indent=2))
+          except Exception as exc:
+              print('WAYBACK ERROR', repr(exc))
 
-          for key, spec in sources.items():
-              official_url = spec['url']
-              print(f'===== {key.upper()} =====')
-              selected = None
-              try:
-                  data = get(official_url)
-                  print('DIRECT bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data), 'head=', data[:80])
-                  if is_xlsx(data):
-                      selected = ('direct', official_url, data)
-              except Exception as exc:
-                  print('DIRECT ERROR', repr(exc))
-
-              if selected is None:
-                  for collection in spec['collections']:
-                      records, error = commoncrawl_records(collection, official_url)
-                      if error:
-                          print('CC INDEX ERROR', collection, error)
-                          continue
-                      matches = [r for r in records if str(r.get('status')) == '200']
-                      print('CC MATCHES', collection, len(matches))
-                      for record in reversed(matches):
-                          print('CC RECORD', collection, {k: record.get(k) for k in ('timestamp','status','mime','digest','length','filename','offset')})
-                          try:
-                              data = commoncrawl_body(record)
-                          except Exception as exc:
-                              print('CC BODY ERROR', collection, record.get('timestamp'), repr(exc))
-                              continue
-                          print('COMMONCRAWL', collection, record.get('timestamp'), 'bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data))
-                          if is_xlsx(data):
-                              selected = (f"commoncrawl:{collection}:{record.get('timestamp')}", official_url, data)
-                              break
-                      if selected is not None:
-                          break
-
-              if selected is None:
-                  print('NO VALID XLSX DELIVERY FOUND')
-                  continue
-
-              mode, selected_url, data = selected
-              path = Path(f'/tmp/ges-{key}.xlsx')
-              path.write_bytes(data)
-              print('SELECTED_MODE=', mode)
-              print('SELECTED_URL=', selected_url)
-              print('SELECTED_BYTES=', len(data))
-              print('SELECTED_SHA256=', hashlib.sha256(data).hexdigest())
-              inspect(path)
+          print('===== ODONAT PAGE LINKS =====')
+          page_url = 'https://www.odonat-grandest.fr/znieff-documents-telechargeables/'
+          try:
+              data, _, status = get(page_url)
+              text = data.decode('utf-8', 'replace')
+              print('PAGE status=', status, 'bytes=', len(data))
+              for token in text.split('href=')[1:]:
+                  quote = token[:1]
+                  if quote not in ('"', "'"):
+                      continue
+                  href = token[1:].split(quote,1)[0]
+                  if any(x in href.casefold() for x in ('xlsx','xls','znieff','determin')):
+                      print('HREF', href)
+          except Exception as exc:
+              print('PAGE ERROR', repr(exc))
           PY
