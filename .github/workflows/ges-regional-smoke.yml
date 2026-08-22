@@ -1,0 +1,104 @@
+name: Grand Est ZNIEFF regional source smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/ges/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/ges-regional-smoke.yml'
+
+jobs:
+  build-ges-znieff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install XLSX reader
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download ODONAT Grand Est ZNIEFF fauna v2.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx'
+          curl --fail --location --retry 3 --max-time 180 "$URL" -o "$RUNNER_TEMP/ges-fauna.xlsx"
+          test "$(head -c 2 "$RUNNER_TEMP/ges-fauna.xlsx")" = 'PK'
+          echo 'a130de0436237ebde5b4fcee582ac8890bdadeed679cda96d4896f9082866c1f  '"$RUNNER_TEMP/ges-fauna.xlsx" | sha256sum --check --strict
+          echo "GES_FAUNA_SOURCE=$RUNNER_TEMP/ges-fauna.xlsx" >> "$GITHUB_ENV"
+
+      - name: Build Grand Est fauna package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ges-packages"
+          python data-pipeline/regions/ges/build_odonat_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$GES_FAUNA_SOURCE" \
+            --out "$RUNNER_TEMP/ges-packages/ges-znieff-fauna.json" \
+            --checked-at 2026-08-22 \
+            --min-match-rate 0.98
+          echo "GES_PACKAGES_DIR=$RUNNER_TEMP/ges-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional package and sentinel
+        shell: bash
+        run: |
+          REGIONAL_DIR="$GES_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 1) throw new Error(`1 paquet Grand Est attendu, reçu ${packages.length}`)
+          const pkg = packages[0]
+          if (pkg.source.id !== 'dreal-ges-odonat-znieff-fauna-2026-v2.2') throw new Error('Source Grand Est inattendue')
+          if (pkg.source.sha256 !== 'a130de0436237ebde5b4fcee582ac8890bdadeed679cda96d4896f9082866c1f') throw new Error('SHA-256 Grand Est inattendu')
+          const replacement = pkg.replaces.find((rule) => rule.region === 'GES' && rule.category === 'znieff' && rule.realm === 'fauna')
+          if (!replacement || !Array.isArray(replacement.cdRefs) || replacement.cdRefs.length < 400) throw new Error('Override Grand Est insuffisamment ciblé')
+          if (pkg.statuses.length < 500) throw new Error(`Volume Grand Est anormalement faible: ${pkg.statuses.length}`)
+
+          const rhino = pkg.statuses.filter((status) => status.cdRef === 60313)
+          const determinant = rhino.find((status) => status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui')
+          if (!determinant) throw new Error('Sentinelle Rhinolophus hipposideros: statut EDZ régional absent')
+          const priorities = new Map(rhino.filter((status) => status.label === 'Priorité ZNIEFF').map((status) => [status.scopeLabel, status.value]))
+          const expected = new Map([
+            ['Plaine de Champagne et Brie', '1 - très prioritaire'],
+            ['Plateaux lorrains et massif ardennais', '2 - prioritaire'],
+            ['Massif vosgien', '1 - très prioritaire'],
+            ['Fossé rhénan et massif jurassien', '1 - très prioritaire'],
+          ])
+          for (const [scope, value] of expected) {
+            if (priorities.get(scope) !== value) throw new Error(`Sentinelle Rhinolophus: ${scope} attendu ${value}, reçu ${priorities.get(scope)}`)
+          }
+          if (!rhino.some((status) => status.label === 'Condition de surcotation ZNIEFF')) throw new Error('Sentinelle Rhinolophus: condition de surcotation absente')
+          console.log({ statuses: pkg.statuses.length, replacementRefs: replacement.cdRefs.length, diagnostics: pkg.diagnostics, rhino })
+          NODE
+
+      - name: Upload normalized package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ges-znieff-fauna-regional-package
+          path: ${{ env.GES_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7
