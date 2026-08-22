@@ -70,3 +70,42 @@ jobs:
               grep -ao 'Maintenance en cours' "$out" | head || true
             fi
           done
+
+      - name: Probe Wayback archive for official ODS
+        shell: bash
+        run: |
+          set -euo pipefail
+          original='https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods'
+          encoded="$(python - <<'PY'
+          import urllib.parse
+          print(urllib.parse.quote('https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods', safe=''))
+          PY
+          )"
+          api="https://archive.org/wayback/available?url=$encoded"
+          echo "WAYBACK_API=$api"
+          curl --fail --location --retry 3 --silent --show-error "$api" -o "$RUNNER_TEMP/wayback.json"
+          cat "$RUNNER_TEMP/wayback.json"
+          snapshot="$(python - "$RUNNER_TEMP/wayback.json" <<'PY'
+          import json, sys
+          data=json.load(open(sys.argv[1], encoding='utf-8'))
+          closest=data.get('archived_snapshots', {}).get('closest', {})
+          print(closest.get('url', '') if closest.get('available') else '')
+          PY
+          )"
+          if [ -z "$snapshot" ]; then
+            echo 'NO_WAYBACK_SNAPSHOT=1'
+            exit 0
+          fi
+          snapshot="${snapshot/http:\/\//https://}"
+          echo "WAYBACK_SNAPSHOT=$snapshot"
+          curl --fail --location --retry 3 --silent --show-error "$snapshot" -o "$RUNNER_TEMP/ara-wayback.ods"
+          echo "wayback bytes=$(wc -c < "$RUNNER_TEMP/ara-wayback.ods")"
+          file "$RUNNER_TEMP/ara-wayback.ods"
+          sha256sum "$RUNNER_TEMP/ara-wayback.ods"
+          if unzip -t "$RUNNER_TEMP/ara-wayback.ods" >/dev/null 2>&1; then
+            echo 'WAYBACK_ODS_OK=1'
+            unzip -l "$RUNNER_TEMP/ara-wayback.ods" | head -n 30
+          else
+            echo 'WAYBACK_ODS_OK=0'
+            head -c 256 "$RUNNER_TEMP/ara-wayback.ods" | xxd
+          fi
