@@ -22,7 +22,7 @@ jobs:
       - name: Probe INPN determinant page
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           url='https://inpn.mnhn.fr/zone/znieff/especes-determinantes/region/44'
           curl --location --retry 2 --max-time 60 \
             -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36' \
@@ -30,15 +30,15 @@ jobs:
             -H 'Accept-Language: fr-FR,fr;q=0.9,en;q=0.5' \
             -D "$RUNNER_TEMP/inpn.headers" "$url" -o "$RUNNER_TEMP/inpn.html" || true
           echo '=== INPN HEADERS ==='
-          cat "$RUNNER_TEMP/inpn.headers" || true
-          echo '=== INPN SIZE / HEAD ==='
+          head -n 25 "$RUNNER_TEMP/inpn.headers" || true
+          echo '=== INPN SIZE / TITLE ==='
           wc -c "$RUNNER_TEMP/inpn.html" || true
-          head -c 1000 "$RUNNER_TEMP/inpn.html" || true
-          echo
-          echo '=== INPN LINKS / ENDPOINT CANDIDATES ==='
-          grep -Eo 'https?://[^"'"' <>]+|href="[^"]+"|src="[^"]+"|[A-Za-z0-9_./?&=-]*(csv|export|download|telecharg)[A-Za-z0-9_./?&=%+-]*' "$RUNNER_TEMP/inpn.html" \
-            | grep -Ei 'csv|export|download|telecharg|especes-determinantes|znieff' \
-            | head -n 200 || true
+          grep -io '<title>[^<]*</title>' "$RUNNER_TEMP/inpn.html" | head -n 5 || true
+          if grep -qi 'cf-mitigated: challenge' "$RUNNER_TEMP/inpn.headers"; then
+            echo 'INPN_RESULT=cloudflare_challenge'
+          else
+            echo 'INPN_RESULT=no_cloudflare_challenge_detected'
+          fi
 
       - name: Download BDC Statuts v18
         shell: bash
