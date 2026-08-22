@@ -45,10 +45,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          URL='https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx'
-          curl --fail --location --retry 3 --max-time 180 "$URL" -o "$RUNNER_TEMP/ges-fauna.xlsx"
-          test "$(head -c 2 "$RUNNER_TEMP/ges-fauna.xlsx")" = 'PK'
-          echo 'a130de0436237ebde5b4fcee582ac8890bdadeed679cda96d4896f9082866c1f  '"$RUNNER_TEMP/ges-fauna.xlsx" | sha256sum --check --strict
+          bash data-pipeline/regions/ges/download_odonat_znieff.sh "$RUNNER_TEMP/ges-fauna.xlsx"
           echo "GES_FAUNA_SOURCE=$RUNNER_TEMP/ges-fauna.xlsx" >> "$GITHUB_ENV"
 
       - name: Build Grand Est fauna package

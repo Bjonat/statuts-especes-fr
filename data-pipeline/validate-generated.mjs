@@ -92,6 +92,7 @@ assert.equal(alcedo?.scientificName, 'Alcedo atthis', 'Martin-pêcheur présent 
 const cvlFlora = await loadStatuses('flora', 'CVL')
 const naqFlora = await loadStatuses('flora', 'NAQ')
 const cvlFauna = await loadStatuses('fauna', 'CVL')
+const gesFauna = await loadStatuses('fauna', 'GES')
 
 const naqZnieffSourceId = 'obv-na-znieff-flore-2019-v1.2'
 if (manifest.sources.some((source) => source.id === naqZnieffSourceId)) {
@@ -145,12 +146,29 @@ const alcedoNationalProtection = findStatus(
 )
 assert.ok(alcedoNationalProtection, 'Alcedo atthis: protection nationale disponible en Centre-Val de Loire')
 
+const gesZnieffSourceId = 'dreal-ges-odonat-znieff-fauna-2026-v2.2'
+if (manifest.sources.some((source) => source.id === gesZnieffSourceId)) {
+  const gesZnieff = gesFauna.filter((status) => status.category === 'znieff' && status.sourceId === gesZnieffSourceId)
+  const rhino = gesZnieff.filter((status) => status.cdRef === 60313)
+  assert.ok(
+    rhino.some((status) => status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui'),
+    'Rhinolophus hipposideros: déterminante ZNIEFF Grand Est',
+  )
+  assert.ok(
+    rhino.some((status) => status.label === 'Priorité ZNIEFF' && status.scope === 'partial' && status.scopeLabel === 'Massif vosgien'),
+    'Rhinolophus hipposideros: priorité Vosges conservée comme portée partielle',
+  )
+}
+
 console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- définitions de statut: ${definitions.length.toLocaleString('fr-FR')}`)
 if (manifest.sources.some((source) => source.id === naqZnieffSourceId)) {
   console.log('- enrichissement régional: ZNIEFF flore Nouvelle-Aquitaine v1.2 (2019)')
+}
+if (manifest.sources.some((source) => source.id === gesZnieffSourceId)) {
+  console.log('- enrichissement régional: ZNIEFF faune Grand Est v2.2 (juin 2026)')
 }
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {

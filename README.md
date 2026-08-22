@@ -100,4 +100,6 @@ Une attention particulière est portée aux anciennes régions : un statut appli
 ## Documentation métier
 
 - [`data-pipeline/README.md`](data-pipeline/README.md) — règles de transformation et validation des référentiels ;
-- [`docs/data-sources-cvl.md`](docs/data-sources-cvl.md) — audit de fraîcheur et priorisation des sources Centre-Val de Loire.
+- [`docs/data-sources-cvl.md`](docs/data-sources-cvl.md) — audit de fraîcheur et priorisation des sources Centre-Val de Loire ;
+- [`docs/data-sources-ara.md`](docs/data-sources-ara.md) — intégration ZNIEFF Auvergne-Rhône-Alpes ;
+- [`docs/data-sources-ges.md`](docs/data-sources-ges.md) — intégration ZNIEFF faune Grand Est.

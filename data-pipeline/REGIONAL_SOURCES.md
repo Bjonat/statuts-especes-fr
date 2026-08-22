@@ -46,7 +46,7 @@ Règles impératives :
 | Bretagne (`BRE`) | `READY` | `READY` | Responsabilité biologique régionale disponible | **Très haute** |
 | Centre-Val de Loire (`CVL`) | `READY_WHEN_AVAILABLE` | `READY` | Rareté/indigénat CBNBP à qualifier | Haute |
 | Corse (`COR`) | `RESEARCH_REQUIRED` pour consolidation | `PARTIAL` | À documenter | Moyenne |
-| Grand Est (`GES`) | `READY` | `PARTIAL` selon groupes | Anciennes régions à préserver | **Très haute** |
+| Grand Est (`GES`) | `IMPORTED` faune ; `READY` flore | `PARTIAL` selon groupes | Anciennes régions à préserver | **Très haute** |
 | Hauts-de-France (`HDF`) | `PARTIAL` | `PARTIAL` | Anciennes régions à préserver | Moyenne |
 | Île-de-France (`IDF`) | `READY` | `PARTIAL` selon groupes | À compléter via ARB/CBNBP | Haute |
 | Normandie (`NOR`) | `PARTIAL` | `READY` selon groupes unifiés | Anciennes régions à préserver | Haute |
@@ -188,12 +188,14 @@ Chercher le fichier opérationnel utilisé pour l'inventaire ZNIEFF corse avant 
 
 ### GES — Grand Est
 
-#### ZNIEFF — `READY`
+#### ZNIEFF — `IMPORTED` pour la faune ; `READY` pour la flore vasculaire
 
 - **DREAL Grand Est** : https://www.grand-est.developpement-durable.gouv.fr/les-nouvelles-listes-d-especes-determinantes-a22851.html
 - **Page vérifiée** : mise à jour indiquée au 16/07/2026.
-- **Faune** : tableur `LISTES EDZ AEE FAUNE v2.2 - 06 2026.xlsx`.
-- **Flore vasculaire** : tableur `LISTES EDZ AEE FLORE v1_08 2024.xlsx`.
+- **Faune — source utilisée par le projet** : LEDZfauna v2.2, juin 2026, republicée par ODONAT Grand Est lorsque le frontal DREAL est en maintenance.
+- **Fichier** : https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx
+- **SHA-256** : `a130de0436237ebde5b4fcee582ac8890bdadeed679cda96d4896f9082866c1f`.
+- **Flore vasculaire** : tableur `LISTES EDZ AEE FLORE v1_08 2024.xlsx` encore à brancher ; le frontal DREAL reste à sonder et un miroir institutionnel reproductible n'a pas encore été retenu.
 - Les listes intègrent des niveaux de priorité et plusieurs entités naturelles ; conserver ces portées/qualificatifs plutôt que de les écraser.
 
 #### Listes rouges — `PARTIAL` selon groupes
@@ -207,7 +209,7 @@ Chercher le fichier opérationnel utilisé pour l'inventaire ZNIEFF corse avant 
 
 #### Action suivante
 
-Importer ZNIEFF flore/faune, puis LRR unifiées groupe par groupe en laissant les anciennes régions explicites pour le reste.
+Importer ZNIEFF flore, puis LRR unifiées groupe par groupe en laissant les anciennes régions explicites pour le reste.
 
 ---
 

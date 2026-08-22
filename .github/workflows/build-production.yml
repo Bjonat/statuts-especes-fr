@@ -163,6 +163,13 @@ jobs:
           sha256sum "$RUNNER_TEMP"/cvl-lrr/*.pdf
           echo "CVL_LRR_DIR=$RUNNER_TEMP/cvl-lrr" >> "$GITHUB_ENV"
 
+      - name: Download regional Grand Est ZNIEFF fauna source
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ges/download_odonat_znieff.sh "$RUNNER_TEMP/ges-znieff-fauna.xlsx"
+          echo "GES_ZNIEFF_FAUNA_FILE=$RUNNER_TEMP/ges-znieff-fauna.xlsx" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         run: |
           python data-pipeline/regions/ara/build_dreal_znieff.py \
@@ -198,6 +205,11 @@ jobs:
             --coleopteres "$CVL_LRR_DIR/coleopteres-2025.pdf" \
             --out-dir "$REGIONAL_DIR" \
             --min-match-rate 0.97
+          python data-pipeline/regions/ges/build_odonat_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$GES_ZNIEFF_FAUNA_FILE" \
+            --out "$REGIONAL_DIR/ges-znieff-fauna.json" \
+            --min-match-rate 0.98
 
       - name: Run tests
         run: npm test
@@ -227,6 +239,7 @@ jobs:
             'arb-cvl-lrr-odonates-2022',
             'arb-cvl-lrr-papillons-2024',
             'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
+            'dreal-ges-odonat-znieff-fauna-2026-v2.2',
           ]
           const ids = new Set(manifest.sources.map((source) => source.id))
           for (const id of required) {
@@ -290,6 +303,7 @@ jobs:
             'arb-cvl-lrr-odonates-2022',
             'arb-cvl-lrr-papillons-2024',
             'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
+            'dreal-ges-odonat-znieff-fauna-2026-v2.2',
           ]
           const ids = new Set(dataManifest.sources.map((source) => source.id))
           for (const id of required) {

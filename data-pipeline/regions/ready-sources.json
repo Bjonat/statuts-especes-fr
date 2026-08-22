@@ -78,11 +78,16 @@
       "region": "GES",
       "categories": ["znieff"],
       "realms": ["fauna"],
+      "state": "IMPORTED",
       "landingPage": "https://www.grand-est.developpement-durable.gouv.fr/les-nouvelles-listes-d-especes-determinantes-a22851.html",
       "resources": [
         {
           "kind": "xlsx",
-          "url": "https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_faunev2_2_juin2026.xlsx"
+          "version": "LEDZfauna v2.2 - juin 2026",
+          "url": "https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx",
+          "canonicalUrl": "https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_faunev2_2_juin2026.xlsx",
+          "mirrorLandingUrl": "https://www.odonat-grandest.fr/znieff-documents-telechargeables/",
+          "sha256": "a130de0436237ebde5b4fcee582ac8890bdadeed679cda96d4896f9082866c1f"
         }
       ]
     },
