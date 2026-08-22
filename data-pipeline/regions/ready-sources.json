@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "checkedAt": "2026-08-21",
+  "checkedAt": "2026-08-22",
   "policy": {
     "requiredState": "READY",
     "failClosed": true,
@@ -13,11 +13,16 @@
       "region": "ARA",
       "categories": ["znieff"],
       "realms": ["flora", "fauna"],
+      "state": "IMPORTED",
       "landingPage": "https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/les-especes-et-habitats-determinantes-des-znieff-a19735.html",
       "resources": [
         {
           "kind": "ods",
-          "url": "https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods"
+          "version": "2023-06",
+          "url": "https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods",
+          "archiveUrl": "https://web.archive.org/web/20260513033231/https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods",
+          "archiveCapturedAt": "2026-05-13",
+          "sha256": "ab505dcac9297257e8432743c4f60f5a41a7c3f527880d917d6b55f65ddf4f86"
         }
       ]
     },
