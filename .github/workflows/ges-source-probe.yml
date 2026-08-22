@@ -1,0 +1,112 @@
+name: Grand Est ZNIEFF source delivery probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ges-source-probe.yml'
+
+jobs:
+  probe-ges-znieff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install workbook inspector
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Probe official and archived XLSX
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+          from openpyxl import load_workbook
+
+          UA = 'Mozilla/5.0 (compatible; statuts-especes-fr/1.0; +https://github.com/Bjonat/statuts-especes-fr)'
+          sources = {
+              'fauna': 'https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_faunev2_2_juin2026.xlsx',
+              'flora': 'https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_florev1_08_2024_2_.xlsx',
+          }
+
+          def get(url: str, timeout=90) -> bytes:
+              req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': '*/*'})
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                  return r.read()
+
+          def is_xlsx(data: bytes) -> bool:
+              return data.startswith(b'PK\x03\x04') and b'[Content_Types].xml' in data[:1000000]
+
+          def archive_captures(url: str):
+              query = 'https://web.archive.org/cdx/search/cdx?' + urllib.parse.urlencode({
+                  'url': url,
+                  'output': 'json',
+                  'filter': 'statuscode:200',
+                  'fl': 'timestamp,original,statuscode,mimetype,digest,length',
+                  'collapse': 'digest',
+              })
+              rows = json.loads(get(query, timeout=120))
+              return rows[1:] if rows else []
+
+          def inspect(path: Path):
+              wb = load_workbook(path, read_only=True, data_only=True)
+              print('SHEETS=', wb.sheetnames)
+              for ws in wb.worksheets[:12]:
+                  print(f'--- SHEET {ws.title} rows={ws.max_row} cols={ws.max_column} ---')
+                  shown = 0
+                  for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 20), values_only=True):
+                      values = [str(v).strip() if v is not None else '' for v in row[:30]]
+                      if any(values):
+                          print(values)
+                          shown += 1
+                      if shown >= 8:
+                          break
+
+          for key, official_url in sources.items():
+              print(f'===== {key.upper()} =====')
+              try:
+                  data = get(official_url)
+                  print('DIRECT bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data), 'head=', data[:80])
+              except Exception as exc:
+                  print('DIRECT ERROR', repr(exc))
+
+              captures = archive_captures(official_url)
+              print('CAPTURES=', captures[-20:])
+              if not captures:
+                  print('NO ARCHIVE CAPTURE')
+                  continue
+
+              success = None
+              for capture in reversed(captures):
+                  ts = capture[0]
+                  archive_url = f'https://web.archive.org/web/{ts}id_/{official_url}'
+                  try:
+                      data = get(archive_url, timeout=180)
+                  except Exception as exc:
+                      print('ARCHIVE ERROR', ts, repr(exc))
+                      continue
+                  print('ARCHIVE', ts, 'bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data))
+                  if is_xlsx(data):
+                      success = (ts, archive_url, data)
+                      break
+
+              if success is None:
+                  print('NO VALID XLSX CAPTURE')
+                  continue
+              ts, archive_url, data = success
+              path = Path(f'/tmp/ges-{key}.xlsx')
+              path.write_bytes(data)
+              print('SELECTED_ARCHIVE=', archive_url)
+              inspect(path)
+          PY
