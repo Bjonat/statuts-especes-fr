@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { UNPUBLISHABLE_SOURCE_IDS } from './regional.mjs'
 
 function parseArgs(argv) {
   const args = {}
@@ -38,6 +39,11 @@ for (const source of manifest.sources) {
   assert.equal(source.official, true, `source officielle: ${source.id}`)
   assert.match(source.checkedAt ?? '', /^\d{4}-\d{2}-\d{2}$/, `date de vérification: ${source.id}`)
   assert.equal('url' in source, false, `pas de lien documentaire embarqué: ${source.id}`)
+  assert.equal(
+    UNPUBLISHABLE_SOURCE_IDS.has(source.id),
+    false,
+    `témoin de schéma non publiable embarqué: ${source.id}`,
+  )
 }
 
 const flora = await readJson(path.join(directory, manifest.files.taxa.flora.file))

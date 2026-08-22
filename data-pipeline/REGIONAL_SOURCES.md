@@ -36,6 +36,7 @@ Règles impératives :
 | `PENDING_PUBLICATION` | Travail récent/avis validé, mais jeu de données final à attendre. |
 | `RESEARCH_REQUIRED` | Pas encore de source structurée consolidée suffisamment fiable identifiée. |
 | `DO_NOT_IMPORT` | Source connue mais non validée, ambiguë ou impropre à une publication officielle. |
+| `WITNESS` | Fichier officiel exploitable pour préparer un adaptateur ou un smoke-test de schéma, interdit à la publication tant qu'un millésime plus récent n'est pas validé. |
 
 ## 3. Matrice de travail métropolitaine
 
@@ -94,8 +95,14 @@ Règles impératives :
 - **Témoin de schéma accessible** : tableur ARB `231219_sp_statuts_bfc_a_diffuser.xlsx`, millésime 19/12/2023.
 - **URL ARB** : https://www.arb-bfc.fr/content/uploads/2024/06/231219_sp_statuts_bfc_a_diffuser.xlsx
 - **SHA-256 ARB 2023** : `0912139a6f6b6902d6be22e383471b971782502e155b5ae83526bddacbcac073`.
-- **Schéma 2023** : 24 864 taxons, `CD_REF` TAXREF, ZNIEFF BFC unifiée, LRR Bourgogne et Franche-Comté séparées, protections et autres attributs.
-- **Décision pipeline** : le fichier 2023 sert uniquement à préparer l'adaptateur. Il ne doit pas être publié comme substitut du millésime DREAL 2026.
+- **Schéma 2023** : 21 539 taxons avec `CD_REF` TAXREF, ZNIEFF BFC unifiée, LRR Bourgogne et Franche-Comté séparées, protections et autres attributs.
+- **Décision pipeline** : le fichier 2023 sert de témoin de schéma (`WITNESS`). L'adaptateur `data-pipeline/regions/bfc/build_arb_statuts.py` le normalise uniquement avec `--allow-witness-millesime`. Il ne doit pas être publié comme substitut du millésime DREAL 2026.
+- **Sémantique déjà cartographiée** :
+  - ZNIEFF BFC unifiée, portée régionale (`Déterminante stricte` / `station` → `Oui` ; variantes « sous conditions » → `Oui sous condition`) ;
+  - LRR Bourgogne et Franche-Comté conservées comme portées partielles d'anciennes régions ;
+  - catégories UICN composées (`VU (cd_nom …) - LC (cd_nom …)`) ignorées plutôt que fusionnées ;
+  - fonge Franche-Comté et statuts nationaux/européens laissés de côté (BDC ou règne hors catalogue).
+- **Sentinelle** : `Triturus cristatus` (`CD_REF 139`) — ZNIEFF `Déterminante stricte`, LRR `VU` Bourgogne et `VU` Franche-Comté.
 
 #### ZNIEFF — `READY_WHEN_AVAILABLE`
 
@@ -109,7 +116,7 @@ Règles impératives :
 
 #### Action suivante
 
-Reprendre le tableur DREAL 2026 dès qu'il redevient un vrai XLSX ; réutiliser le schéma 2023 déjà cartographié, puis n'importer que les catégories dont le millésime 2026 est confirmé. Les LRR Bourgogne / Franche-Comté restent des portées partielles.
+Reprendre le tableur DREAL 2026 dès qu'il redevient un vrai XLSX ; réutiliser l'adaptateur déjà écrit sur le schéma 2023, puis n'importer que les catégories dont le millésime 2026 est confirmé. Les LRR Bourgogne / Franche-Comté restent des portées partielles. Le smoke régional échoue volontairement si le XLSX 2026 réapparaît avec un autre hash, pour forcer cette revalidation.
 
 ---
 
@@ -396,7 +403,7 @@ Cette section doit être relue avant chaque nouvelle vague d'enrichissement.
 
 | Sujet | État au 21/08/2026 | Action |
 |---|---|---|
-| Tableur maître BFC 03/03/2026 | DREAL en maintenance ; ARB expose seulement le millésime 19/12/2023 | Retester 2026, ne jamais publier 2023 comme 2026 |
+| Tableur maître BFC 03/03/2026 | DREAL en maintenance ; adaptateur écrit sur le témoin ARB 19/12/2023 | Retester 2026, ne jamais publier 2023 comme 2026 |
 | ZNIEFF flore Grand Est 08/2024 | DREAL en maintenance ; aucun miroir ODONAT/CBN reproductible retenu | Retester le XLSX officiel, ne pas extraire le PDF méthodologique |
 | ZNIEFF CVL 2026 | Source officielle identifiée mais DREAL renvoie une page de maintenance aux runners GitHub | Retester le fichier, ne pas utiliser 2025 comme faux 2026 |
 | ZNIEFF Occitanie flore/faune | Fichiers officiels identifiés mais même maintenance DREAL | Retester, éventuellement qualifier le comportement HTTP/User-Agent sans changer de source |

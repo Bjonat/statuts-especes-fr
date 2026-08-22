@@ -84,3 +84,5 @@ Voir [`../docs/data-sources-cvl.md`](../docs/data-sources-cvl.md) pour l'audit d
 - catalogue de rareté CBNBP de 2016 identifié comme trop ancien pour être présenté comme une donnée « à jour » sans avertissement explicite.
 
 La prochaine ingestion régionale prioritaire est la liste ZNIEFF DREAL 2026.
+
+Le tableur maître Bourgogne-Franche-Comté 2026 reste inaccessible. Un adaptateur est toutefois déjà écrit sur le témoin de schéma ARB 2023-12-19 : voir [`../docs/data-sources-bfc.md`](../docs/data-sources-bfc.md). Ce millésime ne doit pas être publié.

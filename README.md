@@ -102,4 +102,5 @@ Une attention particulière est portée aux anciennes régions : un statut appli
 - [`data-pipeline/README.md`](data-pipeline/README.md) — règles de transformation et validation des référentiels ;
 - [`docs/data-sources-cvl.md`](docs/data-sources-cvl.md) — audit de fraîcheur et priorisation des sources Centre-Val de Loire ;
 - [`docs/data-sources-ara.md`](docs/data-sources-ara.md) — intégration ZNIEFF Auvergne-Rhône-Alpes ;
+- [`docs/data-sources-bfc.md`](docs/data-sources-bfc.md) — témoin de schéma BFC 2023, en attente du millésime DREAL 2026 ;
 - [`docs/data-sources-ges.md`](docs/data-sources-ges.md) — intégration ZNIEFF faune Grand Est.

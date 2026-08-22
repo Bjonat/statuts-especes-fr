@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mergeRegionalPackages, validateRegionalPackage } from './regional.mjs'
+import { UNPUBLISHABLE_SOURCE_IDS, mergeRegionalPackages, validateRegionalPackage } from './regional.mjs'
 
 const taxa = [
   { cdRef: 100, realm: 'flora' },
@@ -98,6 +98,67 @@ test('les CD_REF ciblés doivent être valides, non vides et non dupliqués', ()
     () => validateRegionalPackage(packageFixture({ replaces: [{ region: 'OCC', category: 'znieff', realm: 'flora', cdRefs: [100, 100] }] })),
     /dupliqué/,
   )
+})
+
+test('le témoin de schéma BFC 2023 reste explicite et non publiable', () => {
+  assert.equal(UNPUBLISHABLE_SOURCE_IDS.has('arb-bfc-statuts-2023-12-19'), true)
+  const pkg = packageFixture({
+    source: {
+      id: 'arb-bfc-statuts-2023-12-19',
+      name: 'Statuts des espèces de Bourgogne-Franche-Comté',
+      producer: 'DREAL Bourgogne-Franche-Comté / ARB BFC',
+      version: '2023-12-19',
+      official: true,
+      checkedAt: '2026-08-22',
+      publicationPolicy: 'schema-witness-smoke-only',
+    },
+    replaces: [{ region: 'BFC', category: 'red_list_regional', realm: 'fauna', cdRefs: [200] }],
+    statuses: [{
+      cdRef: 200,
+      region: 'BFC',
+      category: 'red_list_regional',
+      label: 'Liste rouge régionale',
+      value: 'VU',
+      sourceId: 'arb-bfc-statuts-2023-12-19',
+      scope: 'partial',
+      scopeLabel: 'ancienne région Bourgogne',
+    }],
+  })
+  assert.equal(validateRegionalPackage(pkg).source.id, 'arb-bfc-statuts-2023-12-19')
+})
+
+test('une LRR d’ancienne région BFC ne remplace que les CD_REF couverts et reste partielle', () => {
+  const base = [
+    { cdRef: 200, region: 'BFC', category: 'red_list_regional', label: 'LRR BDC', value: 'LC', sourceId: 'bdc-v18', scope: 'regional' },
+    { cdRef: 201, region: 'BFC', category: 'red_list_regional', label: 'LRR BDC', value: 'NT', sourceId: 'bdc-v18', scope: 'regional' },
+  ]
+  const taxaWithFauna = [...taxa, { cdRef: 201, realm: 'fauna' }]
+  const pkg = packageFixture({
+    source: {
+      id: 'arb-bfc-statuts-2023-12-19',
+      name: 'Statuts des espèces de Bourgogne-Franche-Comté',
+      producer: 'DREAL Bourgogne-Franche-Comté / ARB BFC',
+      version: '2023-12-19',
+      official: true,
+      checkedAt: '2026-08-22',
+    },
+    replaces: [{ region: 'BFC', category: 'red_list_regional', realm: 'fauna', cdRefs: [200] }],
+    statuses: [{
+      cdRef: 200,
+      region: 'BFC',
+      category: 'red_list_regional',
+      label: 'Liste rouge régionale',
+      value: 'VU',
+      sourceId: 'arb-bfc-statuts-2023-12-19',
+      scope: 'partial',
+      scopeLabel: 'ancienne région Bourgogne',
+    }],
+  })
+
+  const merged = mergeRegionalPackages(base, taxaWithFauna, [pkg])
+  assert.equal(merged.statuses.some((status) => status.cdRef === 200 && status.sourceId === 'bdc-v18'), false)
+  assert.equal(merged.statuses.some((status) => status.cdRef === 200 && status.scope === 'partial' && status.value === 'VU'), true)
+  assert.equal(merged.statuses.some((status) => status.cdRef === 201 && status.sourceId === 'bdc-v18'), true)
 })
 
 test('les CD_REF régionaux inconnus sont comptés et ignorés sans polluer le catalogue', () => {

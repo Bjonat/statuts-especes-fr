@@ -42,6 +42,24 @@
       ]
     },
     {
+      "id": "arb-bfc-statuts-2023-12-19",
+      "region": "BFC",
+      "categories": ["znieff", "red_list_regional"],
+      "realms": ["flora", "fauna"],
+      "state": "WITNESS",
+      "publicationPolicy": "schema-witness-smoke-only",
+      "landingPage": "https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/statut-des-especes-a10460.html",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "2023-12-19",
+          "url": "https://www.arb-bfc.fr/content/uploads/2024/06/231219_sp_statuts_bfc_a_diffuser.xlsx",
+          "sha256": "0912139a6f6b6902d6be22e383471b971782502e155b5ae83526bddacbcac073",
+          "note": "Témoin de schéma ; ne pas publier à la place de dreal-bfc-statuts-2026-03-03"
+        }
+      ]
+    },
+    {
       "id": "oeb-bretagne-znieff",
       "region": "BRE",
       "categories": ["znieff"],

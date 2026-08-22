@@ -3,6 +3,10 @@ import path from 'node:path'
 
 const REALMS = new Set(['flora', 'fauna'])
 
+export const UNPUBLISHABLE_SOURCE_IDS = new Set([
+  'arb-bfc-statuts-2023-12-19',
+])
+
 function replacementKey(region, category, realm) {
   return `${region}|${category}|${realm}`
 }

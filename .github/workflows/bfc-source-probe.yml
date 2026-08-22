@@ -7,7 +7,9 @@ on:
     paths:
       - 'data-pipeline/REGIONAL_SOURCES.md'
       - 'data-pipeline/regions/ready-sources.json'
+      - 'data-pipeline/regions/bfc/**'
       - '.github/workflows/bfc-source-probe.yml'
+      - '.github/workflows/bfc-regional-smoke.yml'
 
 jobs:
   probe-bfc-master:
