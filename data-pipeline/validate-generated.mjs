@@ -53,7 +53,12 @@ assert.ok(flora.length > 20_000, 'volume flore plausible')
 assert.ok(fauna.length > 50_000, 'volume faune plausible')
 assert.ok(definitions.length > 100, 'dictionnaire de statuts plausible')
 assert.ok(definitions.every((definition) => !('citation' in definition) && !('documentUrl' in definition)), 'aucune citation longue ni URL documentaire dans les définitions')
-assert.ok(definitions.every((definition) => typeof definition.value === 'string' && definition.value.length <= 80), 'valeurs de statuts compactes pour le terrain')
+const longValues = definitions.filter((definition) => typeof definition.value !== 'string' || definition.value.length > 80)
+assert.equal(
+  longValues.length,
+  0,
+  `valeurs de statuts compactes pour le terrain: ${JSON.stringify(longValues.slice(0, 5), null, 2)}`,
+)
 
 async function loadLinks(realm, region) {
   return readJson(path.join(directory, manifest.files.statusLinks[realm][region].file))

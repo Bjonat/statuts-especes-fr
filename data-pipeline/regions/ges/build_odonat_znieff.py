@@ -24,6 +24,7 @@ SEARCHABLE_RANKS = {"ES", "SSES", "VAR", "SVAR", "FO", "CAR", "RACE", "AGES"}
 REGIONAL_CATEGORIES = {"EDZ", "EDZ*", "AEE", "AEE*", "NC", "NE"}
 DETERMINANT_CATEGORIES = {"EDZ", "EDZ*"}
 DEMOTED_CATEGORIES = {"AEE", "AEE*"}
+MAX_VALUE_LENGTH = 80
 
 NATURAL_UNITS = {
     "DETZ_BC": "Plaine de Champagne et Brie",
@@ -186,6 +187,13 @@ def priority_value(value: object) -> str | None:
     return raw
 
 
+def compact_value(value: object) -> str | None:
+    text = clean(value)
+    if not text or len(text) > MAX_VALUE_LENGTH:
+        return None
+    return text
+
+
 def add_status(statuses, seen, record):
     key = (
         record["cdRef"], record["category"], record["label"], record["value"],
@@ -272,31 +280,33 @@ def build_package(taxref_path: Path, source_path: Path, checked_at: str):
             }):
                 diagnostics["priorityStatuses"] += 1
 
-        condition = clean(row.get("DETZ_COND"))
-        if condition:
-            if add_status(statuses, seen, {
-                "cdRef": cd_ref,
-                "region": "GES",
-                "category": "znieff",
-                "label": "Condition de déterminance ZNIEFF",
-                "value": condition,
-                "sourceId": SOURCE_ID,
-                "scope": "regional",
-            }):
-                diagnostics["conditionStatuses"] += 1
+        condition = compact_value(row.get("DETZ_COND"))
+        if clean(row.get("DETZ_COND")) and condition is None:
+            diagnostics["omittedLongConditions"] += 1
+        elif condition and add_status(statuses, seen, {
+            "cdRef": cd_ref,
+            "region": "GES",
+            "category": "znieff",
+            "label": "Condition de déterminance ZNIEFF",
+            "value": condition,
+            "sourceId": SOURCE_ID,
+            "scope": "regional",
+        }):
+            diagnostics["conditionStatuses"] += 1
 
-        surcot = clean(row.get("DETZ_SURCO"))
-        if surcot:
-            if add_status(statuses, seen, {
-                "cdRef": cd_ref,
-                "region": "GES",
-                "category": "znieff",
-                "label": "Condition de surcotation ZNIEFF",
-                "value": surcot,
-                "sourceId": SOURCE_ID,
-                "scope": "regional",
-            }):
-                diagnostics["surcotationStatuses"] += 1
+        surcot = compact_value(row.get("DETZ_SURCO"))
+        if clean(row.get("DETZ_SURCO")) and surcot is None:
+            diagnostics["omittedLongSurcotations"] += 1
+        elif surcot and add_status(statuses, seen, {
+            "cdRef": cd_ref,
+            "region": "GES",
+            "category": "znieff",
+            "label": "Condition de surcotation ZNIEFF",
+            "value": surcot,
+            "sourceId": SOURCE_ID,
+            "scope": "regional",
+        }):
+            diagnostics["surcotationStatuses"] += 1
 
     # La feuille BDD rassemble les groupes non encore harmonisés. Lorsqu'un taxon y
     # est explicitement rétrogradé AEE/AEE*, on retire les anciens statuts EDZ des

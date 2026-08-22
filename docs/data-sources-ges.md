@@ -45,7 +45,7 @@ Le pipeline distingue :
 - `EDZ*` : déterminante conditionnelle, valeur `Oui si (re)découverte` ;
 - `AEE` / `AEE*` : espèces à enjeu écologique, hors publication déterminante.
 
-Les conditions de déterminance et de surcotation sont conservées comme cartes de statut distinctes. Les taxons `AEE` restent dans le périmètre de remplacement de la BDC : un ancien statut déterminant BDC peut ainsi être retiré lorsqu'une évaluation Grand Est plus récente rétrograde le taxon.
+Les conditions de déterminance et de surcotation sont conservées comme cartes de statut distinctes, uniquement lorsqu'elles tiennent en 80 caractères (contrainte d'affichage terrain). Quatre libellés plus longs sont omis plutôt que tronqués. Les taxons `AEE` restent dans le périmètre de remplacement de la BDC : un ancien statut déterminant BDC peut ainsi être retiré lorsqu'une évaluation Grand Est plus récente rétrograde le taxon.
 
 La feuille `LISTE FAUNE BDD ZNIEFF GRANDEST` rassemble les groupes non encore harmonisés. Lorsqu'un taxon y est explicitement rétrogradé `AEE` / `AEE*`, le pipeline retire les anciens statuts déterminants des trois ex-régions sans le republier comme espèce déterminante.
 
@@ -55,7 +55,7 @@ Résultat du smoke-test reproductible :
 
 - 536 statuts déterminants régionaux (`EDZ` / `EDZ*`) ;
 - 1 755 priorités d'unités naturelles ;
-- 2 321 statuts normalisés après déduplication ;
+- 2 317 statuts normalisés après déduplication (4 conditions trop longues omises) ;
 - 930 `CD_REF` dans le périmètre de remplacement ciblé ;
 - 137 références rétrogradées depuis la feuille d'attente ;
 - taux de raccord : **100 %** sur les lignes taxonomiques exploitables.
