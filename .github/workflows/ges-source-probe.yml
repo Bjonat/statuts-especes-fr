@@ -19,59 +19,48 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Inspect ODONAT and CBAL media sources
+      - name: Install workbook inspector
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Inspect current ODONAT Grand Est workbook
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx'
+          curl --fail --location --retry 3 --max-time 120 "$url" -o "$RUNNER_TEMP/ges-current.xlsx"
+          test "$(head -c 2 "$RUNNER_TEMP/ges-current.xlsx")" = 'PK'
+          sha256sum "$RUNNER_TEMP/ges-current.xlsx"
+          ls -lh "$RUNNER_TEMP/ges-current.xlsx"
+          XLSX="$RUNNER_TEMP/ges-current.xlsx" python - <<'PY'
+          import os
+          from openpyxl import load_workbook
+
+          path = os.environ['XLSX']
+          wb = load_workbook(path, read_only=True, data_only=True)
+          print('SHEETS=', wb.sheetnames)
+          for ws in wb.worksheets:
+              print(f'===== SHEET {ws.title} rows={ws.max_row} cols={ws.max_column} =====')
+              shown = 0
+              for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 45), values_only=True):
+                  values = [str(v).strip() if v is not None else '' for v in row[:45]]
+                  if not any(values):
+                      continue
+                  print(values)
+                  shown += 1
+                  if shown >= 16:
+                      break
+          PY
+
+      - name: Confirm source link through WordPress API
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json
-          import urllib.parse
-          import urllib.request
-
-          UA = 'Mozilla/5.0 (compatible; statuts-especes-fr/1.0; +https://github.com/Bjonat/statuts-especes-fr)'
-
-          def get(url, timeout=10):
-              req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': 'application/json,text/html,*/*'})
-              with urllib.request.urlopen(req, timeout=timeout) as response:
-                  return response.read(), dict(response.headers), response.status
-
-          queries = [
-              ('ODONAT-znieff', 'https://www.odonat-grandest.fr/wp-json/wp/v2/media?search=znieff&per_page=100'),
-              ('ODONAT-edz', 'https://www.odonat-grandest.fr/wp-json/wp/v2/media?search=edz&per_page=100'),
-              ('CBAL-znieff', 'https://www.cbnal.fr/wp-json/wp/v2/media?search=znieff&per_page=100'),
-              ('CBAL-catalogue', 'https://www.cbnal.fr/wp-json/wp/v2/media?search=catalogue&per_page=100'),
-          ]
-          for label, url in queries:
-              print('=====', label, '=====')
-              try:
-                  data, headers, status = get(url)
-                  print('status=', status, 'bytes=', len(data), 'content-type=', headers.get('Content-Type'))
-                  rows = json.loads(data.decode('utf-8'))
-                  print('COUNT=', len(rows))
-                  for row in rows:
-                      print(json.dumps({
-                          'id': row.get('id'),
-                          'date': row.get('date'),
-                          'slug': row.get('slug'),
-                          'title': (row.get('title') or {}).get('rendered'),
-                          'mime': row.get('mime_type'),
-                          'source_url': row.get('source_url'),
-                      }, ensure_ascii=False))
-              except Exception as exc:
-                  print('ERROR', repr(exc))
-
-          print('===== ODONAT CURRENT PAGE LINK =====')
-          try:
-              data, _, status = get('https://www.odonat-grandest.fr/znieff-documents-telechargeables/')
-              text = data.decode('utf-8', 'replace')
-              print('status=', status, 'bytes=', len(data))
-              for token in text.split('href=')[1:]:
-                  q = token[:1]
-                  if q not in ('"', "'"):
-                      continue
-                  href = token[1:].split(q, 1)[0]
-                  if any(x in href.casefold() for x in ('xlsx','xls','znieff','determin')):
-                      print('HREF', href)
-          except Exception as exc:
-              print('ERROR', repr(exc))
+          import json, urllib.request
+          url='https://www.odonat-grandest.fr/wp-json/wp/v2/media/11584'
+          req=urllib.request.Request(url,headers={'User-Agent':'statuts-especes-fr/1.0','Accept':'application/json'})
+          with urllib.request.urlopen(req,timeout=30) as r:
+              row=json.load(r)
+          print(json.dumps({k: row.get(k) for k in ('id','date','modified','slug','mime_type','source_url')}, ensure_ascii=False, indent=2))
+          assert row.get('source_url') == 'https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx'
           PY
