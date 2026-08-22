@@ -1,0 +1,72 @@
+name: ARA ZNIEFF source delivery probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ara-source-probe.yml'
+  workflow_dispatch:
+
+jobs:
+  probe-ara-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Probe DREAL landing page and download variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          landing='https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/les-especes-et-habitats-determinantes-des-znieff-a19735.html?lang=fr'
+          direct='https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods'
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'
+          cookies="$RUNNER_TEMP/ara-cookies.txt"
+
+          echo '===== LANDING PAGE ====='
+          curl --fail --location --silent --show-error \
+            --user-agent "$ua" \
+            --cookie-jar "$cookies" \
+            -D "$RUNNER_TEMP/landing.headers" \
+            "$landing" -o "$RUNNER_TEMP/landing.html"
+          head -n 20 "$RUNNER_TEMP/landing.headers"
+          echo "landing bytes=$(wc -c < "$RUNNER_TEMP/landing.html")"
+          grep -oE 'href="[^"]*2023-06_listes_especes_determinantes_znieff_aura_internet\.ods[^"]*"' "$RUNNER_TEMP/landing.html" || true
+          grep -oi 'Maintenance en cours' "$RUNNER_TEMP/landing.html" | head || true
+
+          urls=(
+            "$direct"
+            "${direct}?download=1"
+            "${direct}?lang=fr"
+            "https://webissimo.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods"
+          )
+
+          i=0
+          for url in "${urls[@]}"; do
+            i=$((i+1))
+            out="$RUNNER_TEMP/ara-$i.bin"
+            hdr="$RUNNER_TEMP/ara-$i.headers"
+            echo "===== VARIANT $i ====="
+            echo "$url"
+            set +e
+            curl --location --silent --show-error \
+              --user-agent "$ua" \
+              --referer "$landing" \
+              --cookie "$cookies" \
+              --header 'Accept: application/vnd.oasis.opendocument.spreadsheet,application/octet-stream,*/*;q=0.8' \
+              --http1.1 \
+              -D "$hdr" \
+              "$url" -o "$out"
+            rc=$?
+            set -e
+            echo "curl_rc=$rc bytes=$(wc -c < "$out" 2>/dev/null || echo 0)"
+            head -n 30 "$hdr" || true
+            file "$out" || true
+            head -c 64 "$out" | xxd || true
+            if unzip -t "$out" >/dev/null 2>&1; then
+              echo "SUCCESS_VARIANT=$i"
+              unzip -l "$out" | head -n 30
+            else
+              grep -ao 'Maintenance en cours' "$out" | head || true
+            fi
+          done
