@@ -42,7 +42,7 @@ Règles impératives :
 | Région | ZNIEFF | Listes rouges régionales | Autres attributs régionaux | Priorité d'enrichissement |
 |---|---|---|---|---|
 | Auvergne-Rhône-Alpes (`ARA`) | `READY` | `PARTIAL` | À documenter selon CBN | Haute |
-| Bourgogne-Franche-Comté (`BFC`) | `READY` via tableur maître | `READY` via tableur maître / sources groupe | Tableur maître de statuts | **Très haute** |
+| Bourgogne-Franche-Comté (`BFC`) | `READY_WHEN_AVAILABLE` via tableur maître 2026 | `READY_WHEN_AVAILABLE` via tableur maître 2026 | Tableur maître de statuts | **Très haute** |
 | Bretagne (`BRE`) | `READY` | `READY` | Responsabilité biologique régionale disponible | **Très haute** |
 | Centre-Val de Loire (`CVL`) | `READY_WHEN_AVAILABLE` | `READY` | Rareté/indigénat CBNBP à qualifier | Haute |
 | Corse (`COR`) | `RESEARCH_REQUIRED` pour consolidation | `PARTIAL` | À documenter | Moyenne |
@@ -85,13 +85,17 @@ Règles impératives :
 
 ### BFC — Bourgogne-Franche-Comté
 
-#### Tableur maître des statuts — `READY` — priorité très haute
+#### Tableur maître des statuts — `READY_WHEN_AVAILABLE` pour 2026 ; témoin de schéma 2023 — priorité très haute
 
-- **Producteur** : DREAL Bourgogne-Franche-Comté.
-- **Page officielle** : https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/statut-des-especes-a10460.html
-- **Ressource repérée** : `20260303_Statuts_Especes_BFC_xls.xlsx` (~4,6 Mio), millésime 03/03/2026.
-- **Contenu annoncé** : espèces de Bourgogne-Franche-Comté, réglementations et évaluations biologiques.
-- **Intérêt** : candidat prioritaire à un connecteur régional unique capable d'alimenter plusieurs catégories : ZNIEFF, listes rouges, protections/évaluations et éventuellement d'autres attributs patrimoniaux selon les colonnes.
+- **Producteur** : DREAL Bourgogne-Franche-Comté / ARB BFC / Sigogne.
+- **Page officielle DREAL** : https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/statut-des-especes-a10460.html
+- **Ressource officielle actuelle** : `260303_sp_statuts_bfc.xlsx`, millésime 03/03/2026.
+- **Blocage au 22/08/2026** : le frontal DREAL renvoie une page HTML `Maintenance en cours` à la place du XLSX.
+- **Témoin de schéma accessible** : tableur ARB `231219_sp_statuts_bfc_a_diffuser.xlsx`, millésime 19/12/2023.
+- **URL ARB** : https://www.arb-bfc.fr/content/uploads/2024/06/231219_sp_statuts_bfc_a_diffuser.xlsx
+- **SHA-256 ARB 2023** : `0912139a6f6b6902d6be22e383471b971782502e155b5ae83526bddacbcac073`.
+- **Schéma 2023** : 24 864 taxons, `CD_REF` TAXREF, ZNIEFF BFC unifiée, LRR Bourgogne et Franche-Comté séparées, protections et autres attributs.
+- **Décision pipeline** : le fichier 2023 sert uniquement à préparer l'adaptateur. Il ne doit pas être publié comme substitut du millésime DREAL 2026.
 
 #### ZNIEFF — `READY`
 
@@ -105,7 +109,7 @@ Règles impératives :
 
 #### Action suivante
 
-**Région candidate n°1 après NAQ** : télécharger le tableur maître 2026, cartographier ses colonnes, mesurer sa couverture et déterminer quelles catégories BDC il peut remplacer sans perte d'information.
+Reprendre le tableur DREAL 2026 dès qu'il redevient un vrai XLSX ; réutiliser le schéma 2023 déjà cartographié, puis n'importer que les catégories dont le millésime 2026 est confirmé. Les LRR Bourgogne / Franche-Comté restent des portées partielles.
 
 ---
 
@@ -195,7 +199,7 @@ Chercher le fichier opérationnel utilisé pour l'inventaire ZNIEFF corse avant 
 - **Faune — source utilisée par le projet** : LEDZfauna v2.2, juin 2026, republicée par ODONAT Grand Est lorsque le frontal DREAL est en maintenance.
 - **Fichier** : https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx
 - **SHA-256** : `a130de0436237ebde5b4fcee582ac8890bdadeed679cda96d4896f9082866c1f`.
-- **Flore vasculaire** : tableur `LISTES EDZ AEE FLORE v1_08 2024.xlsx` encore à brancher ; le frontal DREAL reste à sonder et un miroir institutionnel reproductible n'a pas encore été retenu.
+- **Flore vasculaire** : tableur `LISTES EDZ AEE FLORE v1_08 2024.xlsx` encore à brancher. Au 22/08/2026, le frontal DREAL est en maintenance ; ODONAT ne republicie que la faune ; Lobelia expose des fiches taxon mais pas d'export machine de la liste officielle. Ne pas extraire l'annexe PDF comme substitut du XLSX.
 - Les listes intègrent des niveaux de priorité et plusieurs entités naturelles ; conserver ces portées/qualificatifs plutôt que de les écraser.
 
 #### Listes rouges — `PARTIAL` selon groupes
@@ -392,6 +396,8 @@ Cette section doit être relue avant chaque nouvelle vague d'enrichissement.
 
 | Sujet | État au 21/08/2026 | Action |
 |---|---|---|
+| Tableur maître BFC 03/03/2026 | DREAL en maintenance ; ARB expose seulement le millésime 19/12/2023 | Retester 2026, ne jamais publier 2023 comme 2026 |
+| ZNIEFF flore Grand Est 08/2024 | DREAL en maintenance ; aucun miroir ODONAT/CBN reproductible retenu | Retester le XLSX officiel, ne pas extraire le PDF méthodologique |
 | ZNIEFF CVL 2026 | Source officielle identifiée mais DREAL renvoie une page de maintenance aux runners GitHub | Retester le fichier, ne pas utiliser 2025 comme faux 2026 |
 | ZNIEFF Occitanie flore/faune | Fichiers officiels identifiés mais même maintenance DREAL | Retester, éventuellement qualifier le comportement HTTP/User-Agent sans changer de source |
 | NAQ flore LRR 2026 | Avis CSRPN repéré | Attendre la publication finale exploitable |

@@ -31,10 +31,12 @@
       "region": "BFC",
       "categories": ["znieff", "red_list_regional"],
       "realms": ["flora", "fauna"],
+      "state": "READY_WHEN_AVAILABLE",
       "landingPage": "https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/statut-des-especes-a10460.html",
       "resources": [
         {
           "kind": "xlsx",
+          "version": "2026-03-03",
           "url": "https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/IMG/xlsx/260303_sp_statuts_bfc.xlsx"
         }
       ]
