@@ -1,0 +1,104 @@
+name: BFC master status source probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/bfc-source-probe.yml'
+
+jobs:
+  probe-bfc-master:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Probe direct source and Wayback captures
+        shell: bash
+        run: |
+          set -euo pipefail
+          canonical='https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/IMG/xlsx/260303_sp_statuts_bfc.xlsx'
+          direct="$RUNNER_TEMP/bfc-direct.xlsx"
+
+          if curl --fail --location --retry 2 --silent --show-error "$canonical" -o "$direct"; then
+            if unzip -t "$direct" >/dev/null 2>&1; then
+              echo 'BFC_DIRECT_OK=true' >> "$GITHUB_ENV"
+              echo "BFC_FILE=$direct" >> "$GITHUB_ENV"
+              echo 'Source DREAL directe exploitable.'
+              exit 0
+            fi
+            if grep -aq 'Maintenance en cours' "$direct"; then
+              echo '::warning::DREAL BFC en maintenance ; recherche d’une capture Wayback.'
+            else
+              echo '::warning::La DREAL BFC ne renvoie pas un XLSX exploitable ; recherche d’une capture Wayback.'
+            fi
+          else
+            echo '::warning::Téléchargement direct BFC impossible ; recherche d’une capture Wayback.'
+          fi
+
+          cdx="$RUNNER_TEMP/bfc-cdx.json"
+          curl --fail --location --retry 3 --silent --show-error --get \
+            'https://web.archive.org/cdx/search/cdx' \
+            --data-urlencode "url=$canonical" \
+            --data-urlencode 'output=json' \
+            --data-urlencode 'filter=statuscode:200' \
+            --data-urlencode 'fl=timestamp,original,digest,length' \
+            --data-urlencode 'from=2026' \
+            --data-urlencode 'to=2026' \
+            --data-urlencode 'collapse=digest' \
+            -o "$cdx"
+
+          cat "$cdx"
+          selection="$(python - "$cdx" <<'PY'
+          import json, sys
+          rows = json.load(open(sys.argv[1], encoding='utf-8'))
+          if len(rows) <= 1:
+              raise SystemExit(2)
+          header = rows[0]
+          records = [dict(zip(header, row)) for row in rows[1:]]
+          records.sort(key=lambda row: row['timestamp'], reverse=True)
+          row = records[0]
+          print('\t'.join([row['timestamp'], row['original'], row.get('digest',''), row.get('length','')]))
+          PY
+          )" || {
+            echo '::error::Aucune capture Wayback 2026 exploitable trouvée pour le tableur BFC.'
+            exit 1
+          }
+
+          IFS=$'\t' read -r timestamp original digest archived_length <<< "$selection"
+          echo "Capture retenue: $timestamp ; digest=$digest ; longueur=$archived_length"
+          archive="https://web.archive.org/web/${timestamp}id_/${original}"
+          target="$RUNNER_TEMP/bfc-archive.xlsx"
+          curl --fail --location --retry 3 --silent --show-error "$archive" -o "$target"
+          unzip -t "$target" >/dev/null
+          echo "BFC_ARCHIVE_URL=$archive" >> "$GITHUB_ENV"
+          echo "BFC_ARCHIVE_CAPTURED_AT=${timestamp:0:4}-${timestamp:4:2}-${timestamp:6:2}" >> "$GITHUB_ENV"
+          echo "BFC_FILE=$target" >> "$GITHUB_ENV"
+
+      - name: Validate and inspect workbook
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum "$BFC_FILE"
+          ls -lh "$BFC_FILE"
+          python - "$BFC_FILE" <<'PY'
+          import sys, zipfile, xml.etree.ElementTree as ET
+          path = sys.argv[1]
+          ns = {
+              'main': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+              'rel': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+              'pkg': 'http://schemas.openxmlformats.org/package/2006/relationships',
+          }
+          with zipfile.ZipFile(path) as z:
+              wb = ET.fromstring(z.read('xl/workbook.xml'))
+              rels = ET.fromstring(z.read('xl/_rels/workbook.xml.rels'))
+              targets = {r.attrib['Id']: r.attrib['Target'] for r in rels.findall('pkg:Relationship', ns)}
+              sheets = []
+              for sheet in wb.find('main:sheets', ns):
+                  rid = sheet.attrib.get('{%s}id' % ns['rel'])
+                  sheets.append((sheet.attrib.get('name'), targets.get(rid)))
+              print('BFC_SHEETS=', sheets)
+              if not sheets:
+                  raise SystemExit('Aucune feuille trouvée dans le XLSX BFC')
+          PY
