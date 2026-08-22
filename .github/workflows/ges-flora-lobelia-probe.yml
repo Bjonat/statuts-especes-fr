@@ -1,0 +1,67 @@
+name: Grand Est flora Lobelia endpoint probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ges-flora-lobelia-probe.yml'
+
+jobs:
+  inspect-lobelia:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inspect Lobelia public map HTML and scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://lobelia-cbn.fr'
+          curl --fail --location --retry 3 --max-time 90 \
+            -A 'Mozilla/5.0 (compatible; statuts-especes-fr/1.0)' \
+            "$base/consulter/carte" -o "$RUNNER_TEMP/lobelia.html"
+          echo '=== HTML bytes ==='
+          wc -c "$RUNNER_TEMP/lobelia.html"
+          echo '=== forms/actions ==='
+          grep -Eio '<form[^>]+>|action="[^"]+"|data-[a-z0-9_-]+="[^"]+"|name="[^"]+"|id="[^"]+"' "$RUNNER_TEMP/lobelia.html" \
+            | grep -Ei 'carte|indicat|znieff|statut|territ|taxon|search|recher|form|ajax|url' \
+            | head -n 300 || true
+          echo '=== scripts ==='
+          grep -Eo '<script[^>]+src="[^"]+"' "$RUNNER_TEMP/lobelia.html" | sed -E 's/.*src="([^"]+)".*/\1/' > "$RUNNER_TEMP/scripts.txt"
+          cat "$RUNNER_TEMP/scripts.txt"
+
+          mkdir -p "$RUNNER_TEMP/js"
+          n=0
+          while IFS= read -r src; do
+            [ -n "$src" ] || continue
+            case "$src" in
+              http*) url="$src" ;;
+              //*) url="https:$src" ;;
+              /*) url="$base$src" ;;
+              *) url="$base/$src" ;;
+            esac
+            n=$((n+1))
+            curl --fail --location --retry 1 --max-time 40 -A 'Mozilla/5.0' "$url" -o "$RUNNER_TEMP/js/$n.js" || true
+          done < "$RUNNER_TEMP/scripts.txt"
+
+          echo '=== candidate routes in JS ==='
+          grep -RhoE "['\"]/[A-Za-z0-9_./?&=%{}:+-]{3,}['\"]" "$RUNNER_TEMP/js" \
+            | sort -u \
+            | grep -Ei 'carte|indicat|statut|znieff|taxon|recher|search|export|extract|api|ajax|territ' \
+            | head -n 400 || true
+
+          echo '=== context around ZNIEFF / indicateur / ajax ==='
+          grep -RniE 'ZNIEFF|znieff|indicateur|ajax|statut|territoire|Lancer la recherche' "$RUNNER_TEMP/js" \
+            | head -n 300 || true
+
+      - name: Inspect public taxon status source markup
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --max-time 60 \
+            -A 'Mozilla/5.0 (compatible; statuts-especes-fr/1.0)' \
+            'https://lobelia-cbn.fr/fiche-espece/97567/light' -o "$RUNNER_TEMP/taxon.html"
+          echo '=== status-related markup ==='
+          grep -niE 'Déterminantes ZNIEFF en Grand|Grand.Est|statut|znieff' "$RUNNER_TEMP/taxon.html" | head -n 120 || true
