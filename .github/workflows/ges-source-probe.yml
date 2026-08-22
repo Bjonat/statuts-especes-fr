@@ -27,6 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
+          import gzip
           import hashlib
           import json
           import urllib.parse
@@ -40,15 +41,18 @@ jobs:
               'flora': 'https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_florev1_08_2024_2_.xlsx',
           }
 
-          def get(url: str, timeout=90) -> bytes:
-              req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': '*/*'})
+          def get(url: str, timeout=90, headers=None) -> bytes:
+              request_headers = {'User-Agent': UA, 'Accept': '*/*'}
+              if headers:
+                  request_headers.update(headers)
+              req = urllib.request.Request(url, headers=request_headers)
               with urllib.request.urlopen(req, timeout=timeout) as r:
                   return r.read()
 
           def is_xlsx(data: bytes) -> bool:
               return data.startswith(b'PK\x03\x04') and b'[Content_Types].xml' in data[:1000000]
 
-          def archive_captures(url: str):
+          def wayback_captures(url: str):
               query = 'https://web.archive.org/cdx/search/cdx?' + urllib.parse.urlencode({
                   'url': url,
                   'output': 'json',
@@ -59,54 +63,124 @@ jobs:
               rows = json.loads(get(query, timeout=120))
               return rows[1:] if rows else []
 
+          def commoncrawl_records(index_url: str, url: str):
+              query = index_url + '?' + urllib.parse.urlencode({'url': url, 'output': 'json'})
+              try:
+                  text = get(query, timeout=120).decode('utf-8', 'replace')
+              except Exception as exc:
+                  return [], repr(exc)
+              records = []
+              for line in text.splitlines():
+                  line = line.strip()
+                  if not line:
+                      continue
+                  try:
+                      records.append(json.loads(line))
+                  except json.JSONDecodeError:
+                      pass
+              return records, None
+
+          def commoncrawl_body(record: dict) -> bytes:
+              offset = int(record['offset'])
+              length = int(record['length'])
+              warc_url = 'https://data.commoncrawl.org/' + record['filename']
+              compressed = get(
+                  warc_url,
+                  timeout=180,
+                  headers={'Range': f'bytes={offset}-{offset + length - 1}'},
+              )
+              raw = gzip.decompress(compressed)
+              first = raw.find(b'\r\n\r\n')
+              if first < 0:
+                  raise RuntimeError('En-tête WARC introuvable')
+              http = raw[first + 4:]
+              second = http.find(b'\r\n\r\n')
+              if second < 0:
+                  raise RuntimeError('En-tête HTTP introuvable')
+              headers = http[:second].decode('latin1', 'replace').lower()
+              body = http[second + 4:]
+              if 'content-encoding: gzip' in headers:
+                  body = gzip.decompress(body)
+              return body
+
           def inspect(path: Path):
               wb = load_workbook(path, read_only=True, data_only=True)
               print('SHEETS=', wb.sheetnames)
               for ws in wb.worksheets[:12]:
                   print(f'--- SHEET {ws.title} rows={ws.max_row} cols={ws.max_column} ---')
                   shown = 0
-                  for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 20), values_only=True):
+                  for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 24), values_only=True):
                       values = [str(v).strip() if v is not None else '' for v in row[:30]]
                       if any(values):
                           print(values)
                           shown += 1
-                      if shown >= 8:
+                      if shown >= 10:
                           break
+
+          collections = json.loads(get('https://index.commoncrawl.org/collinfo.json', timeout=120))
+          collections = [item for item in collections if item.get('id', '').startswith(('CC-MAIN-2026', 'CC-MAIN-2025'))]
+          print('COMMONCRAWL_COLLECTIONS=', [item['id'] for item in collections[:20]])
 
           for key, official_url in sources.items():
               print(f'===== {key.upper()} =====')
+              selected = None
               try:
                   data = get(official_url)
                   print('DIRECT bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data), 'head=', data[:80])
+                  if is_xlsx(data):
+                      selected = ('direct', official_url, data)
               except Exception as exc:
                   print('DIRECT ERROR', repr(exc))
 
-              captures = archive_captures(official_url)
-              print('CAPTURES=', captures[-20:])
-              if not captures:
-                  print('NO ARCHIVE CAPTURE')
+              captures = wayback_captures(official_url)
+              print('WAYBACK_CAPTURES=', captures[-20:])
+              if selected is None:
+                  for capture in reversed(captures):
+                      ts = capture[0]
+                      archive_url = f'https://web.archive.org/web/{ts}id_/{official_url}'
+                      try:
+                          data = get(archive_url, timeout=180)
+                      except Exception as exc:
+                          print('WAYBACK ERROR', ts, repr(exc))
+                          continue
+                      print('WAYBACK', ts, 'bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data))
+                      if is_xlsx(data):
+                          selected = (f'wayback:{ts}', archive_url, data)
+                          break
+
+              if selected is None:
+                  for collection in collections:
+                      records, error = commoncrawl_records(collection['cdx-api'], official_url)
+                      if error:
+                          print('CC INDEX ERROR', collection['id'], error)
+                          continue
+                      matches = [r for r in records if str(r.get('status')) == '200']
+                      if not matches:
+                          continue
+                      print('CC RECORDS', collection['id'], [{k: r.get(k) for k in ('timestamp','status','mime','digest','length','filename','offset')} for r in matches[-5:]])
+                      for record in reversed(matches):
+                          try:
+                              data = commoncrawl_body(record)
+                          except Exception as exc:
+                              print('CC BODY ERROR', collection['id'], record.get('timestamp'), repr(exc))
+                              continue
+                          print('COMMONCRAWL', collection['id'], record.get('timestamp'), 'bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data))
+                          if is_xlsx(data):
+                              selected = (f"commoncrawl:{collection['id']}:{record.get('timestamp')}", official_url, data)
+                              break
+                      if selected is not None:
+                          break
+
+              if selected is None:
+                  print('NO VALID XLSX DELIVERY FOUND')
                   continue
 
-              success = None
-              for capture in reversed(captures):
-                  ts = capture[0]
-                  archive_url = f'https://web.archive.org/web/{ts}id_/{official_url}'
-                  try:
-                      data = get(archive_url, timeout=180)
-                  except Exception as exc:
-                      print('ARCHIVE ERROR', ts, repr(exc))
-                      continue
-                  print('ARCHIVE', ts, 'bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data))
-                  if is_xlsx(data):
-                      success = (ts, archive_url, data)
-                      break
-
-              if success is None:
-                  print('NO VALID XLSX CAPTURE')
-                  continue
-              ts, archive_url, data = success
+              mode, selected_url, data = selected
               path = Path(f'/tmp/ges-{key}.xlsx')
               path.write_bytes(data)
-              print('SELECTED_ARCHIVE=', archive_url)
+              print('SELECTED_MODE=', mode)
+              print('SELECTED_URL=', selected_url)
+              print('SELECTED_BYTES=', len(data))
+              print('SELECTED_SHA256=', hashlib.sha256(data).hexdigest())
               inspect(path)
           PY
