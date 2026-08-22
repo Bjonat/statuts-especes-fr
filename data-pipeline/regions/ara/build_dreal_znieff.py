@@ -61,8 +61,7 @@ def clean(value: object) -> str:
 
 def semantic_status_key(value: object) -> str:
     key = normalize(value)
-    # Le tableur contient des césures typographiques internes issues de la mise
-    # en page (ex. « Complémen-taire »), qui ne sont pas des catégories métier.
+    # Césures typographiques internes du tableur, sans signification métier.
     return (
         key.replace("complemen-taire", "complementaire")
         .replace("determi-nante", "determinante")
@@ -79,8 +78,6 @@ def canonical_status_value(value: object) -> str:
         return "Déterminante"
     if key == "non determinante":
         return "Non déterminante"
-    # Conserver les conditions métier tout en réparant uniquement les césures
-    # connues du tableur.
     return (
         cleaned.replace("Complémen-taire", "Complémentaire")
         .replace("complémen-taire", "complémentaire")
@@ -266,6 +263,8 @@ def find_header(rows: list[list[str]]) -> tuple[int, int, int | None, int | None
 
 def looks_like_zone(value: str) -> bool:
     key = normalize(value).replace("mediter-raneenne", "mediterraneenne")
+    if key.startswith("rapport") or "http://" in key or "https://" in key or "www." in key:
+        return False
     return any(token in key for token in ("massif central", "plaine rhodanienne", "alpine", "mediterr", "auvergne", "rhone-alpes"))
 
 
