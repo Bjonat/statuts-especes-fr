@@ -75,7 +75,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          original='https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods'
           encoded="$(python - <<'PY'
           import urllib.parse
           print(urllib.parse.quote('https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods', safe=''))
@@ -92,20 +91,89 @@ jobs:
           print(closest.get('url', '') if closest.get('available') else '')
           PY
           )"
-          if [ -z "$snapshot" ]; then
-            echo 'NO_WAYBACK_SNAPSHOT=1'
-            exit 0
-          fi
+          test -n "$snapshot"
           snapshot="${snapshot/http:\/\//https://}"
           echo "WAYBACK_SNAPSHOT=$snapshot"
           curl --fail --location --retry 3 --silent --show-error "$snapshot" -o "$RUNNER_TEMP/ara-wayback.ods"
           echo "wayback bytes=$(wc -c < "$RUNNER_TEMP/ara-wayback.ods")"
           file "$RUNNER_TEMP/ara-wayback.ods"
           sha256sum "$RUNNER_TEMP/ara-wayback.ods"
-          if unzip -t "$RUNNER_TEMP/ara-wayback.ods" >/dev/null 2>&1; then
-            echo 'WAYBACK_ODS_OK=1'
-            unzip -l "$RUNNER_TEMP/ara-wayback.ods" | head -n 30
-          else
-            echo 'WAYBACK_ODS_OK=0'
-            head -c 256 "$RUNNER_TEMP/ara-wayback.ods" | xxd
-          fi
+          unzip -t "$RUNNER_TEMP/ara-wayback.ods" >/dev/null
+          echo 'WAYBACK_ODS_OK=1'
+
+      - name: Inspect ODS sheets and headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - "$RUNNER_TEMP/ara-wayback.ods" <<'PY'
+          import json
+          import sys
+          import zipfile
+          from xml.etree import ElementTree as ET
+
+          path = sys.argv[1]
+          ns = {
+              'office': 'urn:oasis:names:tc:opendocument:xmlns:office:1.0',
+              'table': 'urn:oasis:names:tc:opendocument:xmlns:table:1.0',
+              'text': 'urn:oasis:names:tc:opendocument:xmlns:text:1.0',
+          }
+          with zipfile.ZipFile(path) as archive:
+              root = ET.fromstring(archive.read('content.xml'))
+          spreadsheet = root.find('office:body/office:spreadsheet', ns)
+          assert spreadsheet is not None
+
+          def cell_text(cell):
+              parts = []
+              for p in cell.findall('.//text:p', ns):
+                  text = ''.join(p.itertext()).strip()
+                  if text:
+                      parts.append(text)
+              if parts:
+                  return ' | '.join(parts)
+              for attr in (
+                  '{urn:oasis:names:tc:opendocument:xmlns:office:1.0}string-value',
+                  '{urn:oasis:names:tc:opendocument:xmlns:office:1.0}value',
+              ):
+                  if attr in cell.attrib:
+                      return cell.attrib[attr]
+              return ''
+
+          report = []
+          for sheet in spreadsheet.findall('table:table', ns):
+              name = sheet.attrib.get('{urn:oasis:names:tc:opendocument:xmlns:table:1.0}name', '?')
+              rows = []
+              physical_rows = 0
+              expanded_rows = 0
+              max_cols = 0
+              for row in sheet.findall('table:table-row', ns):
+                  physical_rows += 1
+                  row_repeat = int(row.attrib.get('{urn:oasis:names:tc:opendocument:xmlns:table:1.0}number-rows-repeated', '1'))
+                  expanded_rows += row_repeat
+                  values = []
+                  for cell in list(row):
+                      if cell.tag not in {
+                          '{urn:oasis:names:tc:opendocument:xmlns:table:1.0}table-cell',
+                          '{urn:oasis:names:tc:opendocument:xmlns:table:1.0}covered-table-cell',
+                      }:
+                          continue
+                      repeat = int(cell.attrib.get('{urn:oasis:names:tc:opendocument:xmlns:table:1.0}number-columns-repeated', '1'))
+                      value = cell_text(cell)
+                      values.extend([value] * min(repeat, 80 - len(values)))
+                      if len(values) >= 80:
+                          break
+                  while values and not values[-1]:
+                      values.pop()
+                  max_cols = max(max_cols, len(values))
+                  if any(v.strip() for v in values):
+                      rows.append(values)
+              report.append({
+                  'sheet': name,
+                  'physicalRows': physical_rows,
+                  'expandedRows': expanded_rows,
+                  'nonEmptyRows': len(rows),
+                  'maxColumnsObserved': max_cols,
+                  'preview': rows[:12],
+                  'headerCandidates': [r for r in rows[:80] if any(k in ' '.join(r).casefold() for k in ['cd_ref', 'cd nom', 'nom scientifique', 'massif central', 'plaine rhodanienne', 'alpine', 'mediterr'])][:10],
+              })
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          PY
