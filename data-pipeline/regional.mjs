@@ -13,6 +13,7 @@ export function validateRegionalPackage(pkg, fileName = '<regional>') {
     throw new Error(`${fileName}: métadonnées de source régionale incomplètes`)
   }
   if (pkg.source.official !== true) throw new Error(`${fileName}: la source régionale doit être marquée officielle`)
+  if ('url' in pkg.source) throw new Error(`${fileName}: la source régionale ne doit pas embarquer de champ url documentaire`)
   if (!Array.isArray(pkg.replaces) || !Array.isArray(pkg.statuses)) {
     throw new Error(`${fileName}: replaces/statuses doivent être des tableaux`)
   }

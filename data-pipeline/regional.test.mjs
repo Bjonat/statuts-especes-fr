@@ -45,6 +45,12 @@ test('une source régionale non officielle est refusée', () => {
   assert.throws(() => validateRegionalPackage(pkg), /marquée officielle/)
 })
 
+test('une source régionale ne peut pas embarquer de champ url documentaire', () => {
+  const pkg = packageFixture()
+  pkg.source.url = 'https://example.test/source.xlsx'
+  assert.throws(() => validateRegionalPackage(pkg), /champ url documentaire/)
+})
+
 test('une liste régionale autoritaire remplace la même catégorie BDC pour son règne uniquement', () => {
   const base = [
     { cdRef: 100, region: 'OCC', category: 'znieff', label: 'ZNIEFF BDC', value: 'Oui', sourceId: 'bdc-v18', scope: 'regional' },
