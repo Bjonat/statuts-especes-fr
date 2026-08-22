@@ -22,7 +22,7 @@ jobs:
       - name: Install workbook inspector
         run: python -m pip install --disable-pip-version-check openpyxl
 
-      - name: Probe official and archived XLSX
+      - name: Probe official and focused archive deliveries
         shell: bash
         run: |
           set -euo pipefail
@@ -37,11 +37,17 @@ jobs:
 
           UA = 'Mozilla/5.0 (compatible; statuts-especes-fr/1.0; +https://github.com/Bjonat/statuts-especes-fr)'
           sources = {
-              'fauna': 'https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_faunev2_2_juin2026.xlsx',
-              'flora': 'https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_florev1_08_2024_2_.xlsx',
+              'fauna': {
+                  'url': 'https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_faunev2_2_juin2026.xlsx',
+                  'collections': ['CC-MAIN-2026-30'],
+              },
+              'flora': {
+                  'url': 'https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_florev1_08_2024_2_.xlsx',
+                  'collections': ['CC-MAIN-2026-30', 'CC-MAIN-2025-05', 'CC-MAIN-2024-51', 'CC-MAIN-2024-46', 'CC-MAIN-2024-42', 'CC-MAIN-2024-38'],
+              },
           }
 
-          def get(url: str, timeout=90, headers=None) -> bytes:
+          def get(url: str, timeout=35, headers=None) -> bytes:
               request_headers = {'User-Agent': UA, 'Accept': '*/*'}
               if headers:
                   request_headers.update(headers)
@@ -52,21 +58,11 @@ jobs:
           def is_xlsx(data: bytes) -> bool:
               return data.startswith(b'PK\x03\x04') and b'[Content_Types].xml' in data[:1000000]
 
-          def wayback_captures(url: str):
-              query = 'https://web.archive.org/cdx/search/cdx?' + urllib.parse.urlencode({
-                  'url': url,
-                  'output': 'json',
-                  'filter': 'statuscode:200',
-                  'fl': 'timestamp,original,statuscode,mimetype,digest,length',
-                  'collapse': 'digest',
-              })
-              rows = json.loads(get(query, timeout=120))
-              return rows[1:] if rows else []
-
-          def commoncrawl_records(index_url: str, url: str):
+          def commoncrawl_records(collection: str, url: str):
+              index_url = f'https://index.commoncrawl.org/{collection}-index'
               query = index_url + '?' + urllib.parse.urlencode({'url': url, 'output': 'json'})
               try:
-                  text = get(query, timeout=120).decode('utf-8', 'replace')
+                  text = get(query, timeout=35).decode('utf-8', 'replace')
               except Exception as exc:
                   return [], repr(exc)
               records = []
@@ -86,7 +82,7 @@ jobs:
               warc_url = 'https://data.commoncrawl.org/' + record['filename']
               compressed = get(
                   warc_url,
-                  timeout=180,
+                  timeout=90,
                   headers={'Range': f'bytes={offset}-{offset + length - 1}'},
               )
               raw = gzip.decompress(compressed)
@@ -109,19 +105,16 @@ jobs:
               for ws in wb.worksheets[:12]:
                   print(f'--- SHEET {ws.title} rows={ws.max_row} cols={ws.max_column} ---')
                   shown = 0
-                  for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 24), values_only=True):
-                      values = [str(v).strip() if v is not None else '' for v in row[:30]]
+                  for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row, 28), values_only=True):
+                      values = [str(v).strip() if v is not None else '' for v in row[:32]]
                       if any(values):
                           print(values)
                           shown += 1
                       if shown >= 10:
                           break
 
-          collections = json.loads(get('https://index.commoncrawl.org/collinfo.json', timeout=120))
-          collections = [item for item in collections if item.get('id', '').startswith(('CC-MAIN-2026', 'CC-MAIN-2025'))]
-          print('COMMONCRAWL_COLLECTIONS=', [item['id'] for item in collections[:20]])
-
-          for key, official_url in sources.items():
+          for key, spec in sources.items():
+              official_url = spec['url']
               print(f'===== {key.upper()} =====')
               selected = None
               try:
@@ -132,41 +125,24 @@ jobs:
               except Exception as exc:
                   print('DIRECT ERROR', repr(exc))
 
-              captures = wayback_captures(official_url)
-              print('WAYBACK_CAPTURES=', captures[-20:])
               if selected is None:
-                  for capture in reversed(captures):
-                      ts = capture[0]
-                      archive_url = f'https://web.archive.org/web/{ts}id_/{official_url}'
-                      try:
-                          data = get(archive_url, timeout=180)
-                      except Exception as exc:
-                          print('WAYBACK ERROR', ts, repr(exc))
-                          continue
-                      print('WAYBACK', ts, 'bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data))
-                      if is_xlsx(data):
-                          selected = (f'wayback:{ts}', archive_url, data)
-                          break
-
-              if selected is None:
-                  for collection in collections:
-                      records, error = commoncrawl_records(collection['cdx-api'], official_url)
+                  for collection in spec['collections']:
+                      records, error = commoncrawl_records(collection, official_url)
                       if error:
-                          print('CC INDEX ERROR', collection['id'], error)
+                          print('CC INDEX ERROR', collection, error)
                           continue
                       matches = [r for r in records if str(r.get('status')) == '200']
-                      if not matches:
-                          continue
-                      print('CC RECORDS', collection['id'], [{k: r.get(k) for k in ('timestamp','status','mime','digest','length','filename','offset')} for r in matches[-5:]])
+                      print('CC MATCHES', collection, len(matches))
                       for record in reversed(matches):
+                          print('CC RECORD', collection, {k: record.get(k) for k in ('timestamp','status','mime','digest','length','filename','offset')})
                           try:
                               data = commoncrawl_body(record)
                           except Exception as exc:
-                              print('CC BODY ERROR', collection['id'], record.get('timestamp'), repr(exc))
+                              print('CC BODY ERROR', collection, record.get('timestamp'), repr(exc))
                               continue
-                          print('COMMONCRAWL', collection['id'], record.get('timestamp'), 'bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data))
+                          print('COMMONCRAWL', collection, record.get('timestamp'), 'bytes=', len(data), 'sha256=', hashlib.sha256(data).hexdigest(), 'xlsx=', is_xlsx(data))
                           if is_xlsx(data):
-                              selected = (f"commoncrawl:{collection['id']}:{record.get('timestamp')}", official_url, data)
+                              selected = (f"commoncrawl:{collection}:{record.get('timestamp')}", official_url, data)
                               break
                       if selected is not None:
                           break
