@@ -1,0 +1,137 @@
+name: ARA ZNIEFF regional source smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/ara/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/ara-regional-smoke.yml'
+
+jobs:
+  build-ara-znieff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download official ARA ODS with verified archive fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          direct='https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods'
+          archive='https://web.archive.org/web/20260513033231/https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods'
+          expected='ab505dcac9297257e8432743c4f60f5a41a7c3f527880d917d6b55f65ddf4f86'
+          target="$RUNNER_TEMP/ara-znieff.ods"
+
+          direct_ok=false
+          if curl --fail --location --retry 2 --silent --show-error "$direct" -o "$target"; then
+            if unzip -t "$target" >/dev/null 2>&1; then
+              direct_ok=true
+            elif grep -aq 'Maintenance en cours' "$target"; then
+              echo '::warning::DREAL ARA en maintenance ; utilisation de la capture officielle archivée du 13/05/2026.'
+            else
+              echo '::warning::La DREAL ARA n’a pas renvoyé un ODS exploitable ; essai de la capture archivée vérifiée.'
+            fi
+          else
+            echo '::warning::Téléchargement DREAL ARA impossible ; essai de la capture archivée vérifiée.'
+          fi
+
+          if [ "$direct_ok" != true ]; then
+            curl --fail --location --retry 3 --silent --show-error "$archive" -o "$target"
+            unzip -t "$target" >/dev/null
+          fi
+
+          actual="$(sha256sum "$target" | cut -d' ' -f1)"
+          echo "ARA_ODS_SHA256=$actual"
+          test "$actual" = "$expected"
+          echo "ARA_ODS=$target" >> "$GITHUB_ENV"
+
+      - name: Build ARA regional package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/regional"
+          python data-pipeline/regions/ara/build_dreal_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --ods "$ARA_ODS" \
+            --out "$RUNNER_TEMP/regional/ara-znieff.json" \
+            --min-match-rate 0.97
+
+      - name: Validate regional package contract and sentinels
+        shell: bash
+        run: |
+          REGIONAL_DIR="$RUNNER_TEMP/regional" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 1) throw new Error(`1 paquet ARA attendu, reçu ${packages.length}`)
+          const pkg = packages[0]
+          if (pkg.source.id !== 'dreal-ara-znieff-2023-06') throw new Error('Source ARA inattendue')
+          if (pkg.source.sha256 !== 'ab505dcac9297257e8432743c4f60f5a41a7c3f527880d917d6b55f65ddf4f86') throw new Error('SHA ARA inattendu')
+          if ((pkg.diagnostics?.matchRate ?? 0) < 0.97) throw new Error(`Raccord TAXREF insuffisant: ${pkg.diagnostics?.matchRate}`)
+          if (!pkg.statuses.length) throw new Error('Paquet ARA vide')
+          if (!pkg.statuses.some((status) => status.scope === 'partial' && /Zone/i.test(status.scopeLabel ?? ''))) {
+            throw new Error('Aucune portée biogéographique partielle ARA conservée')
+          }
+          if (!pkg.statuses.some((status) => /^Déterminante \(/.test(status.value))) {
+            throw new Error('Les conditions de déterminance ARA ne sont pas conservées')
+          }
+          if (pkg.statuses.some((status) => /^Non déterminante$/i.test(status.value))) {
+            throw new Error('Les évaluations négatives ne doivent pas devenir des cartes de statut')
+          }
+          for (const replacement of pkg.replaces) {
+            if (!replacement.cdRefs?.length) throw new Error('Le remplacement ARA doit être ciblé par CD_REF évalués')
+          }
+
+          const aconit = pkg.statuses.filter((status) => status.cdRef === 80037 && status.label.includes('Flore vasculaire'))
+          if (!aconit.some((status) => status.value === 'Déterminante' && status.scope === 'partial' && /Plaine rhodanienne/.test(status.scopeLabel ?? ''))) {
+            throw new Error('Sentinelle Aconitum napellus: portée Plaine rhodanienne absente')
+          }
+          const wolf = pkg.statuses.filter((status) => status.cdRef === 60577 && status.label.includes('Mammifères'))
+          if (!wolf.some((status) => status.scope === 'regional' && /type 2 seulement/i.test(status.value))) {
+            throw new Error('Sentinelle Canis lupus: condition ZNIEFF type 2 absente')
+          }
+
+          const replaced = new Set(pkg.replaces.flatMap((rule) => rule.cdRefs ?? []))
+          if (!replaced.has(8207)) throw new Error('Sentinelle négative Rusticoclytus rusticus non couverte par le remplacement')
+          if (pkg.statuses.some((status) => status.cdRef === 8207 && status.label.includes('Coléoptères saproxyliques'))) {
+            throw new Error('Sentinelle négative Rusticoclytus rusticus publiée à tort')
+          }
+          console.log(JSON.stringify({
+            statuses: pkg.statuses.length,
+            replacements: pkg.replaces.map((rule) => ({ realm: rule.realm, refs: rule.cdRefs.length })),
+            diagnostics: pkg.diagnostics,
+          }, null, 2))
+          NODE
+
+      - name: Upload normalized ARA package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ara-znieff-regional-package
+          path: ${{ runner.temp }}/regional/ara-znieff.json
+          if-no-files-found: error
+          retention-days: 7
