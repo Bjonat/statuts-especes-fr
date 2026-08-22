@@ -232,12 +232,16 @@ def find_header(rows: list[list[str]]) -> tuple[int, int, int | None, int | None
     raise RuntimeError("En-tête taxonomique introuvable")
 
 
+def looks_like_zone(value: str) -> bool:
+    key = normalize(value)
+    return any(token in key for token in ("massif central", "plaine rhodanienne", "alpine", "mediterr", "auvergne", "rhone-alpes"))
+
+
 def zone_labels(rows: list[list[str]], header_index: int, zone_col: int) -> list[str]:
     for row in rows[header_index + 1 : header_index + 5]:
-        candidates = [compact_zone_label(row[i]) if i < len(row) else "" for i in range(zone_col, zone_col + 4)]
-        normalized = [normalize(value) for value in candidates]
-        if sum(bool(value) and not value.startswith("rapport") and not value.startswith("annexes") for value in normalized) >= 3:
-            return candidates
+        raw = [row[i] if i < len(row) else "" for i in range(zone_col, zone_col + 4)]
+        if sum(looks_like_zone(value) for value in raw) >= 3:
+            return [compact_zone_label(value) for value in raw]
     return CURRENT_ZONES.copy()
 
 
@@ -421,7 +425,7 @@ def serialize_diagnostics(diagnostics: dict) -> dict:
     result["sheets"] = {
         name: {
             **stats,
-            "values": dict(sorted(stats["values"].items())),
+            **({"values": dict(sorted(stats["values"].items()))} if "values" in stats else {}),
         }
         for name, stats in diagnostics["sheets"].items()
     }
@@ -477,11 +481,7 @@ def build_package(taxref_path: Path, ods_path: Path, checked_at: str, min_match_
         sample = diagnostics["unknownStatusCells"][:20]
         raise SystemExit(f"Valeurs ZNIEFF ARA inconnues ({len(diagnostics['unknownStatusCells'])}): {sample}")
 
-    matched = sum(
-        stats.get("matched", 0)
-        for stats in diagnostics["sheets"].values()
-        if isinstance(stats, dict)
-    )
+    matched = sum(stats.get("matched", 0) for stats in diagnostics["sheets"].values() if isinstance(stats, dict))
     unresolved = sum(
         stats.get("unmatched", 0) + stats.get("ambiguous", 0)
         for stats in diagnostics["sheets"].values()
