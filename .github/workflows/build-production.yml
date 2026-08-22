@@ -78,6 +78,13 @@ jobs:
           test -n "$BDC_FILE"
           echo "BDC_FILE=$BDC_FILE" >> "$GITHUB_ENV"
 
+      - name: Download regional Auvergne-Rhône-Alpes ZNIEFF source
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ara/download_dreal_znieff.sh "$RUNNER_TEMP/ara-znieff.ods"
+          echo "ARA_ZNIEFF_FILE=$RUNNER_TEMP/ara-znieff.ods" >> "$GITHUB_ENV"
+
       - name: Download regional ZNIEFF flora Nouvelle-Aquitaine
         shell: bash
         run: |
@@ -158,6 +165,11 @@ jobs:
 
       - name: Build regional packages
         run: |
+          python data-pipeline/regions/ara/build_dreal_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --ods "$ARA_ZNIEFF_FILE" \
+            --out "$REGIONAL_DIR/ara-znieff.json" \
+            --min-match-rate 0.97
           python data-pipeline/regions/naq/build_znieff.py \
             --taxref "$TAXREF_FILE" \
             --workbook "$NAQ_ZNIEFF_FILE" \
@@ -200,6 +212,7 @@ jobs:
           const fs = require('fs')
           const manifest = JSON.parse(fs.readFileSync('public/data/manifest.json', 'utf8'))
           const required = [
+            'dreal-ara-znieff-2023-06',
             'obv-na-znieff-flore-2019-v1.2',
             'oeb-bretagne-znieff-csv-2026-01-29',
             'oeb-bretagne-lrr-csv-2026-01-29',
@@ -262,6 +275,7 @@ jobs:
           const dataManifest = JSON.parse(fs.readFileSync('dist/data/manifest.json', 'utf8'))
           if (dataManifest.official !== true || dataManifest.regions.length !== 13) process.exit(1)
           const required = [
+            'dreal-ara-znieff-2023-06',
             'obv-na-znieff-flore-2019-v1.2',
             'oeb-bretagne-znieff-csv-2026-01-29',
             'oeb-bretagne-lrr-csv-2026-01-29',
