@@ -97,12 +97,12 @@ Règles impératives :
 - **Schéma 2023** : 24 864 taxons, `CD_REF` TAXREF, ZNIEFF BFC unifiée, LRR Bourgogne et Franche-Comté séparées, protections et autres attributs.
 - **Décision pipeline** : le fichier 2023 sert uniquement à préparer l'adaptateur. Il ne doit pas être publié comme substitut du millésime DREAL 2026.
 
-#### ZNIEFF — `READY`
+#### ZNIEFF — `READY_WHEN_AVAILABLE`
 
 - **Page ressources** : https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/ressources-a10417.html
 - La DREAL renvoie le suivi des taxons déterminants vers le tableur « statuts espèces », annoncé comme évolutif.
 
-#### Listes rouges — `READY` / selon groupes
+#### Listes rouges — `READY_WHEN_AVAILABLE` / selon groupes
 
 - Utiliser en priorité les données du tableur maître lorsque la provenance et le millésime du groupe y sont explicites.
 - Vérifier les publications spécifiques lorsqu'elles sont plus récentes ; par exemple certaines évaluations faunistiques ont été validées/publiées en 2025-2026.
