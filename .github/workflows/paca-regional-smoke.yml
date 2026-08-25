@@ -1,4 +1,4 @@
-name: PACA regional source smoke test
+name: PACA regional ZNIEFF and LRR smoke test
 
 on:
   workflow_dispatch:
@@ -6,15 +6,20 @@ on:
     branches: [main]
     paths:
       - 'data-pipeline/regions/pac/**'
-      - 'data-pipeline/regions/inspect_workbook.py'
+      - 'data-pipeline/regional.mjs'
       - '.github/workflows/paca-regional-smoke.yml'
 
 jobs:
-  probe-paca-sources:
+  build-pac-sources:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -24,60 +29,81 @@ jobs:
       - name: Install workbook readers
         run: python -m pip install --disable-pip-version-check openpyxl xlrd
 
-      - name: Download official PACA tables
+      - name: Download TAXREF v18
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/pac"
-          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/znieff_faune_janv-2024.xlsx' -o "$RUNNER_TEMP/pac/znieff-faune-2024.xlsx"
-          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xls/znieff_flore_2016.xls' -o "$RUNNER_TEMP/pac/znieff-flore-2016.xls"
-          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/liste_rouge_avifaune_paca_csrpn_janv2020.xlsx' -o "$RUNNER_TEMP/pac/lrr-oiseaux-2020.xlsx"
-          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lr_paca_odonates_2017_web.xlsx' -o "$RUNNER_TEMP/pac/lrr-odonates-2017.xlsx"
-          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/tableau_simplifie_lrr-pap_2024.xlsx' -o "$RUNNER_TEMP/pac/lrr-papillons-2024.xlsx"
-          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/LR_PACA_Flore_2015_web.xlsx' -o "$RUNNER_TEMP/pac/lrr-flore-2015.xlsx"
-          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lrr_paca_reptiles_amphibiens_2016.xlsx' -o "$RUNNER_TEMP/pac/lrr-herpetofaune-2016.xlsx"
-          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lr_paca_orthop_2018_web.xlsx' -o "$RUNNER_TEMP/pac/lrr-orthopteres-2018.xlsx"
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
 
-          maintenance=0
-          for file in "$RUNNER_TEMP"/pac/*; do
-            if head -c 512 "$file" | grep -Eqi '<!doctype html|<html'; then
-              if grep -qi 'Maintenance en cours' "$file"; then
-                echo "::warning::$(basename "$file"): source DREAL PACA momentanément indisponible (page Maintenance en cours)."
-                maintenance=$((maintenance + 1))
-                continue
-              fi
-              echo "::error::$(basename "$file"): page HTML inattendue reçue à la place du référentiel."
-              exit 1
-            fi
-
-            case "$file" in
-              *.xlsx)
-                test "$(head -c 2 "$file")" = 'PK' || { echo "::error::Signature XLSX invalide: $file"; exit 1; }
-                ;;
-              *.xls)
-                test "$(head -c 8 "$file" | xxd -p)" = 'd0cf11e0a1b11ae1' || { echo "::error::Signature XLS invalide: $file"; exit 1; }
-                ;;
-            esac
-          done
-
-          sha256sum "$RUNNER_TEMP"/pac/*
-          echo "PAC_DIR=$RUNNER_TEMP/pac" >> "$GITHUB_ENV"
-          echo "PAC_MAINTENANCE_COUNT=$maintenance" >> "$GITHUB_ENV"
-          if [ "$maintenance" -gt 0 ]; then
-            echo "::notice::$maintenance source(s) PACA non inspectable(s) pendant la maintenance DREAL ; ce run reste informatif."
-          fi
-
-      - name: Inspect available PACA schemas
+      - name: Download PACA sources
         shell: bash
         run: |
           set -euo pipefail
-          inspected=0
-          for file in "$PAC_DIR"/*; do
-            if head -c 512 "$file" | grep -Eqi '<!doctype html|<html'; then
-              continue
-            fi
-            echo "===== $file ====="
-            python data-pipeline/regions/inspect_workbook.py "$file"
-            inspected=$((inspected + 1))
-          done
-          echo "PACA: $inspected fichier(s) structuré(s) inspecté(s), ${PAC_MAINTENANCE_COUNT:-0} indisponible(s)."
+          bash data-pipeline/regions/pac/download_sources.sh "$RUNNER_TEMP/pac-sources"
+          echo "PAC_SOURCES_DIR=$RUNNER_TEMP/pac-sources" >> "$GITHUB_ENV"
+
+      - name: Build PACA packages
+        run: |
+          mkdir -p "$RUNNER_TEMP/pac-packages"
+          python data-pipeline/regions/pac/build_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$PAC_SOURCES_DIR" \
+            --out-dir "$RUNNER_TEMP/pac-packages" \
+            --min-match-rate 0.97
+          python data-pipeline/regions/pac/build_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$PAC_SOURCES_DIR" \
+            --out-dir "$RUNNER_TEMP/pac-packages" \
+            --min-match-rate 0.97
+          echo "PAC_PACKAGES_DIR=$RUNNER_TEMP/pac-packages" >> "$GITHUB_ENV"
+
+      - name: Validate packages and sentinels
+        run: |
+          node - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          import assert from 'node:assert/strict'
+
+          const packages = await loadRegionalPackages(process.env.PAC_PACKAGES_DIR)
+          const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
+          const expected = [
+            'dreal-pac-znieff-fauna-2024-01',
+            'dreal-pac-znieff-flora-2016',
+            'dreal-pac-lrr-oiseaux-2020',
+            'dreal-pac-lrr-odonates-2017',
+            'dreal-pac-lrr-papillons-2024',
+            'dreal-pac-lrr-flore-2015',
+            'dreal-pac-lrr-amphibiens-2016',
+            'dreal-pac-lrr-reptiles-2016',
+            'dreal-pac-lrr-orthopteres-2018',
+          ]
+          for (const id of expected) {
+            assert.ok(byId[id], `paquet manquant: ${id}`)
+            assert.ok(!('url' in byId[id].source), `${id}: champ url interdit`)
+          }
+
+          const checks = [
+            ['dreal-pac-znieff-fauna-2024-01', 139, 'Déterminante'],
+            ['dreal-pac-znieff-fauna-2024-01', 60313, 'Remarquable'],
+            ['dreal-pac-znieff-flora-2016', 610608, 'Déterminante'],
+            ['dreal-pac-lrr-oiseaux-2020', 2657, 'CR'],
+            ['dreal-pac-lrr-odonates-2017', 65397, 'CR'],
+            ['dreal-pac-lrr-papillons-2024', 53341, 'RE'],
+            ['dreal-pac-lrr-flore-2015', 79903, 'RE'],
+            ['dreal-pac-lrr-amphibiens-2016', 139, 'CR'],
+            ['dreal-pac-lrr-reptiles-2016', 78141, 'RE'],
+            ['dreal-pac-lrr-orthopteres-2018', 66052, 'CR'],
+          ]
+          for (const [id, cdRef, value] of checks) {
+            assert.ok(
+              byId[id].statuses.some((status) => status.cdRef === cdRef && status.value === value),
+              `${id}/${cdRef}=${value}`,
+            )
+          }
+          console.log(Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg.statuses.length])))
+          NODE

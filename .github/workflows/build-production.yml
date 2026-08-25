@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          python -m pip install --disable-pip-version-check openpyxl
+          python -m pip install --disable-pip-version-check openpyxl xlrd
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends poppler-utils
 
@@ -191,6 +191,13 @@ jobs:
           bash data-pipeline/regions/bfc/download_arb_statuts.sh "$RUNNER_TEMP/bfc-statuts.xlsx"
           echo "BFC_SOURCE=$RUNNER_TEMP/bfc-statuts.xlsx" >> "$GITHUB_ENV"
 
+      - name: Download regional PACA ZNIEFF and LRR sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/pac/download_sources.sh "$RUNNER_TEMP/pac-sources"
+          echo "PAC_SOURCES_DIR=$RUNNER_TEMP/pac-sources" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         run: |
           python data-pipeline/regions/ara/build_dreal_znieff.py \
@@ -246,6 +253,16 @@ jobs:
             --source "$BFC_SOURCE" \
             --out "$REGIONAL_DIR/bfc-statuts.json" \
             --min-match-rate 0.97
+          python data-pipeline/regions/pac/build_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$PAC_SOURCES_DIR" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
+          python data-pipeline/regions/pac/build_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$PAC_SOURCES_DIR" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
 
       - name: Run tests
         run: npm test
@@ -286,6 +303,15 @@ jobs:
             'dreal-naq-znieff-mollusques-2025',
             'dreal-naq-znieff-orthopteres-2026',
             'dreal-naq-znieff-oiseaux-marins-2026',
+            'dreal-pac-znieff-fauna-2024-01',
+            'dreal-pac-znieff-flora-2016',
+            'dreal-pac-lrr-oiseaux-2020',
+            'dreal-pac-lrr-odonates-2017',
+            'dreal-pac-lrr-papillons-2024',
+            'dreal-pac-lrr-flore-2015',
+            'dreal-pac-lrr-amphibiens-2016',
+            'dreal-pac-lrr-reptiles-2016',
+            'dreal-pac-lrr-orthopteres-2018',
           ]
           const ids = new Set(manifest.sources.map((source) => source.id))
           for (const id of required) {
@@ -360,6 +386,15 @@ jobs:
             'dreal-naq-znieff-mollusques-2025',
             'dreal-naq-znieff-orthopteres-2026',
             'dreal-naq-znieff-oiseaux-marins-2026',
+            'dreal-pac-znieff-fauna-2024-01',
+            'dreal-pac-znieff-flora-2016',
+            'dreal-pac-lrr-oiseaux-2020',
+            'dreal-pac-lrr-odonates-2017',
+            'dreal-pac-lrr-papillons-2024',
+            'dreal-pac-lrr-flore-2015',
+            'dreal-pac-lrr-amphibiens-2016',
+            'dreal-pac-lrr-reptiles-2016',
+            'dreal-pac-lrr-orthopteres-2018',
           ]
           const ids = new Set(dataManifest.sources.map((source) => source.id))
           for (const id of required) {

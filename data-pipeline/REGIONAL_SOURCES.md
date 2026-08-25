@@ -54,7 +54,7 @@ Règles impératives :
 | Nouvelle-Aquitaine (`NAQ`) | `IMPORTED` flore vasculaire + groupes unifiés | `PARTIAL` / nouveaux travaux 2026 en attente | EEE 2022 actuellement bloquée | **Très haute** |
 | Occitanie (`OCC`) | `READY_WHEN_AVAILABLE` | `PARTIAL` / travaux 2026 en attente | Zones biogéographiques à conserver | **Très haute** |
 | Pays de la Loire (`PDL`) | `READY` avec mises à jour 2026 à surveiller | `RESEARCH_REQUIRED` pour consolidation | Rareté/indigénat à qualifier | Moyenne |
-| Provence-Alpes-Côte d'Azur (`PAC`) | `READY` | `READY` selon groupes | À compléter via CBNMed/CBNA | **Très haute** |
+| Provence-Alpes-Côte d'Azur (`PAC`) | `IMPORTED` faune 2024 + flore 2016 | `IMPORTED` selon groupes publiés | À compléter via CBNMed/CBNA | **Très haute** |
 
 ---
 
@@ -387,26 +387,25 @@ Qualifier les nouvelles listes ZNIEFF 2026 dès publication opérationnelle, pui
 
 ### PAC — Provence-Alpes-Côte d'Azur
 
-#### ZNIEFF — `READY`
+#### ZNIEFF — `IMPORTED`
 
 - **DREAL PACA** : https://www.paca.developpement-durable.gouv.fr/actualisation-de-l-inventaire-a9673.html
-- Ressources structurées disponibles pour la faune déterminante/remarquable, la flore, les habitats et des listes marines.
-- **Faune** : un tableur janvier 2024 est identifié parmi les ressources actuelles.
-- **Décision pipeline** : importer par groupe en conservant la distinction « déterminante » / « remarquable » si elle est présente dans la source.
+- **Faune** : `znieff_faune_janv-2024.xlsx` → `dreal-pac-znieff-fauna-2024-01` (SHA `d38ffb58…`) — valeurs `Déterminante` / `Remarquable`.
+- **Flore** : `znieff_flore_2016.xls` → `dreal-pac-znieff-flora-2016` (SHA `1c39c39f…`) — même sémantique ; en cas de double statut, priorité à `Déterminante`.
 
-#### Listes rouges — `READY`
+#### Listes rouges — `IMPORTED` selon groupes
 
 - **DREAL PACA — hub LRR** : https://www.paca.developpement-durable.gouv.fr/listes-rouges-regionales-a7296.html
-- **Page vérifiée** : mise à jour indiquée au 26/06/2026.
-- Le portail centralise les publications par groupes et propose selon les cas PDF et tableurs XLSX.
+- Groupes importés : oiseaux 2020, odonates 2017, papillons 2024, flore 2015 (menacées), amphibiens/reptiles 2016, orthoptères 2018.
+- La flore LRR ne couvre que les taxons menacés : `replaces` limité aux `cdRefs` couverts.
 
 #### Rareté / indigénat — à qualifier
 
-- Les CBN méditerranéen et alpin sont les producteurs naturels à investiguer pour des catalogues floristiques régionaux structurés.
+- Les CBN méditerranéen et alpin restent à investiguer pour des catalogues floristiques structurés hors LRR/ZNIEFF.
 
 #### Action suivante
 
-Importer ZNIEFF puis LRR groupe par groupe ; traiter ensuite les attributs floristiques CBN comme enrichissements autonomes.
+Surveiller les révisions DREAL ; brancher les attributs CBN comme enrichissements autonomes.
 
 ---
 
@@ -450,10 +449,10 @@ Pour chaque nouvelle source ou nouveau millésime :
 
 À données accessibles et validées égales :
 
-1. **PACA** — ZNIEFF + LRR structurées.
-2. **Pays de la Loire** — ZNIEFF 2018 ODS faune/flore.
-3. **Grand Est** — LRR unifiées groupe par groupe (ZNIEFF faune/flore déjà importées).
-4. **Bretagne** — responsabilité biologique régionale (ZNIEFF/LRR OEB déjà branchés).
+1. **Pays de la Loire** — ZNIEFF 2018 ODS faune/flore.
+2. **Grand Est** — LRR unifiées groupe par groupe (ZNIEFF faune/flore déjà importées).
+3. **Bretagne** — responsabilité biologique régionale (ZNIEFF/LRR OEB déjà branchés).
+4. **Île-de-France** — LRR par groupe (ZNIEFF déjà faite).
 5. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
 6. **Île-de-France** — CSV ZNIEFF puis LRR par groupe.
 7. **Centre-Val de Loire** et **Occitanie** — dès retour effectif des fichiers DREAL.
