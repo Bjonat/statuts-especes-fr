@@ -315,6 +315,27 @@
       "resourceDiscovery": "ANBDD / DREAL group-specific unified LRR"
     },
     {
+      "id": "cbnhdf-digitale-znieff-hn-flora",
+      "region": "NOR",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.cbnhdf.fr/je-telecharge",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "Digitale BS-BIF-FVF-PV 4.0 (2026-03-31) — filtre HN",
+          "url": "https://www.cbnhdf.fr/system/files/2026-05/DIGITALE_BS-BIF-FVF_PV_4.0_20260331.xlsx",
+          "sha256": "71ae71b770f7b3911349e501caaaa65ac7dba8172d12b96ef4b90d5056995c95"
+        }
+      ],
+      "notes": "Portée partielle Haute-Normandie ; [Oui] exclus ; BN/faune hors vague."
+    },
+    {
       "id": "dreal-naq-znieff-groups",
       "region": "NAQ",
       "categories": [

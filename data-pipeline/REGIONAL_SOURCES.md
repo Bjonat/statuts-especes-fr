@@ -50,7 +50,7 @@ Règles impératives :
 | Grand Est (`GES`) | `IMPORTED` faune et flore vasculaire | `IMPORTED` 10 groupes faune unifiés ; `PARTIAL` reste | Anciennes régions à préserver | **Haute** (flore LRR / historiques) |
 | Hauts-de-France (`HDF`) | `PARTIAL` | `PARTIAL` | Anciennes régions à préserver | Moyenne |
 | Île-de-France (`IDF`) | `IMPORTED` (GeoNat) | `IMPORTED` 8 groupes via GeoNat ; poissons PDF hors vague | — | Surveiller GeoNat + poissons |
-| Normandie (`NOR`) | `PARTIAL` | `READY` selon groupes unifiés | Anciennes régions à préserver | Haute |
+| Normandie (`NOR`) | `PARTIAL` (HN flore Digitale) | `READY` selon groupes unifiés | Anciennes régions à préserver | Haute |
 | Nouvelle-Aquitaine (`NAQ`) | `IMPORTED` flore vasculaire + groupes unifiés | `PARTIAL` / nouveaux travaux 2026 en attente | EEE 2022 actuellement bloquée | **Très haute** |
 | Occitanie (`OCC`) | `READY_WHEN_AVAILABLE` | `PARTIAL` / travaux 2026 en attente | Zones biogéographiques à conserver | **Très haute** |
 | Pays de la Loire (`PDL`) | `IMPORTED` faune/flore 2018 | `RESEARCH_REQUIRED` pour consolidation | Rareté/indigénat à qualifier | Moyenne |
@@ -279,12 +279,14 @@ Surveiller les révisions GeoNat ; brancher les poissons dès disponibilité mac
 
 ### NOR — Normandie
 
-#### ZNIEFF — `PARTIAL`
+#### ZNIEFF — `PARTIAL` (flore Haute-Normandie importée)
 
 - **DREAL Normandie** : https://www.normandie.developpement-durable.gouv.fr/les-listes-d-especes-et-d-habitats-determinants-de-a3126.html
 - **Page vérifiée** : mise à jour indiquée au 27/02/2025.
 - La DREAL précise que des listes issues des anciennes Basse-Normandie et Haute-Normandie restent opérationnelles pour certains groupes, les listes unifiées devant les remplacer progressivement.
-- Une liste synthétique Normandie 2024 est signalée dans les ressources DREAL ; vérifier son périmètre et son format avant de la traiter comme source autoritaire.
+- **Vague 1 importée** : flore vasculaire Haute-Normandie via catalogue Digitale CBNHDF (`cbnhdf-digitale-znieff-hn-flora-2026-03-31`), portée `partial` `Haute-Normandie`, ~841 statuts, raccord TAXREF 100 %.
+- **SHA-256** : `71ae71b770f7b3911349e501caaaa65ac7dba8172d12b96ef4b90d5056995c95`.
+- **Hors vague** : Basse-Normandie ; faune ; liste synthétique Normandie 2024 PDF/non exhaustive machine ; `[Oui]` Digitale (erreur/douteux/cultivé).
 
 #### Listes rouges — `READY` pour groupes unifiés, sinon `PARTIAL`
 
@@ -294,7 +296,7 @@ Surveiller les révisions GeoNat ; brancher les poissons dès disponibilité mac
 
 #### Action suivante
 
-Importer les LRR unifiées sans attendre, puis traiter les ZNIEFF historiques avec une portée Basse-/Haute-Normandie explicite tant qu'un remplacement unifié n'est pas démontré.
+Surveiller une ZNIEFF Normandie unifiée ; compléter Basse-Normandie / faune en portées historiques tant qu'un remplacement unifié n'est pas démontré.
 
 ---
 
@@ -441,7 +443,7 @@ Cette section doit être relue avant chaque nouvelle vague d'enrichissement.
 | GES LRR faune unifiée (10 groupes) | Importée via ODONAT | Surveiller révisions ; hors périmètre : hivernants, mammifères, flore |
 | GES flore LRR unifiée | Couverture encore incomplète | Conserver les anciennes régions pour les groupes non unifiés |
 | HDF | Nombreux jeux encore issus de Picardie / Nord-Pas-de-Calais | Ne jamais étendre automatiquement à toute la région |
-| Normandie ZNIEFF | Transition Basse-/Haute-Normandie vers jeux unifiés | Conserver la portée historique jusqu'à remplacement démontré |
+| Normandie ZNIEFF | Flore HN importée (Digitale) ; BN/faune/unifié encore ouverts | Conserver la portée historique jusqu'à remplacement démontré |
 | PDL déterminantes bryophytes/characées 2026 | Avis CSRPN 2026 | Attendre l'intégration dans la ressource opérationnelle DREAL |
 
 ## 6. Protocole obligatoire avant d'intégrer une source
@@ -465,11 +467,11 @@ Pour chaque nouvelle source ou nouveau millésime :
 
 À données accessibles et validées égales :
 
-1. **Normandie** — ZNIEFF (LRR déjà faites).
-2. **Grand Est** — reste LRR mammifères/flore/historiques (10 groupes faune déjà importés).
-3. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
-4. **Centre-Val de Loire** et **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
-5. **Hauts-de-France**, **ARA LRR**, **Corse** — portées historiques / consolidation.
-6. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune / BRE / IDF** — déjà importés ; surveiller révisions.
+1. **Grand Est** — reste LRR mammifères/flore/historiques (10 groupes faune déjà importés).
+2. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
+3. **Centre-Val de Loire** et **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
+4. **Hauts-de-France**, **ARA LRR**, **Corse** — portées historiques / consolidation.
+5. **Normandie** — compléter BN/faune ZNIEFF (HN flore déjà importée).
+6. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune / BRE / IDF / NOR HN flore** — déjà importés ; surveiller révisions.
 
 Cet ordre n'est pas une hiérarchie écologique : il vise le meilleur rapport **fiabilité de la source / caractère structuré / gain métier / coût d'adaptation**.

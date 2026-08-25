@@ -431,6 +431,33 @@ for (const check of idfLrrChecks) {
   )
 }
 
+const norFlora = await loadStatuses('flora', 'NOR')
+const norZnieffSourceId = 'cbnhdf-digitale-znieff-hn-flora-2026-03-31'
+if (manifest.sources.some((source) => source.id === norZnieffSourceId)) {
+  const norZnieff = norFlora.filter((status) => status.category === 'znieff' && status.sourceId === norZnieffSourceId)
+  assert.ok(norZnieff.length >= 500, 'ZNIEFF flore Haute-Normandie: volume plausible >= 500')
+  assert.ok(
+    norZnieff.every((status) => status.scope === 'partial' && status.scopeLabel === 'Haute-Normandie'),
+    'ZNIEFF flore Haute-Normandie: portée partielle conservée',
+  )
+  assert.ok(
+    findStatus(
+      norZnieff,
+      111815,
+      (status) => status.label === 'Déterminante ZNIEFF' && status.value === 'Oui',
+    ),
+    'Osmunda regalis: déterminante ZNIEFF Haute-Normandie',
+  )
+  assert.ok(
+    findStatus(
+      norZnieff,
+      109297,
+      (status) => status.label === 'Déterminante ZNIEFF' && status.value === 'Oui (pro parte)',
+    ),
+    'Narcissus pseudonarcissus: déterminante ZNIEFF Haute-Normandie (pro parte)',
+  )
+}
+
 console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
@@ -464,6 +491,9 @@ if (manifest.sources.some((source) => source.id === 'oeb-bretagne-responsabilite
 }
 if (manifest.sources.some((source) => source.id === 'arb-idf-lrr-amphibiens-2023')) {
   console.log('- enrichissement régional: LRR Île-de-France via GeoNat (8 groupes)')
+}
+if (manifest.sources.some((source) => source.id === norZnieffSourceId)) {
+  console.log('- enrichissement régional: ZNIEFF flore Haute-Normandie (Digitale 4.0)')
 }
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {
