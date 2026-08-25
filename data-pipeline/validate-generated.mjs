@@ -204,12 +204,87 @@ if (manifest.sources.some((source) => source.id === bfcSourceId)) {
   )
 }
 
+const naqFauna = await loadStatuses('fauna', 'NAQ')
+const naqGroupChecks = [
+  {
+    id: 'dreal-naq-znieff-characees-2023',
+    realmStatuses: naqFlora,
+    cdRef: 73555,
+    message: 'Chara fragifera: déterminante ZNIEFF NAQ characées',
+  },
+  {
+    id: 'dreal-naq-znieff-oiseaux-nicheurs-2023',
+    realmStatuses: naqFauna,
+    cdRef: 3571,
+    message: 'Alcedo atthis: déterminante ZNIEFF NAQ oiseaux nicheurs',
+  },
+  {
+    id: 'dreal-naq-znieff-araignees-2023',
+    realmStatuses: naqFauna,
+    cdRef: 719819,
+    message: 'Eratigena inermis: déterminante ZNIEFF NAQ araignées (portée partielle)',
+    requirePartial: true,
+  },
+  {
+    id: 'dreal-naq-znieff-amphibiens-2024-09',
+    realmStatuses: naqFauna,
+    cdRef: 444427,
+    message: 'Calotriton asper: déterminante ZNIEFF NAQ amphibiens (64)',
+    requirePartial: true,
+  },
+  {
+    id: 'dreal-naq-znieff-reptiles-2024-09',
+    realmStatuses: naqFauna,
+    cdRef: 701823,
+    message: 'Vipera seoanei: déterminante ZNIEFF NAQ reptiles (64)',
+    requirePartial: true,
+  },
+  {
+    id: 'dreal-naq-znieff-mollusques-2025',
+    realmStatuses: naqFauna,
+    cdRef: 162701,
+    message: 'Platyla cryptomena: déterminante ZNIEFF NAQ mollusques',
+  },
+  {
+    id: 'dreal-naq-znieff-orthopteres-2026',
+    realmStatuses: naqFauna,
+    cdRef: 65899,
+    message: 'Gryllotalpa gryllotalpa: déterminante ZNIEFF NAQ orthoptères (79/86)',
+    requirePartial: true,
+  },
+  {
+    id: 'dreal-naq-znieff-oiseaux-marins-2026',
+    realmStatuses: naqFauna,
+    cdRef: 3388,
+    message: 'Alca torda: déterminante ZNIEFF NAQ oiseaux marins',
+  },
+]
+for (const check of naqGroupChecks) {
+  if (!manifest.sources.some((source) => source.id === check.id)) continue
+  const rows = check.realmStatuses.filter(
+    (status) => status.category === 'znieff' && status.sourceId === check.id && status.cdRef === check.cdRef,
+  )
+  assert.ok(
+    rows.some((status) => status.label === 'Déterminante ZNIEFF' && status.value === 'Oui'),
+    check.message,
+  )
+  if (check.requirePartial) {
+    assert.ok(
+      rows.some((status) => status.scope === 'partial' && status.scopeLabel),
+      `${check.message}: portée partielle conservée`,
+    )
+  }
+}
+
 console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- définitions de statut: ${definitions.length.toLocaleString('fr-FR')}`)
 if (manifest.sources.some((source) => source.id === naqZnieffSourceId)) {
   console.log('- enrichissement régional: ZNIEFF flore Nouvelle-Aquitaine v1.2 (2019)')
+}
+if (manifest.sources.some((source) => source.id === 'dreal-naq-znieff-orthopteres-2026')) {
+  console.log('- enrichissement régional: ZNIEFF NAQ groupes unifiés (characées → oiseaux marins)')
 }
 if (manifest.sources.some((source) => source.id === gesZnieffSourceId)) {
   console.log('- enrichissement régional: ZNIEFF faune Grand Est v2.2 (juin 2026)')
