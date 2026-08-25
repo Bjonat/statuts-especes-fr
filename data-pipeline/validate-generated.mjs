@@ -187,6 +187,34 @@ if (manifest.sources.some((source) => source.id === gesFloraZnieffSourceId)) {
   )
 }
 
+const gesLrrChecks = [
+  { id: 'dreal-ges-odonat-lrr-amphibiens-2023', cdRef: 197, value: 'NT', message: 'Alytes obstetricans: LRR Grand Est amphibiens = NT' },
+  { id: 'dreal-ges-odonat-lrr-reptiles-2023', cdRef: 78141, value: 'CR', message: 'Vipera berus: LRR Grand Est reptiles = CR' },
+  { id: 'dreal-ges-odonat-lrr-mollusques-2023-v1.1', cdRef: 64435, value: 'CR', message: 'Margaritifera margaritifera: LRR Grand Est mollusques = CR' },
+  { id: 'dreal-ges-odonat-lrr-odonates-2023', cdRef: 65202, value: 'EN', message: 'Lestes virens: LRR Grand Est odonates = EN' },
+  { id: 'dreal-ges-odonat-lrr-orthopteres-2024', cdRef: 65641, value: 'CR', message: 'Polysarcus denticauda: LRR Grand Est orthoptères = CR' },
+  { id: 'dreal-ges-odonat-lrr-oiseaux-nicheurs-2024', cdRef: 3984, value: 'CR*', message: 'Prunella collaris: LRR Grand Est oiseaux nicheurs = CR*' },
+  { id: 'dreal-ges-odonat-lrr-papillons-jour-2025', cdRef: 1042429, value: 'RE', message: 'Parnassius mnemosyne: LRR Grand Est papillons = RE' },
+  { id: 'dreal-ges-odonat-lrr-poissons-2024', cdRef: 66315, value: 'CR', message: 'Petromyzon marinus: LRR Grand Est poissons = CR' },
+  { id: 'dreal-ges-odonat-lrr-branchiopodes-2025', cdRef: 348263, value: 'EN', message: 'Lynceus brachyurus: LRR Grand Est branchiopodes = EN' },
+  { id: 'dreal-ges-odonat-lrr-decapodes-2025', cdRef: 18432, value: 'CR*', message: 'Astacus astacus: LRR Grand Est décapodes = CR*' },
+]
+for (const check of gesLrrChecks) {
+  if (!manifest.sources.some((source) => source.id === check.id)) continue
+  assert.ok(
+    findStatus(
+      gesFauna,
+      check.cdRef,
+      (status) =>
+        status.category === 'red_list_regional' &&
+        status.sourceId === check.id &&
+        status.scope === 'regional' &&
+        status.value === check.value,
+    ),
+    check.message,
+  )
+}
+
 const bfcSourceId = 'dreal-bfc-statuts-2026-03-03'
 if (manifest.sources.some((source) => source.id === bfcSourceId)) {
   const triturus = bfcFauna.filter((status) => status.cdRef === 139 && status.sourceId === bfcSourceId)
@@ -349,6 +377,9 @@ if (manifest.sources.some((source) => source.id === gesZnieffSourceId)) {
 }
 if (manifest.sources.some((source) => source.id === gesFloraZnieffSourceId)) {
   console.log('- enrichissement régional: ZNIEFF flore Grand Est v1.0 (août 2024)')
+}
+if (manifest.sources.some((source) => source.id === 'dreal-ges-odonat-lrr-oiseaux-nicheurs-2024')) {
+  console.log('- enrichissement régional: LRR Grand Est unifiées (10 groupes faune)')
 }
 if (manifest.sources.some((source) => source.id === bfcSourceId)) {
   console.log('- enrichissement régional: tableur maître BFC 03/03/2026')

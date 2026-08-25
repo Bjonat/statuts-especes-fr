@@ -1,0 +1,122 @@
+name: Grand Est LRR regional source smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/ges/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/ges-lrr-smoke.yml'
+
+jobs:
+  build-ges-lrr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install XLSX reader
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download ODONAT Grand Est LRR workbooks
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ges/download_odonat_lrr.sh "$RUNNER_TEMP/ges-lrr"
+          echo "GES_LRR_DIR=$RUNNER_TEMP/ges-lrr" >> "$GITHUB_ENV"
+
+      - name: Build Grand Est LRR packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ges-lrr-packages"
+          python data-pipeline/regions/ges/build_odonat_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$GES_LRR_DIR" \
+            --out-dir "$RUNNER_TEMP/ges-lrr-packages" \
+            --checked-at 2026-08-25 \
+            --min-match-rate 0.97
+          echo "GES_LRR_PACKAGES_DIR=$RUNNER_TEMP/ges-lrr-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional packages and sentinels
+        shell: bash
+        run: |
+          REGIONAL_DIR="$GES_LRR_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 10) throw new Error(`10 paquets Grand Est LRR attendus, reçu ${packages.length}`)
+          const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
+          const required = [
+            'dreal-ges-odonat-lrr-amphibiens-2023',
+            'dreal-ges-odonat-lrr-reptiles-2023',
+            'dreal-ges-odonat-lrr-mollusques-2023-v1.1',
+            'dreal-ges-odonat-lrr-odonates-2023',
+            'dreal-ges-odonat-lrr-orthopteres-2024',
+            'dreal-ges-odonat-lrr-oiseaux-nicheurs-2024',
+            'dreal-ges-odonat-lrr-branchiopodes-2025',
+            'dreal-ges-odonat-lrr-decapodes-2025',
+            'dreal-ges-odonat-lrr-papillons-jour-2025',
+            'dreal-ges-odonat-lrr-poissons-2024',
+          ]
+          for (const id of required) {
+            const pkg = byId[id]
+            if (!pkg) throw new Error(`Source absente: ${id}`)
+            if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${id}`)
+            if ('url' in pkg.source) throw new Error(`Champ url interdit: ${id}`)
+            const rule = pkg.replaces[0]
+            if (!rule || rule.region !== 'GES' || rule.category !== 'red_list_regional' || rule.realm !== 'fauna' || !Array.isArray(rule.cdRefs) || !rule.cdRefs.length) {
+              throw new Error(`Override invalide: ${id}`)
+            }
+          }
+          const statuses = packages.reduce((sum, pkg) => sum + pkg.statuses.length, 0)
+          if (statuses < 800) throw new Error(`Volume Grand Est LRR anormalement faible: ${statuses}`)
+
+          const sentinels = [
+            ['dreal-ges-odonat-lrr-amphibiens-2023', 197, 'NT'],
+            ['dreal-ges-odonat-lrr-reptiles-2023', 78141, 'CR'],
+            ['dreal-ges-odonat-lrr-mollusques-2023-v1.1', 64435, 'CR'],
+            ['dreal-ges-odonat-lrr-odonates-2023', 65202, 'EN'],
+            ['dreal-ges-odonat-lrr-orthopteres-2024', 65641, 'CR'],
+            ['dreal-ges-odonat-lrr-oiseaux-nicheurs-2024', 3984, 'CR*'],
+            ['dreal-ges-odonat-lrr-papillons-jour-2025', 1042429, 'RE'],
+            ['dreal-ges-odonat-lrr-poissons-2024', 66315, 'CR'],
+            ['dreal-ges-odonat-lrr-branchiopodes-2025', 348263, 'EN'],
+            ['dreal-ges-odonat-lrr-decapodes-2025', 18432, 'CR*'],
+          ]
+          for (const [id, cdRef, value] of sentinels) {
+            const hit = byId[id].statuses.find((status) => status.cdRef === cdRef && status.value === value && status.category === 'red_list_regional')
+            if (!hit) throw new Error(`Sentinelle absente: ${id} cdRef=${cdRef} value=${value}`)
+          }
+          console.log({ packages: packages.length, statuses })
+          NODE
+
+      - name: Upload normalized packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ges-lrr-regional-packages
+          path: ${{ env.GES_LRR_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7

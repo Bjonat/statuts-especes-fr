@@ -184,6 +184,13 @@ jobs:
           bash data-pipeline/regions/ges/download_odonat_znieff_flora.sh "$RUNNER_TEMP/ges-znieff-flora.xlsx"
           echo "GES_ZNIEFF_FLORA_FILE=$RUNNER_TEMP/ges-znieff-flora.xlsx" >> "$GITHUB_ENV"
 
+      - name: Download regional Grand Est LRR sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ges/download_odonat_lrr.sh "$RUNNER_TEMP/ges-lrr"
+          echo "GES_LRR_DIR=$RUNNER_TEMP/ges-lrr" >> "$GITHUB_ENV"
+
       - name: Download regional BFC master status workbook
         shell: bash
         run: |
@@ -255,6 +262,11 @@ jobs:
             --source "$GES_ZNIEFF_FLORA_FILE" \
             --out "$REGIONAL_DIR/ges-znieff-flora.json" \
             --min-match-rate 0.98
+          python data-pipeline/regions/ges/build_odonat_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$GES_LRR_DIR" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
           python data-pipeline/regions/bfc/build_arb_statuts.py \
             --taxref "$TAXREF_FILE" \
             --source "$BFC_SOURCE" \
@@ -306,6 +318,16 @@ jobs:
             'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
             'dreal-ges-odonat-znieff-fauna-2026-v2.2',
             'dreal-ges-znieff-flora-2024-08-v1.0',
+            'dreal-ges-odonat-lrr-amphibiens-2023',
+            'dreal-ges-odonat-lrr-reptiles-2023',
+            'dreal-ges-odonat-lrr-mollusques-2023-v1.1',
+            'dreal-ges-odonat-lrr-odonates-2023',
+            'dreal-ges-odonat-lrr-orthopteres-2024',
+            'dreal-ges-odonat-lrr-oiseaux-nicheurs-2024',
+            'dreal-ges-odonat-lrr-branchiopodes-2025',
+            'dreal-ges-odonat-lrr-decapodes-2025',
+            'dreal-ges-odonat-lrr-papillons-jour-2025',
+            'dreal-ges-odonat-lrr-poissons-2024',
             'dreal-bfc-statuts-2026-03-03',
             'dreal-naq-znieff-characees-2023',
             'dreal-naq-znieff-oiseaux-nicheurs-2023',
@@ -391,6 +413,16 @@ jobs:
             'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
             'dreal-ges-odonat-znieff-fauna-2026-v2.2',
             'dreal-ges-znieff-flora-2024-08-v1.0',
+            'dreal-ges-odonat-lrr-amphibiens-2023',
+            'dreal-ges-odonat-lrr-reptiles-2023',
+            'dreal-ges-odonat-lrr-mollusques-2023-v1.1',
+            'dreal-ges-odonat-lrr-odonates-2023',
+            'dreal-ges-odonat-lrr-orthopteres-2024',
+            'dreal-ges-odonat-lrr-oiseaux-nicheurs-2024',
+            'dreal-ges-odonat-lrr-branchiopodes-2025',
+            'dreal-ges-odonat-lrr-decapodes-2025',
+            'dreal-ges-odonat-lrr-papillons-jour-2025',
+            'dreal-ges-odonat-lrr-poissons-2024',
             'dreal-bfc-statuts-2026-03-03',
             'dreal-naq-znieff-characees-2023',
             'dreal-naq-znieff-oiseaux-nicheurs-2023',
