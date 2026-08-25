@@ -97,6 +97,13 @@ jobs:
           echo "NAQ_ZNIEFF_FILE=$RUNNER_TEMP/znieff-naq-flore.xlsx" >> "$GITHUB_ENV"
           echo "REGIONAL_DIR=$RUNNER_TEMP/regional-packages" >> "$GITHUB_ENV"
 
+      - name: Download regional ZNIEFF groups Nouvelle-Aquitaine
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/naq/download_znieff_groups.sh "$RUNNER_TEMP/naq-znieff-groups"
+          echo "NAQ_ZNIEFF_GROUPS_DIR=$RUNNER_TEMP/naq-znieff-groups" >> "$GITHUB_ENV"
+
       - name: Download regional Bretagne sources
         shell: bash
         run: |
@@ -196,6 +203,11 @@ jobs:
             --workbook "$NAQ_ZNIEFF_FILE" \
             --out "$REGIONAL_DIR/naq-znieff-flora.json" \
             --min-match-rate 0.97
+          python data-pipeline/regions/naq/build_znieff_groups.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$NAQ_ZNIEFF_GROUPS_DIR" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
           python data-pipeline/regions/bre/build_oeb.py \
             --taxref "$TAXREF_FILE" \
             --znieff "$BRE_ZNIEFF_FILE" \
@@ -266,6 +278,14 @@ jobs:
             'dreal-ges-odonat-znieff-fauna-2026-v2.2',
             'dreal-ges-znieff-flora-2024-08-v1.0',
             'dreal-bfc-statuts-2026-03-03',
+            'dreal-naq-znieff-characees-2023',
+            'dreal-naq-znieff-oiseaux-nicheurs-2023',
+            'dreal-naq-znieff-araignees-2023',
+            'dreal-naq-znieff-amphibiens-2024-09',
+            'dreal-naq-znieff-reptiles-2024-09',
+            'dreal-naq-znieff-mollusques-2025',
+            'dreal-naq-znieff-orthopteres-2026',
+            'dreal-naq-znieff-oiseaux-marins-2026',
           ]
           const ids = new Set(manifest.sources.map((source) => source.id))
           for (const id of required) {
@@ -332,6 +352,14 @@ jobs:
             'dreal-ges-odonat-znieff-fauna-2026-v2.2',
             'dreal-ges-znieff-flora-2024-08-v1.0',
             'dreal-bfc-statuts-2026-03-03',
+            'dreal-naq-znieff-characees-2023',
+            'dreal-naq-znieff-oiseaux-nicheurs-2023',
+            'dreal-naq-znieff-araignees-2023',
+            'dreal-naq-znieff-amphibiens-2024-09',
+            'dreal-naq-znieff-reptiles-2024-09',
+            'dreal-naq-znieff-mollusques-2025',
+            'dreal-naq-znieff-orthopteres-2026',
+            'dreal-naq-znieff-oiseaux-marins-2026',
           ]
           const ids = new Set(dataManifest.sources.map((source) => source.id))
           for (const id of required) {

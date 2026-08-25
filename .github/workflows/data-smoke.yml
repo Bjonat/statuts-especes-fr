@@ -126,6 +126,13 @@ jobs:
             echo '::warning::Sources régionales OBV Nouvelle-Aquitaine indisponibles pour ce run.'
           fi
 
+      - name: Download regional ZNIEFF groups Nouvelle-Aquitaine
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/naq/download_znieff_groups.sh "$RUNNER_TEMP/naq-znieff-groups"
+          echo "NAQ_ZNIEFF_GROUPS_DIR=$RUNNER_TEMP/naq-znieff-groups" >> "$GITHUB_ENV"
+
       - name: Inspect regional sources Nouvelle-Aquitaine
         if: env.NAQ_REGIONAL_AVAILABLE == 'true'
         run: |
@@ -221,6 +228,7 @@ jobs:
           if [ "${NAQ_REGIONAL_AVAILABLE:-false}" = 'true' ]; then
             python data-pipeline/regions/naq/build_znieff.py --taxref "$TAXREF_FILE" --workbook "$NAQ_ZNIEFF_FILE" --out "$REGIONAL_DIR/naq-znieff-flora.json"
           fi
+          python data-pipeline/regions/naq/build_znieff_groups.py --taxref "$TAXREF_FILE" --input-dir "$NAQ_ZNIEFF_GROUPS_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/bre/build_oeb.py --taxref "$TAXREF_FILE" --znieff "$BRE_ZNIEFF_FILE" --lrr "$BRE_LRR_FILE" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/nor/build_anbdd_lrr.py --taxref "$TAXREF_FILE" --input-dir "$NOR_LRR_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/idf/build_geonat_znieff.py --taxref "$TAXREF_FILE" --source "$IDF_SOURCE" --out "$REGIONAL_DIR/idf-znieff.json" --min-match-rate 0.97
@@ -264,6 +272,14 @@ jobs:
             'dreal-ges-odonat-znieff-fauna-2026-v2.2',
             'dreal-ges-znieff-flora-2024-08-v1.0',
             'dreal-bfc-statuts-2026-03-03',
+            'dreal-naq-znieff-characees-2023',
+            'dreal-naq-znieff-oiseaux-nicheurs-2023',
+            'dreal-naq-znieff-araignees-2023',
+            'dreal-naq-znieff-amphibiens-2024-09',
+            'dreal-naq-znieff-reptiles-2024-09',
+            'dreal-naq-znieff-mollusques-2025',
+            'dreal-naq-znieff-orthopteres-2026',
+            'dreal-naq-znieff-oiseaux-marins-2026',
           ]
           if (process.env.NAQ_REGIONAL_AVAILABLE === 'true') required.push('obv-na-znieff-flore-2019-v1.2')
           const ids = new Set(manifest.sources.map((source) => source.id))

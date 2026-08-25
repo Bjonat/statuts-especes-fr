@@ -51,7 +51,7 @@ Règles impératives :
 | Hauts-de-France (`HDF`) | `PARTIAL` | `PARTIAL` | Anciennes régions à préserver | Moyenne |
 | Île-de-France (`IDF`) | `READY` | `PARTIAL` selon groupes | À compléter via ARB/CBNBP | Haute |
 | Normandie (`NOR`) | `PARTIAL` | `READY` selon groupes unifiés | Anciennes régions à préserver | Haute |
-| Nouvelle-Aquitaine (`NAQ`) | `IMPORTED` flore ; `READY` autres groupes | `PARTIAL` / nouveaux travaux 2026 en attente | EEE 2022 actuellement bloquée | **Très haute** |
+| Nouvelle-Aquitaine (`NAQ`) | `IMPORTED` flore vasculaire + groupes unifiés | `PARTIAL` / nouveaux travaux 2026 en attente | EEE 2022 actuellement bloquée | **Très haute** |
 | Occitanie (`OCC`) | `READY_WHEN_AVAILABLE` | `PARTIAL` / travaux 2026 en attente | Zones biogéographiques à conserver | **Très haute** |
 | Pays de la Loire (`PDL`) | `READY` avec mises à jour 2026 à surveiller | `RESEARCH_REQUIRED` pour consolidation | Rareté/indigénat à qualifier | Moyenne |
 | Provence-Alpes-Côte d'Azur (`PAC`) | `READY` | `READY` selon groupes | À compléter via CBNMed/CBNA | **Très haute** |
@@ -286,7 +286,7 @@ Importer les LRR unifiées sans attendre, puis traiter les ZNIEFF historiques av
 
 ### NAQ — Nouvelle-Aquitaine
 
-#### ZNIEFF — `IMPORTED` pour la flore vasculaire
+#### ZNIEFF — `IMPORTED` pour la flore vasculaire et les groupes unifiés listés
 
 - **DREAL Nouvelle-Aquitaine — listes néo-aquitaines** : https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/les-listes-neo-aquitaines-a11234.html
 - **Page vérifiée** : mise à jour indiquée au 10/08/2026.
@@ -297,9 +297,24 @@ Importer les LRR unifiées sans attendre, puis traiter les ZNIEFF historiques av
 - **Source utilisée par le projet** : liste des espèces déterminantes ZNIEFF de la flore vasculaire de Nouvelle-Aquitaine, v1.2, 2019.
 - **Producteurs** : CBN Sud-Atlantique, CBN Massif central, CBN Pyrénées et Midi-Pyrénées / cadre régional.
 - **Fichier** : https://obv-na.fr/ofsa/ressources/4_ref_bioeval/CBN_2019-Liste_ED_ZNIEFF_flore_Nouvelle-Aquitaine_v1.2_tb.xlsx
-- **État projet** : intégrée dans la PR d'enrichissement régional ; raccord TAXREF v18 mesuré à 99,27 % lors du développement initial.
+- **État projet** : intégrée ; raccord TAXREF v18 mesuré à 99,27 % lors du développement initial.
 
-**Autres listes unifiées repérées sur le portail DREAL** : characées 2023, végétations 2023, habitats naturels 2024, mammifères marins/tortues marines 2020, oiseaux nicheurs 2023, araignées 2023, amphibiens/reptiles 2024, mollusques continentaux 2025, orthoptères 2026 (`bonifait_duhaze-2026_orthopteres-determinants-znieff-na.xlsx`, SHA-256 `9fdcea34…`), oiseaux marins 2026. Adaptateurs encore à écrire pour ces groupes.
+**Autres groupes ZNIEFF unifiés — `IMPORTED`** :
+
+| Groupe | Identifiant pipeline | SHA-256 |
+|---|---|---|
+| Characées 2023 | `dreal-naq-znieff-characees-2023` | `0704cbff…` |
+| Oiseaux nicheurs 2023 | `dreal-naq-znieff-oiseaux-nicheurs-2023` | `93811416…` |
+| Araignées 2023 | `dreal-naq-znieff-araignees-2023` | `5ad29616…` |
+| Amphibiens 2024-09 | `dreal-naq-znieff-amphibiens-2024-09` | `9f2e117e…` |
+| Reptiles 2024-09 | `dreal-naq-znieff-reptiles-2024-09` | `1f5511a5…` |
+| Mollusques continentaux 2025 | `dreal-naq-znieff-mollusques-2025` | `ed3ea1b1…` |
+| Orthoptères 2026 | `dreal-naq-znieff-orthopteres-2026` | `9fdcea34…` |
+| Oiseaux marins 2026 | `dreal-naq-znieff-oiseaux-marins-2026` | `aa139c51…` |
+
+Les portées départementales, exceptions CSRPN et conditions de déterminance sont conservées (`partial` + `scopeLabel`). Les valeurs de condition de plus de 80 caractères sont omises.
+
+**Hors périmètre actuel** : végétations 2023, habitats naturels 2024, mammifères marins/tortues marines 2020 (pas dans les groupes READY branchés).
 
 #### Listes rouges — `PARTIAL` + `PENDING_PUBLICATION`
 
@@ -317,7 +332,7 @@ Importer les LRR unifiées sans attendre, puis traiter les ZNIEFF historiques av
 
 #### Action suivante
 
-Après la flore ZNIEFF déjà branchée, intégrer les autres groupes ZNIEFF unifiés les plus récents, puis surveiller la publication finale des travaux flore 2026.
+Surveiller la publication finale des LRR / protections flore 2026 ; brancher végétations / habitats / mammifères marins si les tableurs machine sont stabilisés.
 
 ---
 
@@ -435,10 +450,10 @@ Pour chaque nouvelle source ou nouveau millésime :
 
 À données accessibles et validées égales :
 
-1. **Nouvelle-Aquitaine** — poursuivre les groupes ZNIEFF unifiés après la flore déjà intégrée (orthoptères 2026 : URL corrigée, adaptateur à écrire).
-2. **Bretagne** — exploiter les CSV OEB ZNIEFF/LRR et la responsabilité biologique régionale.
+1. **PACA** — ZNIEFF + LRR structurées.
+2. **Pays de la Loire** — ZNIEFF 2018 ODS faune/flore.
 3. **Grand Est** — LRR unifiées groupe par groupe (ZNIEFF faune/flore déjà importées).
-4. **PACA** — ZNIEFF + LRR structurées.
+4. **Bretagne** — responsabilité biologique régionale (ZNIEFF/LRR OEB déjà branchés).
 5. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
 6. **Île-de-France** — CSV ZNIEFF puis LRR par groupe.
 7. **Centre-Val de Loire** et **Occitanie** — dès retour effectif des fichiers DREAL.

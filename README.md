@@ -103,4 +103,5 @@ Une attention particulière est portée aux anciennes régions : un statut appli
 - [`docs/data-sources-cvl.md`](docs/data-sources-cvl.md) — audit de fraîcheur et priorisation des sources Centre-Val de Loire ;
 - [`docs/data-sources-ara.md`](docs/data-sources-ara.md) — intégration ZNIEFF Auvergne-Rhône-Alpes ;
 - [`docs/data-sources-bfc.md`](docs/data-sources-bfc.md) — intégration du tableur maître BFC 03/03/2026 ;
-- [`docs/data-sources-ges.md`](docs/data-sources-ges.md) — intégration ZNIEFF faune Grand Est.
+- [`docs/data-sources-ges.md`](docs/data-sources-ges.md) — intégration ZNIEFF faune/flore Grand Est ;
+- [`docs/data-sources-naq.md`](docs/data-sources-naq.md) — intégration ZNIEFF Nouvelle-Aquitaine (flore + groupes unifiés).
