@@ -300,6 +300,40 @@ for (const check of pacChecks) {
   )
 }
 
+const pdlFauna = await loadStatuses('fauna', 'PDL')
+const pdlFlora = await loadStatuses('flora', 'PDL')
+if (manifest.sources.some((source) => source.id === 'dreal-pdl-znieff-faune-2018')) {
+  assert.ok(
+    pdlFauna.some((status) => status.sourceId === 'dreal-pdl-znieff-faune-2018' && status.cdRef === 139 && status.value === 'Oui'),
+    'Triturus cristatus: déterminante ZNIEFF PDL',
+  )
+  assert.ok(
+    pdlFauna.some(
+      (status) =>
+        status.sourceId === 'dreal-pdl-znieff-faune-2018' &&
+        status.cdRef === 2651 &&
+        status.label === 'Condition de déterminance' &&
+        status.value === 'Nicheur',
+    ),
+    'Hieraaetus pennatus: condition Nicheur PDL',
+  )
+}
+if (manifest.sources.some((source) => source.id === 'dreal-pdl-znieff-flore-2018')) {
+  assert.ok(
+    pdlFlora.some((status) => status.sourceId === 'dreal-pdl-znieff-flore-2018' && status.cdRef === 80978 && status.value === 'Oui'),
+    'Ajuga chamaepitys: déterminante ZNIEFF PDL flore',
+  )
+  assert.ok(
+    pdlFlora.some(
+      (status) =>
+        status.sourceId === 'dreal-pdl-znieff-flore-2018' &&
+        status.cdRef === 80978 &&
+        status.label === 'Condition de déterminance',
+    ),
+    'Ajuga chamaepitys: restriction géographique PDL conservée',
+  )
+}
+
 console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
@@ -321,6 +355,9 @@ if (manifest.sources.some((source) => source.id === bfcSourceId)) {
 }
 if (manifest.sources.some((source) => source.id === 'dreal-pac-znieff-fauna-2024-01')) {
   console.log('- enrichissement régional: ZNIEFF + LRR Provence-Alpes-Côte d’Azur')
+}
+if (manifest.sources.some((source) => source.id === 'dreal-pdl-znieff-faune-2018')) {
+  console.log('- enrichissement régional: ZNIEFF Pays de la Loire 2018')
 }
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {

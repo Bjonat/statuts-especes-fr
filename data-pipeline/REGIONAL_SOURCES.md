@@ -53,7 +53,7 @@ Règles impératives :
 | Normandie (`NOR`) | `PARTIAL` | `READY` selon groupes unifiés | Anciennes régions à préserver | Haute |
 | Nouvelle-Aquitaine (`NAQ`) | `IMPORTED` flore vasculaire + groupes unifiés | `PARTIAL` / nouveaux travaux 2026 en attente | EEE 2022 actuellement bloquée | **Très haute** |
 | Occitanie (`OCC`) | `READY_WHEN_AVAILABLE` | `PARTIAL` / travaux 2026 en attente | Zones biogéographiques à conserver | **Très haute** |
-| Pays de la Loire (`PDL`) | `READY` avec mises à jour 2026 à surveiller | `RESEARCH_REQUIRED` pour consolidation | Rareté/indigénat à qualifier | Moyenne |
+| Pays de la Loire (`PDL`) | `IMPORTED` faune/flore 2018 | `RESEARCH_REQUIRED` pour consolidation | Rareté/indigénat à qualifier | Moyenne |
 | Provence-Alpes-Côte d'Azur (`PAC`) | `IMPORTED` faune 2024 + flore 2016 | `IMPORTED` selon groupes publiés | À compléter via CBNMed/CBNA | **Très haute** |
 
 ---
@@ -362,13 +362,14 @@ Brancher ZNIEFF flore/faune dès retour des XLSX ; puis intégrer les LRR réell
 
 ### PDL — Pays de la Loire
 
-#### ZNIEFF — `READY` avec mises à jour à surveiller
+#### ZNIEFF — `IMPORTED` (socle 2018)
 
 - **DREAL Pays de la Loire** : https://www.pays-de-la-loire.developpement-durable.gouv.fr/les-listes-des-especes-determinantes-et-habitats-a4613.html
-- Le socle publié comprend notamment les listes continentales faune/flore/habitats 2018 en ODS et des compléments par milieux/groupes.
-- **CSRPN 2022-2026** : https://www.pays-de-la-loire.developpement-durable.gouv.fr/2022-2026-a6457.html
-- Des avis de juin 2026 concernent notamment des listes déterminantes bryophytes et characées.
-- **Décision pipeline** : utiliser les jeux officiellement publiés sur la page ZNIEFF comme source autoritaire ; marquer les avis 2026 `PENDING_PUBLICATION` jusqu'à intégration dans le jeu opérationnel.
+- **Faune** : `liste_pdl__2018_faune_vf.ods` → `dreal-pdl-znieff-faune-2018` (SHA `1bd95cf7…`).
+- **Flore** : `liste_pdl__2018_flore_vf.ods` → `dreal-pdl-znieff-flore-2018` (SHA `2b99b0bf…`).
+- Présence sur liste = déterminante `Oui` ; restrictions / particularités ≤ 80 caractères conservées comme conditions.
+- **CSRPN 2022-2026** : avis 2026 bryophytes/characées en `PENDING_PUBLICATION` jusqu'à intégration dans le jeu opérationnel.
+- Hors import volontaire : habitats 2018 ODS, arthropodes estran, feuille LRR `Feuille2` de la flore.
 
 #### Listes rouges — `RESEARCH_REQUIRED` pour consolidation
 
@@ -381,7 +382,7 @@ Brancher ZNIEFF flore/faune dès retour des XLSX ; puis intégrer les LRR réell
 
 #### Action suivante
 
-Qualifier les nouvelles listes ZNIEFF 2026 dès publication opérationnelle, puis réaliser une recherche dédiée LRR/CBN pour obtenir un jeu régional structuré.
+Surveiller l'intégration opérationnelle des listes 2026 ; puis rechercher un jeu LRR/CBN structuré.
 
 ---
 
@@ -449,13 +450,13 @@ Pour chaque nouvelle source ou nouveau millésime :
 
 À données accessibles et validées égales :
 
-1. **Pays de la Loire** — ZNIEFF 2018 ODS faune/flore.
-2. **Grand Est** — LRR unifiées groupe par groupe (ZNIEFF faune/flore déjà importées).
-3. **Bretagne** — responsabilité biologique régionale (ZNIEFF/LRR OEB déjà branchés).
-4. **Île-de-France** — LRR par groupe (ZNIEFF déjà faite).
+1. **Grand Est** — LRR unifiées groupe par groupe (ZNIEFF faune/flore déjà importées).
+2. **Bretagne** — responsabilité biologique régionale (ZNIEFF/LRR OEB déjà branchés).
+3. **Île-de-France** — LRR par groupe (ZNIEFF déjà faite).
+4. **Normandie** — ZNIEFF (LRR déjà faites).
 5. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
-6. **Île-de-France** — CSV ZNIEFF puis LRR par groupe.
-7. **Centre-Val de Loire** et **Occitanie** — dès retour effectif des fichiers DREAL.
-8. **Normandie**, **Hauts-de-France**, **Pays de la Loire**, **ARA**, **Corse** — avec une attention particulière aux portées historiques ou aux trous de consolidation.
+6. **Centre-Val de Loire** et **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
+7. **Hauts-de-France**, **ARA LRR**, **Corse** — portées historiques / consolidation.
+8. **PACA / PDL / NAQ** — déjà importés pour les lots ZNIEFF (et LRR PACA) ; surveiller révisions.
 
 Cet ordre n'est pas une hiérarchie écologique : il vise le meilleur rapport **fiabilité de la source / caractère structuré / gain métier / coût d'adaptation**.
