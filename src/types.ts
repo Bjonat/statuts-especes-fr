@@ -41,6 +41,7 @@ export type StatusCategory =
   | 'protection_national'
   | 'protection_regional'
   | 'znieff'
+  | 'regional_responsibility'
   | 'pna'
   | 'rarity'
   | 'indigenous_status'

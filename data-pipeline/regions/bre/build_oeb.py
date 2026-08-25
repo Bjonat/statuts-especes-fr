@@ -13,6 +13,19 @@ from datetime import date
 from pathlib import Path
 
 REALM_BY_KINGDOM = {"animalia": "fauna", "plantae": "flora"}
+MAX_VALUE_LENGTH = 80
+RESPONSABILITE_SOURCE_ID = "oeb-bretagne-responsabilite-csv-2026-07-29"
+RESPONSABILITE_SHA256 = "38965de26b6c462d5a366b92b9c80bd586b88ff7273603d591367f49c02a7240"
+# Les oiseaux ont deux évaluations distinctes (nicheurs / migrateurs) sur les mêmes taxons.
+PARTIAL_RESPONSABILITE_GROUPS = {"Oiseaux nicheurs", "Oiseaux migrateurs"}
+EXPLICITE_BY_CODE = {
+    "1": "mineure",
+    "2": "modérée",
+    "3": "élevée",
+    "4": "très élevée",
+    "5": "majeure",
+    "NA": "non évaluée car marginale ou exotique",
+}
 
 
 def normalize(value: object) -> str:
@@ -308,6 +321,127 @@ def build_lrr(rows, by_cd_nom, accepted_names, csv_path: Path, checked_at: str):
     }
 
 
+def compact_value(value: str) -> str | None:
+    text = re.sub(r"\s+", " ", value).strip()
+    if not text or len(text) > MAX_VALUE_LENGTH:
+        return None
+    return text
+
+
+def responsabilite_value(row: dict[str, str]) -> str | None:
+    code = row_value(row, "RESULTAT_EVALUATION").upper()
+    if not code:
+        return None
+    explicit = row_value(row, "RESULTAT_EXPLICITE")
+    if explicit:
+        return compact_value(explicit)
+    mapped = EXPLICITE_BY_CODE.get(code)
+    if mapped:
+        return compact_value(mapped)
+    return compact_value(code)
+
+
+def build_responsabilite(rows, by_cd_nom, accepted_names, csv_path: Path, checked_at: str):
+    digest = sha256(csv_path)
+    if digest != RESPONSABILITE_SHA256:
+        raise RuntimeError(f"{RESPONSABILITE_SOURCE_ID}: SHA-256 inattendu {digest}")
+
+    stats = diagnostics_template()
+    statuses = []
+    seen = set()
+    years = defaultdict(int)
+    groups = defaultdict(int)
+    values = defaultdict(int)
+
+    for row in rows:
+        if row_value(row, "TYPE_EVALUATION").casefold() != "responsabilité biologique régionale":
+            continue
+        value = responsabilite_value(row)
+        if not value:
+            continue
+        stats["rows"] += 1
+        cd_ref, realm, mode = resolve(
+            row,
+            ("CODE_NOM_TAXREF", "CD_NOM"),
+            ("NOM_SCIENTIFIQUE_TAXREF", "NOM_SCIEN_VALIDE"),
+            by_cd_nom,
+            accepted_names,
+        )
+        if mode == "excluded_realm":
+            stats[mode] += 1
+            continue
+        if cd_ref is None or realm is None:
+            stats[mode] += 1
+            if len(stats["unresolvedSample"]) < 50:
+                stats["unresolvedSample"].append({
+                    "taxon": row_value(row, "NOM_SCIENTIFIQUE_TAXREF", "NOM_VERNACULAIRE"),
+                    "code": row_value(row, "CODE_NOM_TAXREF"),
+                    "reason": mode,
+                })
+            continue
+        stats["matched"] += 1
+        stats[mode] += 1
+        stats[realm] += 1
+        year = row_value(row, "ANNEE_EVALUATION") or "inconnu"
+        group = row_value(row, "GROUPE_ESPECE") or "inconnu"
+        years[year] += 1
+        groups[group] += 1
+        values[value] += 1
+
+        if group in PARTIAL_RESPONSABILITE_GROUPS:
+            scope = "partial"
+            scope_label = group
+        else:
+            scope = "regional"
+            scope_label = None
+
+        key = (cd_ref, realm, value, scope, scope_label or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        status = {
+            "cdRef": cd_ref,
+            "region": "BRE",
+            "category": "regional_responsibility",
+            "label": "Responsabilité biologique régionale",
+            "value": value,
+            "sourceId": RESPONSABILITE_SOURCE_ID,
+            "scope": scope,
+            "_realm": realm,
+        }
+        if scope_label:
+            status["scopeLabel"] = scope_label
+        statuses.append(status)
+
+    finalize_diagnostics(stats)
+    stats["years"] = dict(sorted(years.items()))
+    stats["groups"] = dict(sorted(groups.items()))
+    stats["values"] = dict(sorted(values.items()))
+    replacements = targeted_replacements(statuses, "regional_responsibility")
+    public_statuses = clean_statuses(statuses)
+    return {
+        "schemaVersion": 1,
+        "source": {
+            "id": RESPONSABILITE_SOURCE_ID,
+            "name": "Responsabilité biologique régionale Bretagne",
+            "producer": "Observatoire de l'environnement en Bretagne / observatoires régionaux faune-flore / CSRPN Bretagne",
+            "version": "CSV data.gouv 29/07/2026 - mise à jour OEB 2025",
+            "publicationYear": 2025,
+            "official": True,
+            "checkedAt": checked_at,
+            "sha256": digest,
+            "landingPage": "https://bretagne-environnement.fr/article/indicateurs-responsabilite-biologique-regionale-bretagne-especes",
+            "sourceUrl": "https://www.data.gouv.fr/api/1/datasets/r/b1d4b313-965a-4bc1-945d-32332befa07a",
+        },
+        "replaces": replacements,
+        "statuses": sorted(
+            public_statuses,
+            key=lambda status: (status["cdRef"], status.get("scopeLabel", ""), status["value"]),
+        ),
+        "diagnostics": stats,
+    }
+
+
 def write_package(package, output: Path, min_match_rate: float):
     diagnostics = package["diagnostics"]
     print(json.dumps({"source": package["source"]["id"], **diagnostics}, ensure_ascii=False, indent=2))
@@ -316,6 +450,8 @@ def write_package(package, output: Path, min_match_rate: float):
             f"{package['source']['id']}: taux de raccord TAXREF insuffisant "
             f"{diagnostics['matchRate']:.2%} < {min_match_rate:.2%}"
         )
+    if not package["statuses"]:
+        raise SystemExit(f"{package['source']['id']}: aucun statut produit")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(package, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"Paquet écrit: {output} - {len(package['statuses'])} statuts")
@@ -326,6 +462,7 @@ def main():
     parser.add_argument("--taxref", required=True)
     parser.add_argument("--znieff", required=True)
     parser.add_argument("--lrr", required=True)
+    parser.add_argument("--responsabilite", required=True)
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--checked-at", default=date.today().isoformat())
     parser.add_argument("--min-match-rate", type=float, default=0.97)
@@ -333,12 +470,23 @@ def main():
 
     znieff_path = Path(args.znieff)
     lrr_path = Path(args.lrr)
+    responsabilite_path = Path(args.responsabilite)
     znieff_rows = read_csv_rows(znieff_path)
     lrr_rows = read_csv_rows(lrr_path)
+    responsabilite_rows = read_csv_rows(responsabilite_path)
 
     z_codes, z_names = wanted_from_rows(znieff_rows, ("CD_NOM",), ("NOM_SCIEN_VALIDE", "NOM_SCIENTIFIQUE_TAXREF"))
     l_codes, l_names = wanted_from_rows(lrr_rows, ("CODE_NOM_TAXREF", "CD_NOM"), ("NOM_SCIENTIFIQUE_TAXREF", "NOM_SCIEN_VALIDE"))
-    by_cd_nom, accepted_names = taxref_lookup(Path(args.taxref), z_codes | l_codes, z_names | l_names)
+    r_codes, r_names = wanted_from_rows(
+        responsabilite_rows,
+        ("CODE_NOM_TAXREF", "CD_NOM"),
+        ("NOM_SCIENTIFIQUE_TAXREF", "NOM_SCIEN_VALIDE"),
+    )
+    by_cd_nom, accepted_names = taxref_lookup(
+        Path(args.taxref),
+        z_codes | l_codes | r_codes,
+        z_names | l_names | r_names,
+    )
 
     out_dir = Path(args.out_dir)
     write_package(
@@ -349,6 +497,11 @@ def main():
     write_package(
         build_lrr(lrr_rows, by_cd_nom, accepted_names, lrr_path, args.checked_at),
         out_dir / "bre-lrr.json",
+        args.min_match_rate,
+    )
+    write_package(
+        build_responsabilite(responsabilite_rows, by_cd_nom, accepted_names, responsabilite_path, args.checked_at),
+        out_dir / "bre-responsabilite.json",
         args.min_match_rate,
     )
 

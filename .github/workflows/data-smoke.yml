@@ -145,11 +145,13 @@ jobs:
           set -euo pipefail
           curl --fail --location --retry 3 https://www.data.gouv.fr/api/1/datasets/r/4ada0b2b-d56e-44a9-8532-9ca2335c625b -o "$RUNNER_TEMP/bre-znieff.csv"
           curl --fail --location --retry 3 https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96 -o "$RUNNER_TEMP/bre-lrr.csv"
+          bash data-pipeline/regions/bre/download_oeb_responsabilite.sh "$RUNNER_TEMP/bre-responsabilite.csv"
           grep -q 'CD_NOM' "$RUNNER_TEMP/bre-znieff.csv"
           grep -q 'RESULTAT_EVALUATION' "$RUNNER_TEMP/bre-lrr.csv"
-          sha256sum "$RUNNER_TEMP/bre-znieff.csv" "$RUNNER_TEMP/bre-lrr.csv"
+          sha256sum "$RUNNER_TEMP/bre-znieff.csv" "$RUNNER_TEMP/bre-lrr.csv" "$RUNNER_TEMP/bre-responsabilite.csv"
           echo "BRE_ZNIEFF_FILE=$RUNNER_TEMP/bre-znieff.csv" >> "$GITHUB_ENV"
           echo "BRE_LRR_FILE=$RUNNER_TEMP/bre-lrr.csv" >> "$GITHUB_ENV"
+          echo "BRE_RESPONSABILITE_FILE=$RUNNER_TEMP/bre-responsabilite.csv" >> "$GITHUB_ENV"
 
       - name: Download regional Normandie LRR sources
         shell: bash
@@ -250,7 +252,7 @@ jobs:
             python data-pipeline/regions/naq/build_znieff.py --taxref "$TAXREF_FILE" --workbook "$NAQ_ZNIEFF_FILE" --out "$REGIONAL_DIR/naq-znieff-flora.json"
           fi
           python data-pipeline/regions/naq/build_znieff_groups.py --taxref "$TAXREF_FILE" --input-dir "$NAQ_ZNIEFF_GROUPS_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
-          python data-pipeline/regions/bre/build_oeb.py --taxref "$TAXREF_FILE" --znieff "$BRE_ZNIEFF_FILE" --lrr "$BRE_LRR_FILE" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
+          python data-pipeline/regions/bre/build_oeb.py --taxref "$TAXREF_FILE" --znieff "$BRE_ZNIEFF_FILE" --lrr "$BRE_LRR_FILE" --responsabilite "$BRE_RESPONSABILITE_FILE" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/nor/build_anbdd_lrr.py --taxref "$TAXREF_FILE" --input-dir "$NOR_LRR_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/idf/build_geonat_znieff.py --taxref "$TAXREF_FILE" --source "$IDF_SOURCE" --out "$REGIONAL_DIR/idf-znieff.json" --min-match-rate 0.97
           python data-pipeline/regions/cvl/build_arb_lrr.py --taxref "$TAXREF_FILE" --odonates "$CVL_LRR_DIR/odonates-2022.pdf" --papillons "$CVL_LRR_DIR/papillons-2024.pdf" --coleopteres "$CVL_LRR_DIR/coleopteres-2025.pdf" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
@@ -288,6 +290,7 @@ jobs:
           const required = [
             'dreal-ara-znieff-2023-06',
             'oeb-bretagne-znieff-csv-2026-01-29', 'oeb-bretagne-lrr-csv-2026-01-29',
+            'oeb-bretagne-responsabilite-csv-2026-07-29',
             'anbdd-normandie-lrr-oiseaux-nicheurs-2024', 'anbdd-normandie-lrr-mammiferes-2022',
             'anbdd-normandie-lrr-amphibiens-2022', 'anbdd-normandie-lrr-reptiles-2022',
             'anbdd-normandie-lrr-odonates-2022', 'anbdd-normandie-lrr-orthopteres-2022',

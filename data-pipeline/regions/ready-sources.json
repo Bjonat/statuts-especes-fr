@@ -87,6 +87,7 @@
         "flora",
         "fauna"
       ],
+      "state": "IMPORTED",
       "landingPage": "https://data.bretagne-environnement.fr/datasets/especes-determinantes-pour-les-znieff-en-bretagne",
       "resources": [
         {
@@ -105,11 +106,33 @@
         "flora",
         "fauna"
       ],
+      "state": "IMPORTED",
       "landingPage": "https://data.bretagne-environnement.fr/datasets/especes-en-listes-rouges-regionales-pour-la-bretagne",
       "resources": [
         {
           "kind": "csv",
           "url": "https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96"
+        }
+      ]
+    },
+    {
+      "id": "oeb-bretagne-responsabilite",
+      "region": "BRE",
+      "categories": [
+        "regional_responsibility"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://bretagne-environnement.fr/article/indicateurs-responsabilite-biologique-regionale-bretagne-especes",
+      "resources": [
+        {
+          "kind": "csv",
+          "version": "mise à jour OEB 2025 / data.gouv 2026-07-29",
+          "url": "https://www.data.gouv.fr/api/1/datasets/r/b1d4b313-965a-4bc1-945d-32332befa07a",
+          "sha256": "38965de26b6c462d5a366b92b9c80bd586b88ff7273603d591367f49c02a7240"
         }
       ]
     },

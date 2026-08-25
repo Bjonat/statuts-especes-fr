@@ -232,6 +232,35 @@ if (manifest.sources.some((source) => source.id === bfcSourceId)) {
   )
 }
 
+const breFauna = await loadStatuses('fauna', 'BRE')
+const breFlora = await loadStatuses('flora', 'BRE')
+const breResponsabiliteSourceId = 'oeb-bretagne-responsabilite-csv-2026-07-29'
+if (manifest.sources.some((source) => source.id === breResponsabiliteSourceId)) {
+  assert.ok(
+    findStatus(
+      breFlora,
+      97152,
+      (status) =>
+        status.category === 'regional_responsibility' &&
+        status.sourceId === breResponsabiliteSourceId &&
+        status.scope === 'regional' &&
+        status.value === 'majeure',
+    ),
+    'Eryngium viviparum: responsabilité biologique Bretagne = majeure',
+  )
+  const alca = breFauna.filter(
+    (status) => status.cdRef === 3388 && status.category === 'regional_responsibility' && status.sourceId === breResponsabiliteSourceId,
+  )
+  assert.ok(
+    alca.some((status) => status.scope === 'partial' && status.scopeLabel === 'Oiseaux nicheurs' && status.value === 'majeure'),
+    'Alca torda: responsabilité biologique Bretagne nicheurs = majeure',
+  )
+  assert.ok(
+    alca.some((status) => status.scope === 'partial' && status.scopeLabel === 'Oiseaux migrateurs' && status.value === 'modérée'),
+    'Alca torda: responsabilité biologique Bretagne migrateurs = modérée',
+  )
+}
+
 const naqFauna = await loadStatuses('fauna', 'NAQ')
 const naqGroupChecks = [
   {
@@ -389,6 +418,9 @@ if (manifest.sources.some((source) => source.id === 'dreal-pac-znieff-fauna-2024
 }
 if (manifest.sources.some((source) => source.id === 'dreal-pdl-znieff-faune-2018')) {
   console.log('- enrichissement régional: ZNIEFF Pays de la Loire 2018')
+}
+if (manifest.sources.some((source) => source.id === 'oeb-bretagne-responsabilite-csv-2026-07-29')) {
+  console.log('- enrichissement régional: responsabilité biologique Bretagne OEB 2025')
 }
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {
