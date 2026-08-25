@@ -225,6 +225,13 @@ jobs:
           bash data-pipeline/regions/pac/download_sources.sh "$RUNNER_TEMP/pac-sources"
           echo "PAC_SOURCES_DIR=$RUNNER_TEMP/pac-sources" >> "$GITHUB_ENV"
 
+      - name: Download regional PDL ZNIEFF sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/pdl/download_znieff.sh "$RUNNER_TEMP/pdl-znieff"
+          echo "PDL_ZNIEFF_DIR=$RUNNER_TEMP/pdl-znieff" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         shell: bash
         run: |
@@ -245,6 +252,7 @@ jobs:
           python data-pipeline/regions/bfc/build_arb_statuts.py --taxref "$TAXREF_FILE" --source "$BFC_SOURCE" --out "$REGIONAL_DIR/bfc-statuts.json" --min-match-rate 0.97
           python data-pipeline/regions/pac/build_znieff.py --taxref "$TAXREF_FILE" --input-dir "$PAC_SOURCES_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/pac/build_lrr.py --taxref "$TAXREF_FILE" --input-dir "$PAC_SOURCES_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
+          python data-pipeline/regions/pdl/build_znieff.py --taxref "$TAXREF_FILE" --input-dir "$PDL_ZNIEFF_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           echo "REGIONAL_DIR=$REGIONAL_DIR" >> "$GITHUB_ENV"
 
       - name: Diagnose official source volumes
@@ -298,6 +306,8 @@ jobs:
             'dreal-pac-lrr-amphibiens-2016',
             'dreal-pac-lrr-reptiles-2016',
             'dreal-pac-lrr-orthopteres-2018',
+            'dreal-pdl-znieff-faune-2018',
+            'dreal-pdl-znieff-flore-2018',
           ]
           if (process.env.NAQ_REGIONAL_AVAILABLE === 'true') required.push('obv-na-znieff-flore-2019-v1.2')
           const ids = new Set(manifest.sources.map((source) => source.id))

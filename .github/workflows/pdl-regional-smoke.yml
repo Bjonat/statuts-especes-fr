@@ -1,0 +1,80 @@
+name: Pays de la Loire ZNIEFF regional smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/pdl/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/pdl-regional-smoke.yml'
+
+jobs:
+  build-pdl-znieff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download PDL ZNIEFF sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/pdl/download_znieff.sh "$RUNNER_TEMP/pdl-znieff"
+          echo "PDL_ZNIEFF_DIR=$RUNNER_TEMP/pdl-znieff" >> "$GITHUB_ENV"
+
+      - name: Build PDL packages
+        run: |
+          mkdir -p "$RUNNER_TEMP/pdl-packages"
+          python data-pipeline/regions/pdl/build_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$PDL_ZNIEFF_DIR" \
+            --out-dir "$RUNNER_TEMP/pdl-packages" \
+            --min-match-rate 0.97
+          echo "PDL_PACKAGES_DIR=$RUNNER_TEMP/pdl-packages" >> "$GITHUB_ENV"
+
+      - name: Validate packages and sentinels
+        run: |
+          node - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          import assert from 'node:assert/strict'
+
+          const packages = await loadRegionalPackages(process.env.PDL_PACKAGES_DIR)
+          const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
+          for (const id of ['dreal-pdl-znieff-faune-2018', 'dreal-pdl-znieff-flore-2018']) {
+            assert.ok(byId[id], `paquet manquant: ${id}`)
+            assert.ok(!('url' in byId[id].source), `${id}: champ url interdit`)
+          }
+          const fauna = byId['dreal-pdl-znieff-faune-2018'].statuses
+          const flora = byId['dreal-pdl-znieff-flore-2018'].statuses
+          assert.ok(fauna.some((s) => s.cdRef === 139 && s.value === 'Oui'))
+          assert.ok(fauna.some((s) => s.cdRef === 2651 && s.label === 'Condition de déterminance' && s.value === 'Nicheur'))
+          assert.ok(flora.some((s) => s.cdRef === 80978 && s.value === 'Oui'))
+          assert.ok(flora.some((s) => s.cdRef === 80978 && s.label === 'Condition de déterminance'))
+          console.log({
+            fauna: fauna.length,
+            flora: flora.length,
+          })
+          NODE

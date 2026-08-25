@@ -198,6 +198,13 @@ jobs:
           bash data-pipeline/regions/pac/download_sources.sh "$RUNNER_TEMP/pac-sources"
           echo "PAC_SOURCES_DIR=$RUNNER_TEMP/pac-sources" >> "$GITHUB_ENV"
 
+      - name: Download regional PDL ZNIEFF sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/pdl/download_znieff.sh "$RUNNER_TEMP/pdl-znieff"
+          echo "PDL_ZNIEFF_DIR=$RUNNER_TEMP/pdl-znieff" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         run: |
           python data-pipeline/regions/ara/build_dreal_znieff.py \
@@ -263,6 +270,11 @@ jobs:
             --input-dir "$PAC_SOURCES_DIR" \
             --out-dir "$REGIONAL_DIR" \
             --min-match-rate 0.97
+          python data-pipeline/regions/pdl/build_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$PDL_ZNIEFF_DIR" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
 
       - name: Run tests
         run: npm test
@@ -312,6 +324,8 @@ jobs:
             'dreal-pac-lrr-amphibiens-2016',
             'dreal-pac-lrr-reptiles-2016',
             'dreal-pac-lrr-orthopteres-2018',
+            'dreal-pdl-znieff-faune-2018',
+            'dreal-pdl-znieff-flore-2018',
           ]
           const ids = new Set(manifest.sources.map((source) => source.id))
           for (const id of required) {
@@ -395,6 +409,8 @@ jobs:
             'dreal-pac-lrr-amphibiens-2016',
             'dreal-pac-lrr-reptiles-2016',
             'dreal-pac-lrr-orthopteres-2018',
+            'dreal-pdl-znieff-faune-2018',
+            'dreal-pdl-znieff-flore-2018',
           ]
           const ids = new Set(dataManifest.sources.map((source) => source.id))
           for (const id of required) {

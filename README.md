@@ -105,4 +105,5 @@ Une attention particulière est portée aux anciennes régions : un statut appli
 - [`docs/data-sources-bfc.md`](docs/data-sources-bfc.md) — intégration du tableur maître BFC 03/03/2026 ;
 - [`docs/data-sources-ges.md`](docs/data-sources-ges.md) — intégration ZNIEFF faune/flore Grand Est ;
 - [`docs/data-sources-naq.md`](docs/data-sources-naq.md) — intégration ZNIEFF Nouvelle-Aquitaine (flore + groupes unifiés) ;
-- [`docs/data-sources-pac.md`](docs/data-sources-pac.md) — intégration ZNIEFF + LRR Provence-Alpes-Côte d'Azur.
+- [`docs/data-sources-pac.md`](docs/data-sources-pac.md) — intégration ZNIEFF + LRR Provence-Alpes-Côte d'Azur ;
+- [`docs/data-sources-pdl.md`](docs/data-sources-pdl.md) — intégration ZNIEFF Pays de la Loire 2018.

@@ -277,14 +277,20 @@
         {
           "kind": "ods",
           "realm": "fauna",
-          "url": "https://www.pays-de-la-loire.developpement-durable.gouv.fr/IMG/ods/liste_pdl__2018_faune_vf.ods"
+          "url": "https://www.pays-de-la-loire.developpement-durable.gouv.fr/IMG/ods/liste_pdl__2018_faune_vf.ods",
+          "sha256": "1bd95cf726ddbf5cb17f71c00092eecf3ed7b6e0fa6d7d6216b1a46adc73b91e",
+          "pipelineId": "dreal-pdl-znieff-faune-2018"
         },
         {
           "kind": "ods",
           "realm": "flora",
-          "url": "https://www.pays-de-la-loire.developpement-durable.gouv.fr/IMG/ods/liste_pdl__2018_flore_vf.ods"
+          "url": "https://www.pays-de-la-loire.developpement-durable.gouv.fr/IMG/ods/liste_pdl__2018_flore_vf.ods",
+          "sha256": "2b99b0bf40fa6c3f9ccec4b72a0d991baa792f5919a00a430575106c671f9d37",
+          "pipelineId": "dreal-pdl-znieff-flore-2018"
         }
-      ]
+      ],
+      "state": "IMPORTED",
+      "note": "Socle ZNIEFF continental 2018 ; habitats/estran/LRR hors périmètre."
     },
     {
       "id": "dreal-pac-znieff-fauna-2024-01",
