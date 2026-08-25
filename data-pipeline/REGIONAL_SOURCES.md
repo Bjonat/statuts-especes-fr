@@ -44,7 +44,7 @@ Règles impératives :
 |---|---|---|---|---|
 | Auvergne-Rhône-Alpes (`ARA`) | `READY` | `PARTIAL` | À documenter selon CBN | Haute |
 | Bourgogne-Franche-Comté (`BFC`) | `IMPORTED` via tableur maître 2026 | `IMPORTED` via tableur maître 2026 | Tableur maître de statuts | **Très haute** |
-| Bretagne (`BRE`) | `READY` | `READY` | Responsabilité biologique régionale disponible | **Très haute** |
+| Bretagne (`BRE`) | `IMPORTED` | `IMPORTED` | Responsabilité biologique `IMPORTED` | Surveiller révisions OEB |
 | Centre-Val de Loire (`CVL`) | `READY_WHEN_AVAILABLE` | `READY` | Rareté/indigénat CBNBP à qualifier | Haute |
 | Corse (`COR`) | `RESEARCH_REQUIRED` pour consolidation | `PARTIAL` | À documenter | Moyenne |
 | Grand Est (`GES`) | `IMPORTED` faune et flore vasculaire | `IMPORTED` 10 groupes faune unifiés ; `PARTIAL` reste | Anciennes régions à préserver | **Haute** (flore LRR / historiques) |
@@ -115,28 +115,35 @@ Surveiller les prochaines mises à jour du tableur maître ; conserver les port�
 
 ### BRE — Bretagne
 
-#### ZNIEFF — `READY`
+#### ZNIEFF — `IMPORTED`
 
 - **DREAL** : https://www.bretagne.developpement-durable.gouv.fr/especes-determinantes-pour-la-realisation-des-a211.html
 - **Observatoire de l'environnement en Bretagne (OEB)** : https://bretagne-environnement.fr/tableau-de-bord/especes-habitats-determinants-znieff-bretagne
 - La DREAL renvoie vers l'OEB pour la consultation et le téléchargement.
-- **Format intéressant** : CSV téléchargeable pour la liste des espèces déterminantes.
-- **Décision pipeline** : très bon candidat pour un adaptateur reproductible, à condition d'enregistrer la date/millésime réellement exposé par le fichier.
+- **CSV data.gouv** : https://www.data.gouv.fr/api/1/datasets/r/4ada0b2b-d56e-44a9-8532-9ca2335c625b
+- **Identifiant pipeline** : `oeb-bretagne-znieff-csv-2026-01-29`.
 
-#### Listes rouges — `READY`
+#### Listes rouges — `IMPORTED`
 
 - **OEB — synthèse risque régional de disparition** : https://bretagne-environnement.fr/thematique/patrimoine-naturel/article/indicateurs-risque-regional-disparition-especes-bretonnes
-- Page vérifiée comme ressource active en 2025 ; elle centralise les LRR régionales et leurs mises à jour par groupes.
-- Des groupes ont été réévalués récemment, notamment oiseaux nicheurs et poissons d'eau douce.
+- **CSV data.gouv** : https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96
+- **Identifiant pipeline** : `oeb-bretagne-lrr-csv-2026-01-29`.
 
-#### Responsabilité biologique régionale — `READY` à qualifier
+#### Responsabilité biologique régionale — `IMPORTED`
 
-- L'OEB publie également des indicateurs de responsabilité biologique régionale.
-- À intégrer uniquement comme catégorie autonome (`regional_responsibility`) et jamais comme pseudo-score patrimonial universel.
+- **Article OEB** : https://bretagne-environnement.fr/article/indicateurs-responsabilite-biologique-regionale-bretagne-especes
+- **Jeu de données** : https://data.bretagne-environnement.fr/datasets/especes-a-responsabilite-biologique-regionale-en-bretagne
+- **CSV data.gouv** : https://www.data.gouv.fr/api/1/datasets/r/b1d4b313-965a-4bc1-945d-32332befa07a
+- **SHA-256** : `38965de26b6c462d5a366b92b9c80bd586b88ff7273603d591367f49c02a7240`
+- **Identifiant pipeline** : `oeb-bretagne-responsabilite-csv-2026-07-29`
+- Catégorie autonome `regional_responsibility` (jamais fusionnée avec LRR / ZNIEFF).
+- Valeurs publiées : mineure → majeure, plus `NSR` et non évaluée (marginale/exotique).
+- Oiseaux nicheurs / migrateurs : portées `partial` distinctes (évaluations concurrentes sur les mêmes taxons).
+- ~2 200 statuts ; raccord TAXREF 100 % sur les codes TAXREF.
 
 #### Action suivante
 
-Écrire un adaptateur OEB Bretagne séparant clairement ZNIEFF, LRR et responsabilité régionale.
+Surveiller les révisions OEB (CSV data.gouv) ; ne pas réimporter les listes d'espèces indicatrices comme pseudo-responsabilité.
 
 ---
 
@@ -457,13 +464,12 @@ Pour chaque nouvelle source ou nouveau millésime :
 
 À données accessibles et validées égales :
 
-1. **Bretagne** — responsabilité biologique régionale (ZNIEFF/LRR OEB déjà branchés).
-2. **Île-de-France** — LRR par groupe (ZNIEFF déjà faite).
-3. **Normandie** — ZNIEFF (LRR déjà faites).
-4. **Grand Est** — reste LRR mammifères/flore/historiques (10 groupes faune déjà importés).
-5. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
-6. **Centre-Val de Loire** et **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
-7. **Hauts-de-France**, **ARA LRR**, **Corse** — portées historiques / consolidation.
-8. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune** — déjà importés ; surveiller révisions.
+1. **Île-de-France** — LRR par groupe (ZNIEFF déjà faite).
+2. **Normandie** — ZNIEFF (LRR déjà faites).
+3. **Grand Est** — reste LRR mammifères/flore/historiques (10 groupes faune déjà importés).
+4. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
+5. **Centre-Val de Loire** et **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
+6. **Hauts-de-France**, **ARA LRR**, **Corse** — portées historiques / consolidation.
+7. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune / BRE** — déjà importés ; surveiller révisions.
 
 Cet ordre n'est pas une hiérarchie écologique : il vise le meilleur rapport **fiabilité de la source / caractère structuré / gain métier / coût d'adaptation**.

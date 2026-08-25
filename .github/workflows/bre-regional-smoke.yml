@@ -49,15 +49,22 @@ jobs:
           curl --fail --location --retry 3 \
             https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96 \
             -o "$RUNNER_TEMP/bre-lrr.csv"
-          sha256sum "$RUNNER_TEMP/bre-znieff.csv" "$RUNNER_TEMP/bre-lrr.csv"
+          bash data-pipeline/regions/bre/download_oeb_responsabilite.sh "$RUNNER_TEMP/bre-responsabilite.csv"
+          grep -q 'CD_NOM' "$RUNNER_TEMP/bre-znieff.csv"
+          grep -q 'RESULTAT_EVALUATION' "$RUNNER_TEMP/bre-lrr.csv"
+          sha256sum "$RUNNER_TEMP/bre-znieff.csv" "$RUNNER_TEMP/bre-lrr.csv" "$RUNNER_TEMP/bre-responsabilite.csv"
+          echo "BRE_ZNIEFF_FILE=$RUNNER_TEMP/bre-znieff.csv" >> "$GITHUB_ENV"
+          echo "BRE_LRR_FILE=$RUNNER_TEMP/bre-lrr.csv" >> "$GITHUB_ENV"
+          echo "BRE_RESPONSABILITE_FILE=$RUNNER_TEMP/bre-responsabilite.csv" >> "$GITHUB_ENV"
 
       - name: Build Bretagne regional packages
         run: |
           mkdir -p "$RUNNER_TEMP/regional"
           python data-pipeline/regions/bre/build_oeb.py \
             --taxref "$TAXREF_FILE" \
-            --znieff "$RUNNER_TEMP/bre-znieff.csv" \
-            --lrr "$RUNNER_TEMP/bre-lrr.csv" \
+            --znieff "$BRE_ZNIEFF_FILE" \
+            --lrr "$BRE_LRR_FILE" \
+            --responsabilite "$BRE_RESPONSABILITE_FILE" \
             --out-dir "$RUNNER_TEMP/regional" \
             --min-match-rate 0.97
 
@@ -66,13 +73,29 @@ jobs:
           REGIONAL_DIR="$RUNNER_TEMP/regional" node --input-type=module - <<'NODE'
           import { loadRegionalPackages } from './data-pipeline/regional.mjs'
           const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
-          if (packages.length !== 2) throw new Error(`2 paquets Bretagne attendus, reçu ${packages.length}`)
+          if (packages.length !== 3) throw new Error(`3 paquets Bretagne attendus, reçu ${packages.length}`)
           const ids = new Set(packages.map((pkg) => pkg.source.id))
           if (!ids.has('oeb-bretagne-znieff-csv-2026-01-29')) throw new Error('Paquet ZNIEFF Bretagne absent')
           if (!ids.has('oeb-bretagne-lrr-csv-2026-01-29')) throw new Error('Paquet LRR Bretagne absent')
+          if (!ids.has('oeb-bretagne-responsabilite-csv-2026-07-29')) throw new Error('Paquet responsabilité Bretagne absent')
+          const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
           for (const pkg of packages) {
             if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${pkg.source.id}`)
             if (pkg.statuses.length === 0) throw new Error(`Paquet vide: ${pkg.source.id}`)
+          }
+          const resp = byId['oeb-bretagne-responsabilite-csv-2026-07-29']
+          if (resp.source.sha256 !== '38965de26b6c462d5a366b92b9c80bd586b88ff7273603d591367f49c02a7240') {
+            throw new Error('SHA-256 responsabilité Bretagne inattendu')
+          }
+          if (resp.statuses.length < 1_500) throw new Error(`Volume responsabilité anormalement faible: ${resp.statuses.length}`)
+          const eryngium = resp.statuses.find((status) => status.cdRef === 97152 && status.value === 'majeure' && status.scope === 'regional')
+          if (!eryngium) throw new Error('Sentinelle Eryngium viviparum absente')
+          const alca = resp.statuses.filter((status) => status.cdRef === 3388)
+          if (!alca.some((status) => status.scope === 'partial' && status.scopeLabel === 'Oiseaux nicheurs' && status.value === 'majeure')) {
+            throw new Error('Sentinelle Alca torda nicheurs absente')
+          }
+          if (!alca.some((status) => status.scope === 'partial' && status.scopeLabel === 'Oiseaux migrateurs' && status.value === 'modérée')) {
+            throw new Error('Sentinelle Alca torda migrateurs absente')
           }
           console.log(packages.map((pkg) => ({ id: pkg.source.id, statuses: pkg.statuses.length, diagnostics: pkg.diagnostics })))
           NODE
