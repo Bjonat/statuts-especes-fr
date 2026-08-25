@@ -47,7 +47,7 @@ Règles impératives :
 | Bretagne (`BRE`) | `READY` | `READY` | Responsabilité biologique régionale disponible | **Très haute** |
 | Centre-Val de Loire (`CVL`) | `READY_WHEN_AVAILABLE` | `READY` | Rareté/indigénat CBNBP à qualifier | Haute |
 | Corse (`COR`) | `RESEARCH_REQUIRED` pour consolidation | `PARTIAL` | À documenter | Moyenne |
-| Grand Est (`GES`) | `IMPORTED` faune et flore vasculaire | `PARTIAL` selon groupes | Anciennes régions à préserver | **Très haute** |
+| Grand Est (`GES`) | `IMPORTED` faune et flore vasculaire | `IMPORTED` 10 groupes faune unifiés ; `PARTIAL` reste | Anciennes régions à préserver | **Haute** (flore LRR / historiques) |
 | Hauts-de-France (`HDF`) | `PARTIAL` | `PARTIAL` | Anciennes régions à préserver | Moyenne |
 | Île-de-France (`IDF`) | `READY` | `PARTIAL` selon groupes | À compléter via ARB/CBNBP | Haute |
 | Normandie (`NOR`) | `PARTIAL` | `READY` selon groupes unifiés | Anciennes régions à préserver | Haute |
@@ -207,18 +207,24 @@ Chercher le fichier opérationnel utilisé pour l'inventaire ZNIEFF corse avant 
 - Les listes intègrent des niveaux de priorité et plusieurs entités naturelles ; conserver ces portées/qualificatifs plutôt que de les écraser.
 - Ne pas extraire l'annexe PDF comme substitut d'un tableur officiel.
 
-#### Listes rouges — `PARTIAL` selon groupes
+#### Listes rouges — `IMPORTED` (10 groupes faune) + `PARTIAL` pour le reste
 
 - **Hub LRR Grand Est** : https://www.grand-est.developpement-durable.gouv.fr/listes-rouges-grand-est-a22124.html
-- Page vérifiée en avril 2026.
-- Plusieurs groupes faunistiques disposent de listes rouges unifiées Grand Est et de tableaux téléchargeables.
+- **Dépôt opérationnel ODONAT** : https://www.odonat-grandest.fr/telechargements/Listes_rouges/
+- **Groupes importés** (tableurs XLSX, SHA-256 fail-closed) :
+  - amphibiens 2023, reptiles 2023 (`LISTE_ROUGE_AMPHIBIA_REPTILIA.xlsx`) ;
+  - mollusques 2023 v1.1, odonates 2023, orthoptères 2024 ;
+  - oiseaux nicheurs 2024 ;
+  - branchiopodes 2025, décapodes 2025, papillons de jour 2025, poissons 2024.
+- **Identifiants pipeline** : `dreal-ges-odonat-lrr-<groupe>-…` (10 paquets, ~904 statuts, raccord TAXREF 100 % sur les taxons ancrés).
+- **Exclus volontairement** : oiseaux hivernants (conflit de catégorie avec nicheurs sur les mêmes taxons) ; récapitulatif PDF ; taxons `ID_TAX=NA` / formes populationnelles sans ancrage TAXREF.
 - **Listes historiques** : https://www.grand-est.developpement-durable.gouv.fr/listes-rouges-regionales-historiques-a18396.html
-- Tant qu'un groupe n'a pas de LRR Grand Est unifiée, les anciennes listes Alsace / Champagne-Ardenne / Lorraine doivent rester des portées partielles.
+- Tant qu'un groupe n'a pas de LRR Grand Est unifiée (mammifères, flore, etc.), les anciennes listes Alsace / Champagne-Ardenne / Lorraine doivent rester des portées partielles.
 - **Flore** : ne pas inventer une LRR unifiée Grand Est ; des travaux restent à mener sur plusieurs groupes floristiques.
 
 #### Action suivante
 
-Importer les LRR unifiées groupe par groupe en laissant les anciennes régions explicites pour le reste.
+Surveiller les révisions ODONAT ; brancher mammifères / flore dès publication d'un tableur unifié ; conserver les historiques pour les groupes non couverts.
 
 ---
 
@@ -424,6 +430,7 @@ Cette section doit être relue avant chaque nouvelle vague d'enrichissement.
 | NAQ protections flore 2026 | Avis/proposition CSRPN repéré | Attendre le texte/référentiel final applicable |
 | NAQ PEE/EEE 2022 | Fichier public mais métadonnées internes « v0.9 non validée » | Ne pas importer avant clarification |
 | ARA flore LRR unifiée | Travail annoncé, horizon 2027 | Conserver les portées historiques jusqu'à publication |
+| GES LRR faune unifiée (10 groupes) | Importée via ODONAT | Surveiller révisions ; hors périmètre : hivernants, mammifères, flore |
 | GES flore LRR unifiée | Couverture encore incomplète | Conserver les anciennes régions pour les groupes non unifiés |
 | HDF | Nombreux jeux encore issus de Picardie / Nord-Pas-de-Calais | Ne jamais étendre automatiquement à toute la région |
 | Normandie ZNIEFF | Transition Basse-/Haute-Normandie vers jeux unifiés | Conserver la portée historique jusqu'à remplacement démontré |
@@ -450,13 +457,13 @@ Pour chaque nouvelle source ou nouveau millésime :
 
 À données accessibles et validées égales :
 
-1. **Grand Est** — LRR unifiées groupe par groupe (ZNIEFF faune/flore déjà importées).
-2. **Bretagne** — responsabilité biologique régionale (ZNIEFF/LRR OEB déjà branchés).
-3. **Île-de-France** — LRR par groupe (ZNIEFF déjà faite).
-4. **Normandie** — ZNIEFF (LRR déjà faites).
+1. **Bretagne** — responsabilité biologique régionale (ZNIEFF/LRR OEB déjà branchés).
+2. **Île-de-France** — LRR par groupe (ZNIEFF déjà faite).
+3. **Normandie** — ZNIEFF (LRR déjà faites).
+4. **Grand Est** — reste LRR mammifères/flore/historiques (10 groupes faune déjà importés).
 5. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
 6. **Centre-Val de Loire** et **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
 7. **Hauts-de-France**, **ARA LRR**, **Corse** — portées historiques / consolidation.
-8. **PACA / PDL / NAQ** — déjà importés pour les lots ZNIEFF (et LRR PACA) ; surveiller révisions.
+8. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune** — déjà importés ; surveiller révisions.
 
 Cet ordre n'est pas une hiérarchie écologique : il vise le meilleur rapport **fiabilité de la source / caractère structuré / gain métier / coût d'adaptation**.

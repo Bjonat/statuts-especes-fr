@@ -87,4 +87,28 @@ La ZNIEFF flore Grand Est LEDZflora v1.0 (août 2024) est également importée :
 - raccord TAXREF 100 % ;
 - sentinelle `Achillea nobilis` (`CD_REF 79914`).
 
-Les listes rouges unifiées restent un chantier séparé.
+## Listes rouges régionales unifiées — 10 groupes faune
+
+État vérifié le 25/08/2026.
+
+- Hub DREAL : `https://www.grand-est.developpement-durable.gouv.fr/listes-rouges-grand-est-a22124.html`
+- Fichiers opérationnels ODONAT : `https://www.odonat-grandest.fr/telechargements/Listes_rouges/`
+- Scripts : `download_odonat_lrr.sh` (SHA-256 fail-closed) + `build_odonat_lrr.py`
+- Smoke : `.github/workflows/ges-lrr-smoke.yml`
+
+| Groupe | Identifiant | Millésime | SHA-256 (préfixe) | Sentinelle |
+|---|---|---|---|---|
+| Amphibiens | `dreal-ges-odonat-lrr-amphibiens-2023` | v1.0 / 2023 | `0c284571…` | `Alytes obstetricans` 197 = NT |
+| Reptiles | `dreal-ges-odonat-lrr-reptiles-2023` | v1.0 / 2023 | idem fichier herpéto | `Vipera berus` 78141 = CR |
+| Mollusques | `dreal-ges-odonat-lrr-mollusques-2023-v1.1` | v1.1 / 2023 | `4f87fbaf…` | `Margaritifera margaritifera` 64435 = CR |
+| Odonates | `dreal-ges-odonat-lrr-odonates-2023` | v1.0 / 2023 | `9756dfc7…` | `Lestes virens` 65202 = EN |
+| Orthoptères | `dreal-ges-odonat-lrr-orthopteres-2024` | v1.0 / 2024 | `a7737aa5…` | `Polysarcus denticauda` 65641 = CR |
+| Oiseaux nicheurs | `dreal-ges-odonat-lrr-oiseaux-nicheurs-2024` | LRGE_OIn_1.0 / 2024 | `e1ae86e4…` | `Prunella collaris` 3984 = CR* |
+| Branchiopodes | `dreal-ges-odonat-lrr-branchiopodes-2025` | LRGE_CRBR_1.0 / 2025 | `0839fe53…` | `Lynceus brachyurus` 348263 = EN |
+| Décapodes | `dreal-ges-odonat-lrr-decapodes-2025` | LRGE_ECC_1.0 / 2025 | `7405bb35…` | `Astacus astacus` 18432 = CR* |
+| Papillons de jour | `dreal-ges-odonat-lrr-papillons-jour-2025` | LRGE_RHO_1.0 / 2025 | `42ed23a5…` | `Parnassius mnemosyne` 1042429 = RE |
+| Poissons | `dreal-ges-odonat-lrr-poissons-2024` | LRGE_POI_1.0 / 2024 | `326f5846…` | `Petromyzon marinus` 66315 = CR |
+
+Volume normalisé : **904** statuts régionaux ; raccord TAXREF **100 %** sur les lignes à `CD_NOM` / `ID_TAX` numérique. Les catégories détaillées (`CR*`, `NAI`, `NAO`, `NAR`, `NANC`) sont conservées.
+
+Hors vague 1 : oiseaux hivernants (conflit avec nicheurs), mammifères (pas de tableur unifié), flore unifiée, listes historiques Alsace / Champagne-Ardenne / Lorraine.

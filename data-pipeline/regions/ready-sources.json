@@ -169,6 +169,75 @@
       ]
     },
     {
+      "id": "dreal-ges-odonat-lrr-unifiees",
+      "region": "GES",
+      "categories": [
+        "red_list_regional"
+      ],
+      "realms": [
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.grand-est.developpement-durable.gouv.fr/listes-rouges-grand-est-a22124.html",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "group": "amphibiens-reptiles",
+          "url": "https://www.odonat-grandest.fr/telechargements/Listes_rouges/LISTE_ROUGE_AMPHIBIA_REPTILIA.xlsx",
+          "sha256": "0c284571af56c70c31b956994fd0b880c62a1088a267bae6a8eb048f2cbb7d40"
+        },
+        {
+          "kind": "xlsx",
+          "group": "mollusques",
+          "url": "https://www.odonat-grandest.fr/telechargements/Listes_rouges/LISTE_ROUGE_MOLLUSQUES.xlsx",
+          "sha256": "4f87fbaf6a4d9b0541ba73db1a24331df40e41aeae347cdc0cf32441c7512a16"
+        },
+        {
+          "kind": "xlsx",
+          "group": "odonates",
+          "url": "https://www.odonat-grandest.fr/telechargements/Listes_rouges/LISTE_ROUGE_ODONATES.xlsx",
+          "sha256": "9756dfc768502c78526bfa13cf5d7e4c25fbb36a66e2de2ca166fba754e8604a"
+        },
+        {
+          "kind": "xlsx",
+          "group": "orthopteres",
+          "url": "https://www.odonat-grandest.fr/telechargements/Listes_rouges/LISTE_ROUGE_ORTHOPTERES_v1_0.xlsx",
+          "sha256": "a7737aa5fd8c8a782e7f5b8e3967912705c4b87bb4daff1a9a6b60313f3bee71"
+        },
+        {
+          "kind": "xlsx",
+          "group": "oiseaux-nicheurs",
+          "url": "https://www.odonat-grandest.fr/telechargements/Listes_rouges/LISTE_ROUGE_OISEAUX_NICHEURS_v1.0.xlsx",
+          "sha256": "e1ae86e45082c11bba9c7b22392cb8adc7efd10697e01b0eab22ce95b09fb07c"
+        },
+        {
+          "kind": "xlsx",
+          "group": "branchiopodes",
+          "url": "https://www.odonat-grandest.fr/telechargements/Listes_rouges/LISTE_ROUGE_BRANCHIOPODES.xlsx",
+          "sha256": "0839fe5311c37d1f7557d9890086ac9c83c401f8cfe5362869c836856a50f5e3"
+        },
+        {
+          "kind": "xlsx",
+          "group": "decapodes",
+          "url": "https://www.odonat-grandest.fr/telechargements/Listes_rouges/LISTE_ROUGE_DECAPODES.xlsx",
+          "sha256": "7405bb352198c20f0103662dbeb2084fa1890d72ff8dac454386a414205deefe"
+        },
+        {
+          "kind": "xlsx",
+          "group": "papillons-jour",
+          "url": "https://www.odonat-grandest.fr/telechargements/Listes_rouges/LISTE_ROUGE_PAPILLONS_JOUR.xlsx",
+          "sha256": "42ed23a590156e41fb272f429803b4cd2ca13076da6fa2f8dc03592ce2640859"
+        },
+        {
+          "kind": "xlsx",
+          "group": "poissons",
+          "url": "https://www.odonat-grandest.fr/telechargements/Listes_rouges/LISTE_ROUGE_POISSONS.xlsx",
+          "sha256": "326f5846535a4e12abcbc063a9398650280bb98ed9ff4e048b7705991778d5c4"
+        }
+      ],
+      "notes": "Oiseaux hivernants exclus (conflit de catégorie avec nicheurs). Mammifères / flore unifiée absents du dépôt ODONAT. Anciennes régions historiques hors vague 1."
+    },
+    {
       "id": "drieat-idf-znieff",
       "region": "IDF",
       "categories": [
