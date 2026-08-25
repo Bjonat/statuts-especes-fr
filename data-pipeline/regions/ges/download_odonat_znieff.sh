@@ -9,7 +9,7 @@ fi
 target="$1"
 direct='https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_faunev2_2_juin2026.xlsx'
 mirror='https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx'
-expected='a130de0436237ebde5b4fcee582ac8890bdadeed679cda96d4896f9082866c1f'
+expected='8b5e6026c844c3ca469d4adc9e75fd6e74532a1f6ad68c2ad8d08d54e00f5dfa'
 
 mkdir -p "$(dirname "$target")"
 direct_ok=false

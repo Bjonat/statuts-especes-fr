@@ -10,7 +10,7 @@
 - Miroir institutionnel : `https://www.odonat-grandest.fr/znieff-documents-telechargeables/`.
 - Ressource opérationnelle : XLSX `listes_especes-determinantes-znieff_grand-est_juin2026.xlsx`.
 - Millésime du jeu : LEDZfauna v2.2 — juin 2026.
-- SHA-256 du fichier importé : `a130de0436237ebde5b4fcee582ac8890bdadeed679cda96d4896f9082866c1f`.
+- SHA-256 du fichier importé : `8b5e6026c844c3ca469d4adc9e75fd6e74532a1f6ad68c2ad8d08d54e00f5dfa`.
 
 ### Disponibilité et reproductibilité
 
@@ -80,4 +80,11 @@ L'adaptateur ZNIEFF faune Grand Est est branché dans :
 - le build du dataset officiel ;
 - le bundle PWA/FTP de production.
 
-La ZNIEFF flore Grand Est et les listes rouges unifiées restent des chantiers séparés. Elles ne doivent pas être déduites de cette source faune.
+La ZNIEFF flore Grand Est LEDZflora v1.0 (août 2024) est également importée :
+
+- SHA-256 : `d95b53ebaff27683b58476f8cd4dd39b59190fd3f9e571da284e6d936174af1d` ;
+- 1 027 déterminantes régionales, 3 830 statuts normalisés ;
+- raccord TAXREF 100 % ;
+- sentinelle `Achillea nobilis` (`CD_REF 79914`).
+
+Les listes rouges unifiées restent un chantier séparé.

@@ -104,6 +104,8 @@ const cvlFlora = await loadStatuses('flora', 'CVL')
 const naqFlora = await loadStatuses('flora', 'NAQ')
 const cvlFauna = await loadStatuses('fauna', 'CVL')
 const gesFauna = await loadStatuses('fauna', 'GES')
+const gesFlora = await loadStatuses('flora', 'GES')
+const bfcFauna = await loadStatuses('fauna', 'BFC')
 
 const naqZnieffSourceId = 'obv-na-znieff-flore-2019-v1.2'
 if (manifest.sources.some((source) => source.id === naqZnieffSourceId)) {
@@ -171,6 +173,37 @@ if (manifest.sources.some((source) => source.id === gesZnieffSourceId)) {
   )
 }
 
+const gesFloraZnieffSourceId = 'dreal-ges-znieff-flora-2024-08-v1.0'
+if (manifest.sources.some((source) => source.id === gesFloraZnieffSourceId)) {
+  const gesFloraZnieff = gesFlora.filter((status) => status.category === 'znieff' && status.sourceId === gesFloraZnieffSourceId)
+  const achillea = gesFloraZnieff.filter((status) => status.cdRef === 79914)
+  assert.ok(
+    achillea.some((status) => status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui'),
+    'Achillea nobilis: déterminante ZNIEFF Grand Est flore',
+  )
+  assert.ok(
+    achillea.some((status) => status.label === 'Priorité ZNIEFF' && status.scope === 'partial' && status.scopeLabel === 'Massif vosgien'),
+    'Achillea nobilis: priorité Vosges conservée comme portée partielle',
+  )
+}
+
+const bfcSourceId = 'dreal-bfc-statuts-2026-03-03'
+if (manifest.sources.some((source) => source.id === bfcSourceId)) {
+  const triturus = bfcFauna.filter((status) => status.cdRef === 139 && status.sourceId === bfcSourceId)
+  assert.ok(
+    triturus.some((status) => status.category === 'znieff' && status.scope === 'regional' && status.value === 'Oui'),
+    'Triturus cristatus: déterminante ZNIEFF Bourgogne-Franche-Comté',
+  )
+  assert.ok(
+    triturus.some((status) => status.category === 'red_list_regional' && status.scope === 'partial' && status.scopeLabel === 'ancienne région Bourgogne' && status.value === 'VU'),
+    'Triturus cristatus: LRR Bourgogne partielle',
+  )
+  assert.ok(
+    triturus.some((status) => status.category === 'red_list_regional' && status.scope === 'partial' && status.scopeLabel === 'ancienne région Franche-Comté' && status.value === 'VU'),
+    'Triturus cristatus: LRR Franche-Comté partielle',
+  )
+}
+
 console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
@@ -180,6 +213,12 @@ if (manifest.sources.some((source) => source.id === naqZnieffSourceId)) {
 }
 if (manifest.sources.some((source) => source.id === gesZnieffSourceId)) {
   console.log('- enrichissement régional: ZNIEFF faune Grand Est v2.2 (juin 2026)')
+}
+if (manifest.sources.some((source) => source.id === gesFloraZnieffSourceId)) {
+  console.log('- enrichissement régional: ZNIEFF flore Grand Est v1.0 (août 2024)')
+}
+if (manifest.sources.some((source) => source.id === bfcSourceId)) {
+  console.log('- enrichissement régional: tableur maître BFC 03/03/2026')
 }
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {

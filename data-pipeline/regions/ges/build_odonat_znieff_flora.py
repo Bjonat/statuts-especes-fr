@@ -13,17 +13,14 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
-SOURCE_ID = "dreal-ges-odonat-znieff-fauna-2026-v2.2"
-SOURCE_URL = "https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx"
-SOURCE_SHA256 = "8b5e6026c844c3ca469d4adc9e75fd6e74532a1f6ad68c2ad8d08d54e00f5dfa"
-DREAL_URL = "https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_faunev2_2_juin2026.xlsx"
+SOURCE_ID = "dreal-ges-znieff-flora-2024-08-v1.0"
+SOURCE_URL = "https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_florev1_08_2024_2_.xlsx"
+SOURCE_SHA256 = "d95b53ebaff27683b58476f8cd4dd39b59190fd3f9e571da284e6d936174af1d"
 LANDING_URL = "https://www.grand-est.developpement-durable.gouv.fr/les-nouvelles-listes-d-especes-determinantes-a22851.html"
-ODONAT_LANDING_URL = "https://www.odonat-grandest.fr/znieff-documents-telechargeables/"
 
 SEARCHABLE_RANKS = {"ES", "SSES", "VAR", "SVAR", "FO", "CAR", "RACE", "AGES"}
 REGIONAL_CATEGORIES = {"EDZ", "EDZ*", "AEE", "AEE*", "NC", "NE"}
 DETERMINANT_CATEGORIES = {"EDZ", "EDZ*"}
-DEMOTED_CATEGORIES = {"AEE", "AEE*"}
 MAX_VALUE_LENGTH = 80
 
 NATURAL_UNITS = {
@@ -85,11 +82,11 @@ def find_header(rows: list[list[object]], required: set[str]) -> tuple[int, dict
 
 
 def source_rows(path: Path):
-    harmonized = workbook_rows(path, "LISTE FAUNE EDZ AEE GRAND EST")
-    h_index, h_cols = find_header(harmonized, {"CD_REF", "LB_NOM", "RANG", "DETZ_GE", "DETZ_BC", "DETZ_AL", "DETZ_V", "DETZ_RJ"})
-
-    waiting = workbook_rows(path, "LISTE FAUNE BDD ZNIEFF GRANDEST")
-    w_index, w_cols = find_header(waiting, {"CD_REF", "LB_NOM", "RANG", "EDZ_AEE"})
+    harmonized = workbook_rows(path, "LISTE FLORE EDZ AEE GRAND EST")
+    h_index, h_cols = find_header(
+        harmonized,
+        {"CD_REF", "LB_NOM", "RANG", "DETZ_GE", "DETZ_BC", "DETZ_AL", "DETZ_V", "DETZ_RJ"},
+    )
 
     def records(rows, start, cols):
         for row in rows[start + 1 :]:
@@ -97,13 +94,13 @@ def source_rows(path: Path):
             if any(clean(value) for value in record.values()):
                 yield record
 
-    return list(records(harmonized, h_index, h_cols)), list(records(waiting, w_index, w_cols))
+    return list(records(harmonized, h_index, h_cols))
 
 
-def collect_wanted(harmonized, waiting):
+def collect_wanted(harmonized):
     codes: set[int] = set()
     names: set[str] = set()
-    for row in [*harmonized, *waiting]:
+    for row in harmonized:
         code = as_int(row.get("CD_REF"))
         if code:
             codes.add(code)
@@ -126,10 +123,10 @@ def taxref_lookup(path: Path, wanted_codes: set[int], wanted_names: set[str]):
             if not cd_nom or not cd_ref:
                 continue
             kingdom = clean(row.get("REGNE"))
-            if normalize(kingdom) != "animalia":
+            if normalize(kingdom) != "plantae":
                 continue
             rank = clean(row.get("RANG")).upper()
-            entry = (cd_ref, "fauna", rank)
+            entry = (cd_ref, "flora", rank)
             if cd_nom in wanted_codes:
                 by_cd_nom[cd_nom] = entry
             if cd_ref in wanted_codes and cd_nom == cd_ref:
@@ -209,17 +206,15 @@ def add_status(statuses, seen, record):
 def build_package(taxref_path: Path, source_path: Path, checked_at: str):
     digest = sha256(source_path)
     if digest != SOURCE_SHA256:
-        raise RuntimeError(f"SHA-256 Grand Est inattendu: {digest} != {SOURCE_SHA256}")
+        raise RuntimeError(f"SHA-256 Grand Est flore inattendu: {digest} != {SOURCE_SHA256}")
 
-    harmonized, waiting = source_rows(source_path)
-    wanted_codes, wanted_names = collect_wanted(harmonized, waiting)
+    harmonized = source_rows(source_path)
+    wanted_codes, wanted_names = collect_wanted(harmonized)
     by_cd_nom, by_cd_ref, by_name = taxref_lookup(taxref_path, wanted_codes, wanted_names)
 
     diagnostics = Counter()
     diagnostics["harmonizedRows"] = len(harmonized)
-    diagnostics["waitingRows"] = len(waiting)
     category_counts = Counter()
-    waiting_counts = Counter()
     priority_counts = Counter()
     resolution_modes = Counter()
     unresolved = []
@@ -308,22 +303,6 @@ def build_package(taxref_path: Path, source_path: Path, checked_at: str):
         }):
             diagnostics["surcotationStatuses"] += 1
 
-    # La feuille BDD rassemble les groupes non encore harmonisés. Lorsqu'un taxon y
-    # est explicitement rétrogradé AEE/AEE*, on retire les anciens statuts EDZ des
-    # trois ex-régions sans le republier comme espèce déterminante.
-    for row in waiting:
-        category = clean(row.get("EDZ_AEE")).upper()
-        if category:
-            waiting_counts[category] += 1
-        if category not in DEMOTED_CATEGORIES:
-            continue
-        cd_ref, realm, rank, mode = resolve(row, by_cd_nom, by_cd_ref, by_name)
-        resolution_modes[f"waiting:{mode}"] += 1
-        if cd_ref is None or realm is None:
-            continue
-        replacement_refs.add(cd_ref)
-        diagnostics["waitingDemotedRefs"] += 1
-
     candidates = diagnostics["matchedHarmonized"] + diagnostics["unmatched"] + diagnostics["ambiguous"]
     match_rate = diagnostics["matchedHarmonized"] / candidates if candidates else 1.0
     diagnostics["replacementRefs"] = len(replacement_refs)
@@ -333,22 +312,21 @@ def build_package(taxref_path: Path, source_path: Path, checked_at: str):
         "schemaVersion": 1,
         "source": {
             "id": SOURCE_ID,
-            "name": "Liste des espèces déterminantes ZNIEFF - Faune Grand Est",
-            "producer": "DREAL Grand Est / CSRPN Grand Est / ODONAT Grand Est",
-            "version": "LEDZfauna v2.2 - juin 2026",
-            "publicationYear": 2026,
+            "name": "Liste des espèces déterminantes ZNIEFF - Flore vasculaire Grand Est",
+            "producer": "DREAL Grand Est / CSRPN Grand Est / Conservatoire botanique Alsace-Lorraine",
+            "version": "LEDZflora v1.0 - août 2024",
+            "publicationYear": 2024,
             "official": True,
             "checkedAt": checked_at,
             "sha256": digest,
             "landingPage": LANDING_URL,
             "sourceUrl": SOURCE_URL,
-            "mirrorLandingPage": ODONAT_LANDING_URL,
-            "canonicalSourceUrl": DREAL_URL,
+            "canonicalSourceUrl": SOURCE_URL,
         },
         "replaces": [{
             "region": "GES",
             "category": "znieff",
-            "realm": "fauna",
+            "realm": "flora",
             "cdRefs": sorted(replacement_refs),
         }],
         "statuses": sorted(statuses, key=lambda status: (
@@ -358,7 +336,6 @@ def build_package(taxref_path: Path, source_path: Path, checked_at: str):
             **dict(diagnostics),
             "matchRate": round(match_rate, 6),
             "categories": dict(sorted(category_counts.items())),
-            "waitingCategories": dict(sorted(waiting_counts.items())),
             "priorityValues": dict(sorted(priority_counts.items())),
             "resolutionModes": dict(sorted(resolution_modes.items())),
             "unresolvedSample": unresolved,
@@ -380,14 +357,14 @@ def main():
     print(json.dumps(diagnostics, ensure_ascii=False, indent=2))
     if diagnostics["matchRate"] < args.min_match_rate:
         raise SystemExit(
-            f"Taux de raccord TAXREF Grand Est insuffisant: {diagnostics['matchRate']:.2%} < {args.min_match_rate:.2%}"
+            f"Taux de raccord TAXREF Grand Est flore insuffisant: {diagnostics['matchRate']:.2%} < {args.min_match_rate:.2%}"
         )
     if diagnostics["regionalDeterminantStatuses"] < 250:
-        raise SystemExit(f"Volume EDZ Grand Est anormalement faible: {diagnostics['regionalDeterminantStatuses']}")
+        raise SystemExit(f"Volume EDZ Grand Est flore anormalement faible: {diagnostics['regionalDeterminantStatuses']}")
     if diagnostics["replacementRefs"] < 400:
-        raise SystemExit(f"Couverture Grand Est anormalement faible: {diagnostics['replacementRefs']}")
+        raise SystemExit(f"Couverture Grand Est flore anormalement faible: {diagnostics['replacementRefs']}")
     if not package["statuses"]:
-        raise SystemExit("Aucun statut ZNIEFF Grand Est produit")
+        raise SystemExit("Aucun statut ZNIEFF flore Grand Est produit")
 
     output = Path(args.out)
     output.parent.mkdir(parents=True, exist_ok=True)

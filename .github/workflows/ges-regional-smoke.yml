@@ -48,7 +48,14 @@ jobs:
           bash data-pipeline/regions/ges/download_odonat_znieff.sh "$RUNNER_TEMP/ges-fauna.xlsx"
           echo "GES_FAUNA_SOURCE=$RUNNER_TEMP/ges-fauna.xlsx" >> "$GITHUB_ENV"
 
-      - name: Build Grand Est fauna package
+      - name: Download DREAL Grand Est ZNIEFF flora v1.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ges/download_odonat_znieff_flora.sh "$RUNNER_TEMP/ges-flora.xlsx"
+          echo "GES_FLORA_SOURCE=$RUNNER_TEMP/ges-flora.xlsx" >> "$GITHUB_ENV"
+
+      - name: Build Grand Est fauna and flora packages
         shell: bash
         run: |
           set -euo pipefail
@@ -57,45 +64,61 @@ jobs:
             --taxref "$TAXREF_FILE" \
             --source "$GES_FAUNA_SOURCE" \
             --out "$RUNNER_TEMP/ges-packages/ges-znieff-fauna.json" \
-            --checked-at 2026-08-22 \
+            --checked-at 2026-08-25 \
+            --min-match-rate 0.98
+          python data-pipeline/regions/ges/build_odonat_znieff_flora.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$GES_FLORA_SOURCE" \
+            --out "$RUNNER_TEMP/ges-packages/ges-znieff-flora.json" \
+            --checked-at 2026-08-25 \
             --min-match-rate 0.98
           echo "GES_PACKAGES_DIR=$RUNNER_TEMP/ges-packages" >> "$GITHUB_ENV"
 
-      - name: Validate regional package and sentinel
+      - name: Validate regional packages and sentinels
         shell: bash
         run: |
           REGIONAL_DIR="$GES_PACKAGES_DIR" node --input-type=module - <<'NODE'
           import { loadRegionalPackages } from './data-pipeline/regional.mjs'
           const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
-          if (packages.length !== 1) throw new Error(`1 paquet Grand Est attendu, reçu ${packages.length}`)
-          const pkg = packages[0]
-          if (pkg.source.id !== 'dreal-ges-odonat-znieff-fauna-2026-v2.2') throw new Error('Source Grand Est inattendue')
-          if (pkg.source.sha256 !== 'a130de0436237ebde5b4fcee582ac8890bdadeed679cda96d4896f9082866c1f') throw new Error('SHA-256 Grand Est inattendu')
-          const replacement = pkg.replaces.find((rule) => rule.region === 'GES' && rule.category === 'znieff' && rule.realm === 'fauna')
-          if (!replacement || !Array.isArray(replacement.cdRefs) || replacement.cdRefs.length < 400) throw new Error('Override Grand Est insuffisamment ciblé')
-          if (pkg.statuses.length < 500) throw new Error(`Volume Grand Est anormalement faible: ${pkg.statuses.length}`)
+          if (packages.length !== 2) throw new Error(`2 paquets Grand Est attendus, reçu ${packages.length}`)
+          const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
+          const fauna = byId['dreal-ges-odonat-znieff-fauna-2026-v2.2']
+          const flora = byId['dreal-ges-znieff-flora-2024-08-v1.0']
+          if (!fauna || !flora) throw new Error('Sources Grand Est inattendues')
+          if (fauna.source.sha256 !== '8b5e6026c844c3ca469d4adc9e75fd6e74532a1f6ad68c2ad8d08d54e00f5dfa') throw new Error('SHA-256 Grand Est faune inattendu')
+          if (flora.source.sha256 !== 'd95b53ebaff27683b58476f8cd4dd39b59190fd3f9e571da284e6d936174af1d') throw new Error('SHA-256 Grand Est flore inattendu')
 
-          const rhino = pkg.statuses.filter((status) => status.cdRef === 60313)
-          const determinant = rhino.find((status) => status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui')
-          if (!determinant) throw new Error('Sentinelle Rhinolophus hipposideros: statut EDZ régional absent')
-          const priorities = new Map(rhino.filter((status) => status.label === 'Priorité ZNIEFF').map((status) => [status.scopeLabel, status.value]))
-          const expected = new Map([
-            ['Plaine de Champagne et Brie', '1 - très prioritaire'],
-            ['Plateaux lorrains et massif ardennais', '2 - prioritaire'],
-            ['Massif vosgien', '1 - très prioritaire'],
-            ['Fossé rhénan et massif jurassien', '1 - très prioritaire'],
-          ])
-          for (const [scope, value] of expected) {
-            if (priorities.get(scope) !== value) throw new Error(`Sentinelle Rhinolophus: ${scope} attendu ${value}, reçu ${priorities.get(scope)}`)
+          const faunaReplacement = fauna.replaces.find((rule) => rule.region === 'GES' && rule.category === 'znieff' && rule.realm === 'fauna')
+          if (!faunaReplacement || !Array.isArray(faunaReplacement.cdRefs) || faunaReplacement.cdRefs.length < 400) throw new Error('Override Grand Est faune insuffisamment ciblé')
+          if (fauna.statuses.length < 500) throw new Error(`Volume Grand Est faune anormalement faible: ${fauna.statuses.length}`)
+          const rhino = fauna.statuses.filter((status) => status.cdRef === 60313)
+          if (!rhino.find((status) => status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui')) {
+            throw new Error('Sentinelle Rhinolophus hipposideros: statut EDZ régional absent')
           }
-          if (!rhino.some((status) => status.label === 'Condition de surcotation ZNIEFF')) throw new Error('Sentinelle Rhinolophus: condition de surcotation absente')
-          console.log({ statuses: pkg.statuses.length, replacementRefs: replacement.cdRefs.length, diagnostics: pkg.diagnostics, rhino })
+          if (!rhino.some((status) => status.label === 'Condition de surcotation ZNIEFF')) {
+            throw new Error('Sentinelle Rhinolophus: condition de surcotation absente')
+          }
+
+          const floraReplacement = flora.replaces.find((rule) => rule.region === 'GES' && rule.category === 'znieff' && rule.realm === 'flora')
+          if (!floraReplacement || !Array.isArray(floraReplacement.cdRefs) || floraReplacement.cdRefs.length < 400) throw new Error('Override Grand Est flore insuffisamment ciblé')
+          if (flora.statuses.length < 1_000) throw new Error(`Volume Grand Est flore anormalement faible: ${flora.statuses.length}`)
+          const achillea = flora.statuses.filter((status) => status.cdRef === 79914)
+          if (!achillea.find((status) => status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui')) {
+            throw new Error('Sentinelle Achillea nobilis: statut EDZ régional absent')
+          }
+          if (!achillea.some((status) => status.label === 'Priorité ZNIEFF' && status.scope === 'partial' && status.scopeLabel === 'Massif vosgien')) {
+            throw new Error('Sentinelle Achillea nobilis: priorité Vosges absente')
+          }
+          console.log({
+            fauna: { statuses: fauna.statuses.length, replacementRefs: faunaReplacement.cdRefs.length },
+            flora: { statuses: flora.statuses.length, replacementRefs: floraReplacement.cdRefs.length },
+          })
           NODE
 
-      - name: Upload normalized package
+      - name: Upload normalized packages
         uses: actions/upload-artifact@v4
         with:
-          name: ges-znieff-fauna-regional-package
+          name: ges-znieff-regional-packages
           path: ${{ env.GES_PACKAGES_DIR }}/*.json
           if-no-files-found: error
           retention-days: 7

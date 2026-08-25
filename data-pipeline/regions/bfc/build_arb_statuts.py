@@ -13,12 +13,18 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
+OFFICIAL_SOURCE_ID = "dreal-bfc-statuts-2026-03-03"
+OFFICIAL_SHA256 = "4c16ef90ccfa016a7715aac7dc195e1e897ce27763f50937df5b687173e1ee02"
+OFFICIAL_VERSION = "2026-03-03"
+OFFICIAL_YEAR = 2026
+OFFICIAL_URL = "https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/IMG/xlsx/260303_sp_statuts_bfc.xlsx"
+
 WITNESS_SOURCE_ID = "arb-bfc-statuts-2023-12-19"
 WITNESS_SHA256 = "0912139a6f6b6902d6be22e383471b971782502e155b5ae83526bddacbcac073"
 WITNESS_VERSION = "2023-12-19"
 WITNESS_YEAR = 2023
 WITNESS_URL = "https://www.arb-bfc.fr/content/uploads/2024/06/231219_sp_statuts_bfc_a_diffuser.xlsx"
-DREAL_2026_URL = "https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/IMG/xlsx/260303_sp_statuts_bfc.xlsx"
+
 DREAL_LANDING_URL = "https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/statut-des-especes-a10460.html"
 ARB_LANDING_URL = "https://www.arb-bfc.fr/"
 
@@ -95,7 +101,7 @@ def znieff_value(raw: str) -> str | None:
     return None
 
 
-def compact_value(value: str) -> str | None:
+def compact_value(value: object) -> str | None:
     text = clean(value)
     if not text or len(text) > MAX_VALUE_LENGTH:
         return None
@@ -140,7 +146,7 @@ def read_source_rows(path: Path) -> list[dict]:
 def is_relevant(row: dict) -> bool:
     if clean(row.get("znieff_determinantes_bfc")):
         return True
-    for field in ("liste_rouge_bourgogne", "liste_rouge_franche_comte"):
+    for field in ("liste_rouge_bfc", "liste_rouge_bourgogne", "liste_rouge_franche_comte"):
         category = clean(row.get(field)).upper()
         if category and VALID_LRR_CATEGORY.fullmatch(category):
             return True
@@ -223,18 +229,38 @@ def resolve(row, by_cd_nom, by_cd_ref, by_name):
     return None, None, "", "unmatched"
 
 
+def source_profile(digest: str, allow_witness: bool) -> dict:
+    if digest == OFFICIAL_SHA256:
+        return {
+            "id": OFFICIAL_SOURCE_ID,
+            "version": OFFICIAL_VERSION,
+            "publicationYear": OFFICIAL_YEAR,
+            "sourceUrl": OFFICIAL_URL,
+            "publishable": True,
+        }
+    if digest == WITNESS_SHA256:
+        if not allow_witness:
+            raise SystemExit(
+                "Le tableur ARB 2023-12-19 est un témoin de schéma. "
+                "Passez --allow-witness-millesime pour un smoke-test, jamais pour une publication."
+            )
+        return {
+            "id": WITNESS_SOURCE_ID,
+            "version": WITNESS_VERSION,
+            "publicationYear": WITNESS_YEAR,
+            "sourceUrl": WITNESS_URL,
+            "publishable": False,
+        }
+    raise SystemExit(
+        f"SHA-256 BFC inattendu: {digest}. Attendu {OFFICIAL_SHA256} (DREAL 2026) "
+        f"ou {WITNESS_SHA256} (témoin ARB 2023)."
+    )
+
+
 def build_package(taxref_path: Path, source_path: Path, checked_at: str, allow_witness: bool):
     digest = sha256(source_path)
-    if digest != WITNESS_SHA256:
-        raise SystemExit(
-            "SHA-256 BFC inattendu. Le millésime DREAL 2026 n’est pas encore validé par cet adaptateur ; "
-            f"reçu {digest}, témoin {WITNESS_SHA256}."
-        )
-    if not allow_witness:
-        raise SystemExit(
-            "Le tableur ARB 2023-12-19 est un témoin de schéma. "
-            "Passez --allow-witness-millesime pour un smoke-test, jamais pour une publication."
-        )
+    profile = source_profile(digest, allow_witness)
+    source_id = profile["id"]
 
     rows = read_source_rows(source_path)
     relevant = [row for row in rows if is_relevant(row)]
@@ -277,7 +303,7 @@ def build_package(taxref_path: Path, source_path: Path, checked_at: str, allow_w
                 "category": "znieff",
                 "label": "Déterminante ZNIEFF",
                 "value": value,
-                "sourceId": WITNESS_SOURCE_ID,
+                "sourceId": source_id,
                 "scope": "regional",
             }):
                 diagnostics["znieffStatuses"] += 1
@@ -292,10 +318,29 @@ def build_package(taxref_path: Path, source_path: Path, checked_at: str, allow_w
                 "category": "znieff",
                 "label": "Condition de déterminance ZNIEFF",
                 "value": condition,
-                "sourceId": WITNESS_SOURCE_ID,
+                "sourceId": source_id,
                 "scope": "regional",
             }):
                 diagnostics["conditionStatuses"] += 1
+
+        unified = clean(row.get("liste_rouge_bfc")).upper()
+        if unified:
+            if not VALID_LRR_CATEGORY.fullmatch(unified):
+                diagnostics["ambiguousLrr"] += 1
+            else:
+                lrr_values[f"regional:{unified}"] += 1
+                if add_status(statuses, seen, {
+                    "cdRef": cd_ref,
+                    "region": "BFC",
+                    "category": "red_list_regional",
+                    "label": "Liste rouge régionale",
+                    "value": unified,
+                    "sourceId": source_id,
+                    "scope": "regional",
+                }):
+                    diagnostics["lrrUnifiedStatuses"] += 1
+                    diagnostics["lrrStatuses"] += 1
+                    replacement_refs["red_list_regional"][realm].add(cd_ref)
 
         for field, scope_label in (
             ("liste_rouge_bourgogne", "ancienne région Bourgogne"),
@@ -314,10 +359,11 @@ def build_package(taxref_path: Path, source_path: Path, checked_at: str, allow_w
                 "category": "red_list_regional",
                 "label": "Liste rouge régionale",
                 "value": category,
-                "sourceId": WITNESS_SOURCE_ID,
+                "sourceId": source_id,
                 "scope": "partial",
                 "scopeLabel": scope_label,
             }):
+                diagnostics["lrrPartialStatuses"] += 1
                 diagnostics["lrrStatuses"] += 1
                 replacement_refs["red_list_regional"][realm].add(cd_ref)
 
@@ -334,23 +380,26 @@ def build_package(taxref_path: Path, source_path: Path, checked_at: str, allow_w
                     "cdRefs": sorted(refs),
                 })
 
+    source = {
+        "id": source_id,
+        "name": "Statuts des espèces de Bourgogne-Franche-Comté",
+        "producer": "DREAL Bourgogne-Franche-Comté / ARB BFC / Sigogne / CSRPN Bourgogne-Franche-Comté",
+        "version": profile["version"],
+        "publicationYear": profile["publicationYear"],
+        "official": True,
+        "checkedAt": checked_at,
+        "sha256": digest,
+        "landingPage": DREAL_LANDING_URL,
+        "sourceUrl": profile["sourceUrl"],
+        "canonicalSourceUrl": OFFICIAL_URL,
+    }
+    if not profile["publishable"]:
+        source["mirrorLandingPage"] = ARB_LANDING_URL
+        source["publicationPolicy"] = "schema-witness-smoke-only"
+
     return {
         "schemaVersion": 1,
-        "source": {
-            "id": WITNESS_SOURCE_ID,
-            "name": "Statuts des espèces de Bourgogne-Franche-Comté",
-            "producer": "DREAL Bourgogne-Franche-Comté / ARB BFC / Sigogne / CSRPN Bourgogne-Franche-Comté",
-            "version": WITNESS_VERSION,
-            "publicationYear": WITNESS_YEAR,
-            "official": True,
-            "checkedAt": checked_at,
-            "sha256": digest,
-            "landingPage": DREAL_LANDING_URL,
-            "sourceUrl": WITNESS_URL,
-            "mirrorLandingPage": ARB_LANDING_URL,
-            "canonicalSourceUrl": DREAL_2026_URL,
-            "publicationPolicy": "schema-witness-smoke-only",
-        },
+        "source": source,
         "replaces": replaces,
         "statuses": sorted(statuses, key=lambda status: (
             status["cdRef"], status["category"], status["label"], status.get("scopeLabel", ""), status["value"]
@@ -401,8 +450,8 @@ def main():
     output = Path(args.out)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(package, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
-    print(f"Paquet régional témoin écrit: {output} - {len(package['statuses'])} statuts")
-    print("Ce paquet ne doit pas être fusionné dans le dataset officiel tant que le millésime DREAL 2026 n’est pas validé.")
+    label = "publiable" if package["source"]["id"] == OFFICIAL_SOURCE_ID else "témoin"
+    print(f"Paquet régional BFC {label} écrit: {output} - {len(package['statuses'])} statuts")
 
 
 if __name__ == "__main__":

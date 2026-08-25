@@ -170,6 +170,20 @@ jobs:
           bash data-pipeline/regions/ges/download_odonat_znieff.sh "$RUNNER_TEMP/ges-znieff-fauna.xlsx"
           echo "GES_ZNIEFF_FAUNA_FILE=$RUNNER_TEMP/ges-znieff-fauna.xlsx" >> "$GITHUB_ENV"
 
+      - name: Download regional Grand Est ZNIEFF flora source
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ges/download_odonat_znieff_flora.sh "$RUNNER_TEMP/ges-znieff-flora.xlsx"
+          echo "GES_ZNIEFF_FLORA_FILE=$RUNNER_TEMP/ges-znieff-flora.xlsx" >> "$GITHUB_ENV"
+
+      - name: Download regional BFC master status workbook
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/bfc/download_arb_statuts.sh "$RUNNER_TEMP/bfc-statuts.xlsx"
+          echo "BFC_SOURCE=$RUNNER_TEMP/bfc-statuts.xlsx" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         run: |
           python data-pipeline/regions/ara/build_dreal_znieff.py \
@@ -210,6 +224,16 @@ jobs:
             --source "$GES_ZNIEFF_FAUNA_FILE" \
             --out "$REGIONAL_DIR/ges-znieff-fauna.json" \
             --min-match-rate 0.98
+          python data-pipeline/regions/ges/build_odonat_znieff_flora.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$GES_ZNIEFF_FLORA_FILE" \
+            --out "$REGIONAL_DIR/ges-znieff-flora.json" \
+            --min-match-rate 0.98
+          python data-pipeline/regions/bfc/build_arb_statuts.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$BFC_SOURCE" \
+            --out "$REGIONAL_DIR/bfc-statuts.json" \
+            --min-match-rate 0.97
 
       - name: Run tests
         run: npm test
@@ -240,6 +264,8 @@ jobs:
             'arb-cvl-lrr-papillons-2024',
             'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
             'dreal-ges-odonat-znieff-fauna-2026-v2.2',
+            'dreal-ges-znieff-flora-2024-08-v1.0',
+            'dreal-bfc-statuts-2026-03-03',
           ]
           const ids = new Set(manifest.sources.map((source) => source.id))
           for (const id of required) {
@@ -304,6 +330,8 @@ jobs:
             'arb-cvl-lrr-papillons-2024',
             'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
             'dreal-ges-odonat-znieff-fauna-2026-v2.2',
+            'dreal-ges-znieff-flora-2024-08-v1.0',
+            'dreal-bfc-statuts-2026-03-03',
           ]
           const ids = new Set(dataManifest.sources.map((source) => source.id))
           for (const id of required) {
