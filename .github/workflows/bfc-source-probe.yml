@@ -1,0 +1,103 @@
+name: BFC master status source probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/REGIONAL_SOURCES.md'
+      - 'data-pipeline/regions/ready-sources.json'
+      - 'data-pipeline/regions/bfc/**'
+      - '.github/workflows/bfc-source-probe.yml'
+      - '.github/workflows/bfc-regional-smoke.yml'
+
+jobs:
+  probe-bfc-master:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install workbook inspector
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Probe DREAL 2026 official workbook
+        shell: bash
+        run: |
+          set -euo pipefail
+          canonical='https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/IMG/xlsx/260303_sp_statuts_bfc.xlsx'
+          target="$RUNNER_TEMP/bfc-2026.xlsx"
+          curl --fail --location --retry 2 --silent --show-error "$canonical" -o "$target" || true
+          if [ -f "$target" ] && [ "$(head -c 2 "$target")" = 'PK' ]; then
+            echo 'BFC_2026_AVAILABLE=true' >> "$GITHUB_ENV"
+            echo "BFC_2026_FILE=$target" >> "$GITHUB_ENV"
+            sha256sum "$target"
+          else
+            echo 'BFC_2026_AVAILABLE=false' >> "$GITHUB_ENV"
+            echo '::warning::Tableur DREAL BFC 03/03/2026 momentanément indisponible ; le millésime ARB 2023-12-19 reste un témoin de schéma, pas un substitut publiable.'
+          fi
+
+      - name: Inspect official 2026 workbook when available
+        if: env.BFC_2026_AVAILABLE == 'true'
+        run: python data-pipeline/regions/inspect_workbook.py "$BFC_2026_FILE"
+
+      - name: Inspect ARB 2023 schema witness
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://www.arb-bfc.fr/content/uploads/2024/06/231219_sp_statuts_bfc_a_diffuser.xlsx'
+          target="$RUNNER_TEMP/bfc-2023-arb.xlsx"
+          expected='0912139a6f6b6902d6be22e383471b971782502e155b5ae83526bddacbcac073'
+          curl --fail --location --retry 3 --silent --show-error "$url" -o "$target"
+          test "$(head -c 2 "$target")" = 'PK'
+          actual="$(sha256sum "$target" | cut -d' ' -f1)"
+          echo "ARB BFC 2023-12-19 SHA-256: $actual"
+          if [ "$actual" != "$expected" ]; then
+            echo "SHA-256 ARB BFC inattendu: $actual != $expected" >&2
+            exit 1
+          fi
+          python data-pipeline/regions/inspect_workbook.py "$target"
+          python - "$target" <<'PY'
+          import sys
+          from collections import Counter
+          from openpyxl import load_workbook
+
+          wb = load_workbook(sys.argv[1], read_only=True, data_only=True)
+          ws = wb['Liste_espèces']
+          rows = ws.iter_rows(values_only=True)
+          header = [str(value or '').strip() for value in next(rows)]
+          required = {
+              'cd_ref', 'nom_scientifique', 'znieff_determinantes_bfc',
+              'liste_rouge_bourgogne', 'liste_rouge_franche_comte',
+          }
+          if not required.issubset(header):
+              raise SystemExit(f'Colonnes BFC manquantes: {sorted(required - set(header))}')
+          znieff = Counter()
+          lrr_b = 0
+          lrr_fc = 0
+          taxa = 0
+          for row in rows:
+              record = dict(zip(header, row))
+              if not record.get('cd_ref'):
+                  continue
+              taxa += 1
+              value = str(record.get('znieff_determinantes_bfc') or '').strip()
+              if value:
+                  znieff[value] += 1
+              if str(record.get('liste_rouge_bourgogne') or '').strip():
+                  lrr_b += 1
+              if str(record.get('liste_rouge_franche_comte') or '').strip():
+                  lrr_fc += 1
+          print({
+              'taxons': taxa,
+              'znieffValues': dict(znieff),
+              'lrrBourgogne': lrr_b,
+              'lrrFrancheComte': lrr_fc,
+              'note': 'Témoin de schéma 2023-12-19 ; ne pas publier à la place du millésime DREAL 2026.',
+          })
+          PY

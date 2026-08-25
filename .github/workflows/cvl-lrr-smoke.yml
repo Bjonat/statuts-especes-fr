@@ -1,0 +1,118 @@
+name: CVL regional red lists smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/cvl/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/cvl-lrr-smoke.yml'
+
+jobs:
+  build-cvl-lrr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install PDF text extractor
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 \
+            https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip \
+            -o "$RUNNER_TEMP/taxref.zip" \
+          || curl --fail --location --retry 3 \
+            https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip \
+            -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download current CVL red-list publications
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cvl-lrr"
+          curl --fail --location --retry 3 \
+            'https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/2025-01/LRodonatesRCVL2022-VF2ok.pdf' \
+            -o "$RUNNER_TEMP/cvl-lrr/odonates-2022.pdf"
+          curl --fail --location --retry 3 \
+            'https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/listes%20rouges/LRR-papillons_2024_vf-4.pdf' \
+            -o "$RUNNER_TEMP/cvl-lrr/papillons-2024.pdf"
+          curl --fail --location --retry 3 \
+            'https://www.laboratoireecoentomologie.com/wp-content/uploads/2026/02/Chapelin-Viscardi-et-al.-2025.-LRR-CVdL-Gyrins-dytiques-donacies.pdf' \
+            -o "$RUNNER_TEMP/cvl-lrr/coleopteres-2025.pdf"
+          for file in "$RUNNER_TEMP"/cvl-lrr/*.pdf; do
+            test "$(head -c 4 "$file")" = '%PDF' || { echo "::error::PDF invalide: $file"; exit 1; }
+          done
+          sha256sum "$RUNNER_TEMP"/cvl-lrr/*.pdf
+          echo "CVL_LRR_DIR=$RUNNER_TEMP/cvl-lrr" >> "$GITHUB_ENV"
+
+      - name: Build CVL regional packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cvl-packages"
+          python data-pipeline/regions/cvl/build_arb_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --odonates "$CVL_LRR_DIR/odonates-2022.pdf" \
+            --papillons "$CVL_LRR_DIR/papillons-2024.pdf" \
+            --coleopteres "$CVL_LRR_DIR/coleopteres-2025.pdf" \
+            --out-dir "$RUNNER_TEMP/cvl-packages" \
+            --min-match-rate 0.97
+          echo "CVL_PACKAGES_DIR=$RUNNER_TEMP/cvl-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional package contract
+        shell: bash
+        run: |
+          REGIONAL_DIR="$CVL_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 3) throw new Error(`3 paquets CVL attendus, reçu ${packages.length}`)
+          const expected = [
+            'arb-cvl-lrr-odonates-2022',
+            'arb-cvl-lrr-papillons-2024',
+            'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
+          ]
+          const ids = new Set(packages.map((pkg) => pkg.source.id))
+          for (const id of expected) {
+            if (!ids.has(id)) throw new Error(`Source CVL absente: ${id}`)
+          }
+          for (const pkg of packages) {
+            if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${pkg.source.id}`)
+            if (!pkg.replaces.every((rule) => rule.region === 'CVL' && rule.category === 'red_list_regional' && rule.realm === 'fauna' && Array.isArray(rule.cdRefs) && rule.cdRefs.length > 0)) {
+              throw new Error(`Override CVL non ciblé: ${pkg.source.id}`)
+            }
+          }
+          const byId = new Map(packages.map((pkg) => [pkg.source.id, pkg]))
+          const odonates = byId.get('arb-cvl-lrr-odonates-2022')
+          const papillons = byId.get('arb-cvl-lrr-papillons-2024')
+          const coleopteres = byId.get('ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025')
+          if (odonates.statuses.length !== 68 || odonates.diagnostics.matchRate !== 1) throw new Error('Odonates CVL: 68 statuts raccordés à 100 % attendus')
+          if (papillons.statuses.length !== 147 || papillons.diagnostics.matchRate !== 1) throw new Error('Papillons CVL: 147 statuts raccordés à 100 % attendus')
+          if (papillons.diagnostics.excludedWrongOrder !== 2) throw new Error(`Papillons CVL: 2 lignes Odonata parasites attendues, reçu ${papillons.diagnostics.excludedWrongOrder}`)
+          if (coleopteres.statuses.length !== 47 || coleopteres.diagnostics.matchRate !== 1) throw new Error('Coléoptères aquatiques CVL: 47 statuts raccordés à 100 % attendus')
+          console.log(packages.map((pkg) => ({ source: pkg.source.id, statuses: pkg.statuses.length, diagnostics: pkg.diagnostics })))
+          NODE
+
+      - name: Upload normalized CVL packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: cvl-lrr-regional-packages
+          path: ${{ env.CVL_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7

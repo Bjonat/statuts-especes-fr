@@ -22,7 +22,7 @@ Ce document fixe quelles sources peuvent être utilisées dans le MVP et avec qu
 - Statut MVP : **production**
 - Source : https://assets.patrinat.fr/files/referentiel/BDC.zip
 
-Ces deux archives sont téléchargées et testées directement par le workflow `data-smoke.yml`.
+Ces deux archives sont téléchargées et testées directement par les workflows de production.
 
 ## Sources régionales Centre-Val de Loire
 
@@ -32,34 +32,78 @@ Ces deux archives sont téléchargées et testées directement par le workflow `
 - Dernière mise à jour publiée : **02/04/2026**
 - Format : tableur XLS, un onglet par groupe taxonomique
 - Contenu : flore, faune et habitats déterminants ; plusieurs groupes ont des millésimes d'actualisation propres
-- Statut MVP : **source régionale prioritaire à intégrer**
+- Statut MVP : **READY_WHEN_AVAILABLE**
 - Source : https://www.centre-val-de-loire.developpement-durable.gouv.fr/habitats-et-especes-determinantes-a4278.html
 - Fichier : https://www.centre-val-de-loire.developpement-durable.gouv.fr/IMG/xls/listes_dz_cvl_actual_avril_2026.xls
 
-Règle : lorsque cette source est intégrée, elle doit pouvoir surcharger ou compléter le statut `ZDET` issu de la BDC pour le territoire Centre-Val de Loire, car elle constitue la publication régionale courante.
+Au 21/08/2026, le frontal DREAL renvoie aux runners GitHub une page de maintenance à la place du XLS. Aucun millésime antérieur ne doit être substitué silencieusement au fichier 2026.
 
-### Listes rouges régionales — DREAL Centre-Val de Loire
+Règle : lorsque cette source redevient accessible, elle doit pouvoir surcharger ou compléter le statut `ZDET` issu de la BDC pour le territoire Centre-Val de Loire, car elle constitue la publication régionale courante.
 
-- Producteur : DREAL Centre-Val de Loire / CSRPN, avec validation UICN pour la plupart des listes
+### Listes rouges régionales — audit terminé
+
+- Producteur de synthèse : DREAL Centre-Val de Loire / CSRPN
 - Page de synthèse publiée : **13/02/2026**
-- Statut MVP : **production via BDC lorsqu'une correspondance existe ; audit par groupe**
 - Source : https://www.centre-val-de-loire.developpement-durable.gouv.fr/listes-rouges-en-region-centre-val-de-loire-a1451.html
+- Statut MVP : **production**
 
-Millésimes actuellement publiés sur cette page :
+La page DREAL distingue les listes validées selon le protocole UICN des autres listes indicatives. Le pipeline ne transforme pas une liste indicative en `red_list_regional` par simple présence sur cette page.
 
-- flore vasculaire : 2013 ;
-- amphibiens : 2013 ;
-- reptiles : 2013 ;
-- oiseaux : 2013 ;
-- chiroptères : 2013 ;
-- poissons et lamproies : 2012 ;
-- mollusques : 2012 ;
-- orthoptéroïdes : 2012 ;
-- odonates : 2022 ;
-- papillons de jour : 2024 ;
-- coléoptères aquatiques (gyrins, grands dytiques, donacies) : 2025.
+#### Trois publications récentes contrôlées directement
 
-Le fait que la page DREAL soit récente ne change pas le millésime scientifique de chaque liste. L'interface doit donc afficher le millésime du référentiel lui-même, pas seulement la date de consultation du site.
+Trois listes récentes disposent désormais d'un adaptateur régional reproductible dans `data-pipeline/regions/cvl/build_arb_lrr.py` :
+
+| Groupe | Millésime | Taxons | Raccord TAXREF v18 | Source importée |
+|---|---:|---:|---:|---|
+| Odonates | 2022 | 68 | 100 % | ARB Centre-Val de Loire |
+| Papillons de jour et Zygènes | 2024 | 147 | 100 % | ARB Centre-Val de Loire |
+| Coléoptères aquatiques — Gyrins, grands Dytiques, Donacies | 2025 | 47 | 100 % | Laboratoire d'Éco-entomologie / partenaires régionaux |
+
+Total : **262 relations LRR régionales contrôlées directement**.
+
+Contrôles appliqués :
+
+- téléchargement de la publication originale et contrôle de signature PDF ;
+- SHA-256 enregistré dans les métadonnées du paquet ;
+- extraction textuelle déterministe via Poppler ;
+- raccord au taxon accepté TAXREF avant recours aux synonymes ;
+- filtre par ordre TAXREF pour empêcher qu'un artefact de mise en page soit interprété comme une espèce du groupe ;
+- distribution UICN et nombre de taxons attendus bloquants ;
+- override BDC limité aux `CD_REF` réellement couverts par chaque publication.
+
+Le PDF Papillons 2024 contient une anomalie de couche texte : en mode `-layout`, sept lignes LC sont fragmentées et deux noms d'Odonates issus d'une ancienne maquette apparaissent au milieu du tableau. Le parseur utilise donc `pdftotext -raw` et exige `ORDRE = Lepidoptera` dans TAXREF. Le résultat est exactement **147/147**, sans exception codée taxon par taxon.
+
+#### Audit BDC v18 pour les autres groupes
+
+Un audit direct de `BDC_18/bdc_18_01.csv` a trouvé **3 564 relations `LRR` applicables à `INSEER24`**, toutes à portée régionale Centre-Val de Loire. Les documents BDC sont :
+
+| `CD_DOC` | Groupe / document | Relations BDC |
+|---:|---|---:|
+| 188890 | Liste rouge des plantes vasculaires de la région Centre — 2013 | 2 746 |
+| 186089 | Oiseaux nicheurs — 2013 | 197 |
+| 186094 | Mollusques — 2012 | 166 |
+| 443486 | Papillons de jour et Zygènes — 2024 | 147 |
+| 186091 | Orthoptères / orthoptéroïdes — 2012 | 71 |
+| 411507 | Odonates — 2022 | 68 |
+| 186092 | Poissons — 2012 | 55 |
+| 188889 | Mammifères hors chiroptères — 2013 | 47 |
+| 186069 | Chiroptères — 2013 | 24 |
+| 186068 | Amphibiens — document BDC cité 2012 | 21 |
+| 186093 | Reptiles — document BDC cité 2012 | 16 |
+| 188888 | Écrevisses — 2013 | 6 |
+
+Cet audit confirme notamment que BDC v18 contient déjà exactement les **147 Papillons 2024** (`CD_DOC 443486`) et les **68 Odonates 2022** (`CD_DOC 411507`). Les paquets régionaux correspondants servent donc surtout à rendre la provenance, le hash et la validation reproductibles.
+
+En revanche, **aucun document LRR BDC applicable au Centre-Val de Loire ne couvre les Coléoptères aquatiques 2025**. Le paquet 2025 constitue donc un enrichissement effectif du socle BDC v18.
+
+La page DREAL 2026 affiche les millésimes « Amphibiens 2013 » et « Reptiles 2013 », alors que les citations documentaires enregistrées dans BDC v18 et les noms de fichiers historiques indiquent 2012. Cette divergence est conservée comme métadonnée de source ; elle ne doit pas être corrigée silencieusement dans les données.
+
+#### Décision pipeline LRR CVL
+
+- conserver BDC v18 pour les groupes historiques tant qu'aucune publication plus récente n'est validée ;
+- appliquer les trois paquets régionaux 2022/2024/2025 uniquement aux `CD_REF` qu'ils couvrent ;
+- ne pas importer les « autres listes » non UICN comme des listes rouges régionales ;
+- surveiller les révisions annoncées des oiseaux, amphibiens, reptiles, poissons et macrocrustacés et écrire un nouvel override uniquement lors de la publication d'un référentiel final.
 
 ### Catalogue de la flore vasculaire / rareté — CBN du Bassin parisien
 
@@ -92,7 +136,8 @@ La date de synchronisation de l'application ne doit jamais être confondue avec 
 
 1. TAXREF v18 + BDC v18 — **fait** ;
 2. tests sentinelles sur des espèces réelles — **fait dans le pipeline** ;
-3. liste ZNIEFF DREAL 2026 — prochain adaptateur régional ;
-4. validation des listes rouges par groupe contre les publications DREAL ;
-5. rareté / indigénat CBNBP uniquement avec millésime explicite ;
-6. test terrain sur téléphone en mode avion.
+3. audit des listes rouges par groupe contre BDC v18 — **fait** ;
+4. Odonates 2022, Papillons/Zygènes 2024 et Coléoptères aquatiques 2025 — **intégrés et validés** ;
+5. liste ZNIEFF DREAL 2026 — **en attente du retour du fichier XLS officiel** ;
+6. rareté / indigénat CBNBP uniquement avec millésime explicite ;
+7. test terrain sur téléphone en mode avion.

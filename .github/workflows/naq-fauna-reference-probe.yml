@@ -1,0 +1,84 @@
+name: NAQ FAUNA reference probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/naq-fauna-reference-probe.yml'
+
+jobs:
+  probe-fauna-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download FAUNA reference page
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            'https://observatoire-fauna.fr/programmes/referentiel-especes/rechercher-especes' \
+            -o "$RUNNER_TEMP/fauna.html"
+          test -s "$RUNNER_TEMP/fauna.html"
+
+      - name: Inspect inline download logic
+        shell: bash
+        run: |
+          PAGE="$RUNNER_TEMP/fauna.html" python - <<'PY'
+          import os, re
+          from pathlib import Path
+
+          text = Path(os.environ['PAGE']).read_text(encoding='utf-8', errors='replace')
+          print('download-csv occurrences:', text.count('download-csv'))
+          for token in ['download-csv', 'csv', 'export', 'ajax', 'fetch(', 'XMLHttpRequest', 'telechargement', 'referentiel']:
+              print(f'===== {token} =====')
+              for match in list(re.finditer(re.escape(token), text, flags=re.I))[:30]:
+                  start = max(0, match.start() - 500)
+                  end = min(len(text), match.end() + 900)
+                  snippet = re.sub(r'\s+', ' ', text[start:end])
+                  print(snippet)
+                  print('---')
+
+          print('===== relative endpoint candidates =====')
+          candidates = set()
+          patterns = [
+              r'["\'](/[^"\']*(?:csv|export|download|referentiel|référentiel)[^"\']*)["\']',
+              r'(?:url|href)\s*[:=]\s*["\']([^"\']+)["\']',
+          ]
+          for pattern in patterns:
+              for value in re.findall(pattern, text, flags=re.I):
+                  if any(word in value.casefold() for word in ('csv', 'export', 'download', 'referentiel', 'référentiel')):
+                      candidates.add(value)
+          for value in sorted(candidates):
+              print(value)
+          PY
+
+      - name: Inspect scripts referenced by page
+        shell: bash
+        run: |
+          PAGE="$RUNNER_TEMP/fauna.html" python - <<'PY'
+          import os, re, urllib.parse, urllib.request
+          from pathlib import Path
+
+          text = Path(os.environ['PAGE']).read_text(encoding='utf-8', errors='replace')
+          sources = re.findall(r'<script[^>]+src=["\']([^"\']+)', text, flags=re.I)
+          print('scripts:', sources)
+          for src in sources:
+              url = urllib.parse.urljoin('https://observatoire-fauna.fr/programmes/referentiel-especes/rechercher-especes', src)
+              try:
+                  data = urllib.request.urlopen(url, timeout=30).read().decode('utf-8', 'replace')
+              except Exception as exc:
+                  print('FAILED', url, exc)
+                  continue
+              hits = []
+              for token in ('download-csv', 'referentiel', 'csv', 'export'):
+                  for match in list(re.finditer(token, data, flags=re.I))[:20]:
+                      hits.append(re.sub(r'\s+', ' ', data[max(0, match.start()-350):match.end()+650]))
+              if hits:
+                  print('===== SCRIPT', url, '=====')
+                  for hit in hits[:60]:
+                      print(hit)
+                      print('---')
+          PY

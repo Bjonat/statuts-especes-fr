@@ -1,0 +1,179 @@
+name: ARA ZNIEFF source delivery probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/ara-source-probe.yml'
+  workflow_dispatch:
+
+jobs:
+  probe-ara-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Probe DREAL landing page and download variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          landing='https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/les-especes-et-habitats-determinantes-des-znieff-a19735.html?lang=fr'
+          direct='https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods'
+          ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36'
+          cookies="$RUNNER_TEMP/ara-cookies.txt"
+
+          echo '===== LANDING PAGE ====='
+          curl --fail --location --silent --show-error \
+            --user-agent "$ua" \
+            --cookie-jar "$cookies" \
+            -D "$RUNNER_TEMP/landing.headers" \
+            "$landing" -o "$RUNNER_TEMP/landing.html"
+          head -n 20 "$RUNNER_TEMP/landing.headers"
+          echo "landing bytes=$(wc -c < "$RUNNER_TEMP/landing.html")"
+          grep -oE 'href="[^"]*2023-06_listes_especes_determinantes_znieff_aura_internet\.ods[^"]*"' "$RUNNER_TEMP/landing.html" || true
+          grep -oi 'Maintenance en cours' "$RUNNER_TEMP/landing.html" | head || true
+
+          urls=(
+            "$direct"
+            "${direct}?download=1"
+            "${direct}?lang=fr"
+            "https://webissimo.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods"
+          )
+
+          i=0
+          for url in "${urls[@]}"; do
+            i=$((i+1))
+            out="$RUNNER_TEMP/ara-$i.bin"
+            hdr="$RUNNER_TEMP/ara-$i.headers"
+            echo "===== VARIANT $i ====="
+            echo "$url"
+            set +e
+            curl --location --silent --show-error \
+              --user-agent "$ua" \
+              --referer "$landing" \
+              --cookie "$cookies" \
+              --header 'Accept: application/vnd.oasis.opendocument.spreadsheet,application/octet-stream,*/*;q=0.8' \
+              --http1.1 \
+              -D "$hdr" \
+              "$url" -o "$out"
+            rc=$?
+            set -e
+            echo "curl_rc=$rc bytes=$(wc -c < "$out" 2>/dev/null || echo 0)"
+            head -n 30 "$hdr" || true
+            file "$out" || true
+            head -c 64 "$out" | xxd || true
+            if unzip -t "$out" >/dev/null 2>&1; then
+              echo "SUCCESS_VARIANT=$i"
+              unzip -l "$out" | head -n 30
+            else
+              grep -ao 'Maintenance en cours' "$out" | head || true
+            fi
+          done
+
+      - name: Probe Wayback archive for official ODS
+        shell: bash
+        run: |
+          set -euo pipefail
+          encoded="$(python - <<'PY'
+          import urllib.parse
+          print(urllib.parse.quote('https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods', safe=''))
+          PY
+          )"
+          api="https://archive.org/wayback/available?url=$encoded"
+          echo "WAYBACK_API=$api"
+          curl --fail --location --retry 3 --silent --show-error "$api" -o "$RUNNER_TEMP/wayback.json"
+          cat "$RUNNER_TEMP/wayback.json"
+          snapshot="$(python - "$RUNNER_TEMP/wayback.json" <<'PY'
+          import json, sys
+          data=json.load(open(sys.argv[1], encoding='utf-8'))
+          closest=data.get('archived_snapshots', {}).get('closest', {})
+          print(closest.get('url', '') if closest.get('available') else '')
+          PY
+          )"
+          test -n "$snapshot"
+          snapshot="${snapshot/http:\/\//https://}"
+          echo "WAYBACK_SNAPSHOT=$snapshot"
+          curl --fail --location --retry 3 --silent --show-error "$snapshot" -o "$RUNNER_TEMP/ara-wayback.ods"
+          echo "wayback bytes=$(wc -c < "$RUNNER_TEMP/ara-wayback.ods")"
+          file "$RUNNER_TEMP/ara-wayback.ods"
+          sha256sum "$RUNNER_TEMP/ara-wayback.ods"
+          unzip -t "$RUNNER_TEMP/ara-wayback.ods" >/dev/null
+          echo 'WAYBACK_ODS_OK=1'
+
+      - name: Inspect ODS sheets and headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - "$RUNNER_TEMP/ara-wayback.ods" <<'PY'
+          import json
+          import sys
+          import zipfile
+          from xml.etree import ElementTree as ET
+
+          path = sys.argv[1]
+          ns = {
+              'office': 'urn:oasis:names:tc:opendocument:xmlns:office:1.0',
+              'table': 'urn:oasis:names:tc:opendocument:xmlns:table:1.0',
+              'text': 'urn:oasis:names:tc:opendocument:xmlns:text:1.0',
+          }
+          with zipfile.ZipFile(path) as archive:
+              root = ET.fromstring(archive.read('content.xml'))
+          spreadsheet = root.find('office:body/office:spreadsheet', ns)
+          assert spreadsheet is not None
+
+          def cell_text(cell):
+              parts = []
+              for p in cell.findall('.//text:p', ns):
+                  text = ''.join(p.itertext()).strip()
+                  if text:
+                      parts.append(text)
+              if parts:
+                  return ' | '.join(parts)
+              for attr in (
+                  '{urn:oasis:names:tc:opendocument:xmlns:office:1.0}string-value',
+                  '{urn:oasis:names:tc:opendocument:xmlns:office:1.0}value',
+              ):
+                  if attr in cell.attrib:
+                      return cell.attrib[attr]
+              return ''
+
+          report = []
+          for sheet in spreadsheet.findall('table:table', ns):
+              name = sheet.attrib.get('{urn:oasis:names:tc:opendocument:xmlns:table:1.0}name', '?')
+              rows = []
+              physical_rows = 0
+              expanded_rows = 0
+              max_cols = 0
+              for row in sheet.findall('table:table-row', ns):
+                  physical_rows += 1
+                  row_repeat = int(row.attrib.get('{urn:oasis:names:tc:opendocument:xmlns:table:1.0}number-rows-repeated', '1'))
+                  expanded_rows += row_repeat
+                  values = []
+                  for cell in list(row):
+                      if cell.tag not in {
+                          '{urn:oasis:names:tc:opendocument:xmlns:table:1.0}table-cell',
+                          '{urn:oasis:names:tc:opendocument:xmlns:table:1.0}covered-table-cell',
+                      }:
+                          continue
+                      repeat = int(cell.attrib.get('{urn:oasis:names:tc:opendocument:xmlns:table:1.0}number-columns-repeated', '1'))
+                      value = cell_text(cell)
+                      values.extend([value] * min(repeat, 80 - len(values)))
+                      if len(values) >= 80:
+                          break
+                  while values and not values[-1]:
+                      values.pop()
+                  max_cols = max(max_cols, len(values))
+                  if any(v.strip() for v in values):
+                      rows.append(values)
+              report.append({
+                  'sheet': name,
+                  'physicalRows': physical_rows,
+                  'expandedRows': expanded_rows,
+                  'nonEmptyRows': len(rows),
+                  'maxColumnsObserved': max_cols,
+                  'preview': rows[:12],
+                  'headerCandidates': [r for r in rows[:80] if any(k in ' '.join(r).casefold() for k in ['cd_ref', 'cd nom', 'nom scientifique', 'massif central', 'plaine rhodanienne', 'alpine', 'mediterr'])][:10],
+              })
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          PY

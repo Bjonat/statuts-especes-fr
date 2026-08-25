@@ -1,0 +1,83 @@
+name: PACA regional source smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/pac/**'
+      - 'data-pipeline/regions/inspect_workbook.py'
+      - '.github/workflows/paca-regional-smoke.yml'
+
+jobs:
+  probe-paca-sources:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install workbook readers
+        run: python -m pip install --disable-pip-version-check openpyxl xlrd
+
+      - name: Download official PACA tables
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pac"
+          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/znieff_faune_janv-2024.xlsx' -o "$RUNNER_TEMP/pac/znieff-faune-2024.xlsx"
+          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xls/znieff_flore_2016.xls' -o "$RUNNER_TEMP/pac/znieff-flore-2016.xls"
+          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/liste_rouge_avifaune_paca_csrpn_janv2020.xlsx' -o "$RUNNER_TEMP/pac/lrr-oiseaux-2020.xlsx"
+          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lr_paca_odonates_2017_web.xlsx' -o "$RUNNER_TEMP/pac/lrr-odonates-2017.xlsx"
+          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/tableau_simplifie_lrr-pap_2024.xlsx' -o "$RUNNER_TEMP/pac/lrr-papillons-2024.xlsx"
+          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/LR_PACA_Flore_2015_web.xlsx' -o "$RUNNER_TEMP/pac/lrr-flore-2015.xlsx"
+          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lrr_paca_reptiles_amphibiens_2016.xlsx' -o "$RUNNER_TEMP/pac/lrr-herpetofaune-2016.xlsx"
+          curl --fail --location --retry 3 'https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lr_paca_orthop_2018_web.xlsx' -o "$RUNNER_TEMP/pac/lrr-orthopteres-2018.xlsx"
+
+          maintenance=0
+          for file in "$RUNNER_TEMP"/pac/*; do
+            if head -c 512 "$file" | grep -Eqi '<!doctype html|<html'; then
+              if grep -qi 'Maintenance en cours' "$file"; then
+                echo "::warning::$(basename "$file"): source DREAL PACA momentanément indisponible (page Maintenance en cours)."
+                maintenance=$((maintenance + 1))
+                continue
+              fi
+              echo "::error::$(basename "$file"): page HTML inattendue reçue à la place du référentiel."
+              exit 1
+            fi
+
+            case "$file" in
+              *.xlsx)
+                test "$(head -c 2 "$file")" = 'PK' || { echo "::error::Signature XLSX invalide: $file"; exit 1; }
+                ;;
+              *.xls)
+                test "$(head -c 8 "$file" | xxd -p)" = 'd0cf11e0a1b11ae1' || { echo "::error::Signature XLS invalide: $file"; exit 1; }
+                ;;
+            esac
+          done
+
+          sha256sum "$RUNNER_TEMP"/pac/*
+          echo "PAC_DIR=$RUNNER_TEMP/pac" >> "$GITHUB_ENV"
+          echo "PAC_MAINTENANCE_COUNT=$maintenance" >> "$GITHUB_ENV"
+          if [ "$maintenance" -gt 0 ]; then
+            echo "::notice::$maintenance source(s) PACA non inspectable(s) pendant la maintenance DREAL ; ce run reste informatif."
+          fi
+
+      - name: Inspect available PACA schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          inspected=0
+          for file in "$PAC_DIR"/*; do
+            if head -c 512 "$file" | grep -Eqi '<!doctype html|<html'; then
+              continue
+            fi
+            echo "===== $file ====="
+            python data-pipeline/regions/inspect_workbook.py "$file"
+            inspected=$((inspected + 1))
+          done
+          echo "PACA: $inspected fichier(s) structuré(s) inspecté(s), ${PAC_MAINTENANCE_COUNT:-0} indisponible(s)."

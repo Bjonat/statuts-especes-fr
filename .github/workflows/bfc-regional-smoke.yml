@@ -1,0 +1,126 @@
+name: BFC regional source smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/bfc/**'
+      - 'data-pipeline/regional.mjs'
+      - 'data-pipeline/validate-generated.mjs'
+      - '.github/workflows/bfc-regional-smoke.yml'
+
+jobs:
+  build-bfc-statuts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install XLSX reader
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download DREAL BFC 2026 workbook
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/bfc/download_arb_statuts.sh "$RUNNER_TEMP/bfc-statuts.xlsx"
+          echo "BFC_SOURCE=$RUNNER_TEMP/bfc-statuts.xlsx" >> "$GITHUB_ENV"
+
+      - name: Build BFC 2026 package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bfc-packages"
+          python data-pipeline/regions/bfc/build_arb_statuts.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$BFC_SOURCE" \
+            --out "$RUNNER_TEMP/bfc-packages/bfc-statuts.json" \
+            --checked-at 2026-08-25 \
+            --min-match-rate 0.97
+          echo "BFC_PACKAGES_DIR=$RUNNER_TEMP/bfc-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional package and sentinel
+        shell: bash
+        run: |
+          REGIONAL_DIR="$BFC_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages, UNPUBLISHABLE_SOURCE_IDS } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 1) throw new Error(`1 paquet BFC attendu, reçu ${packages.length}`)
+          const pkg = packages[0]
+          if (pkg.source.id !== 'dreal-bfc-statuts-2026-03-03') throw new Error('Source BFC inattendue')
+          if (UNPUBLISHABLE_SOURCE_IDS.has(pkg.source.id)) throw new Error('Le millésime BFC 2026 ne doit pas être marqué non publiable')
+          if (pkg.source.sha256 !== '4c16ef90ccfa016a7715aac7dc195e1e897ce27763f50937df5b687173e1ee02') {
+            throw new Error('SHA-256 BFC 2026 inattendu')
+          }
+          if ('url' in pkg.source) throw new Error('Le paquet BFC ne doit pas embarquer de champ url')
+          if (pkg.source.publicationPolicy) throw new Error('Le millésime BFC 2026 ne doit pas porter de politique témoin')
+
+          const znieff = pkg.replaces.filter((rule) => rule.category === 'znieff')
+          const lrr = pkg.replaces.filter((rule) => rule.category === 'red_list_regional')
+          if (znieff.length < 1 || !znieff.every((rule) => Array.isArray(rule.cdRefs) && rule.cdRefs.length > 0)) {
+            throw new Error('Overrides ZNIEFF BFC non ciblés')
+          }
+          if (lrr.length < 1 || !lrr.every((rule) => Array.isArray(rule.cdRefs) && rule.cdRefs.length > 0)) {
+            throw new Error('Overrides LRR BFC non ciblés')
+          }
+          if (pkg.statuses.length < 5_000) throw new Error(`Volume BFC anormalement faible: ${pkg.statuses.length}`)
+          if ((pkg.diagnostics?.lrrUnifiedStatuses ?? 0) < 500) {
+            throw new Error('Volume LRR unifiée BFC anormalement faible')
+          }
+
+          const triturus = pkg.statuses.filter((status) => status.cdRef === 139)
+          const determinant = triturus.find((status) => status.category === 'znieff' && status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui')
+          if (!determinant) throw new Error('Sentinelle Triturus cristatus: ZNIEFF régionale absente')
+          const bourgogne = triturus.find((status) => status.category === 'red_list_regional' && status.scope === 'partial' && status.scopeLabel === 'ancienne région Bourgogne' && status.value === 'VU')
+          const franche = triturus.find((status) => status.category === 'red_list_regional' && status.scope === 'partial' && status.scopeLabel === 'ancienne région Franche-Comté' && status.value === 'VU')
+          if (!bourgogne || !franche) throw new Error('Sentinelle Triturus cristatus: LRR partielles Bourgogne/Franche-Comté absentes')
+          if (triturus.some((status) => status.category === 'red_list_regional' && status.scope === 'regional')) {
+            throw new Error('Sentinelle Triturus cristatus: une LRR unifiée a été inventée pour ce taxon')
+          }
+          console.log({ statuses: pkg.statuses.length, diagnostics: pkg.diagnostics, triturus })
+          NODE
+
+      - name: Keep ARB 2023 witness guarded
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/bfc/download_arb_witness.sh "$RUNNER_TEMP/bfc-witness.xlsx"
+          if python data-pipeline/regions/bfc/build_arb_statuts.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$RUNNER_TEMP/bfc-witness.xlsx" \
+            --out "$RUNNER_TEMP/bfc-should-not-exist.json"; then
+            echo "Le témoin 2023 a été accepté sans --allow-witness-millesime" >&2
+            exit 1
+          fi
+          test ! -f "$RUNNER_TEMP/bfc-should-not-exist.json"
+
+      - name: Upload normalized package
+        uses: actions/upload-artifact@v4
+        with:
+          name: bfc-statuts-regional-package
+          path: ${{ env.BFC_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7

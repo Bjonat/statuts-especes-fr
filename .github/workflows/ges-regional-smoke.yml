@@ -1,0 +1,124 @@
+name: Grand Est ZNIEFF regional source smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/ges/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/ges-regional-smoke.yml'
+
+jobs:
+  build-ges-znieff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install XLSX reader
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download ODONAT Grand Est ZNIEFF fauna v2.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ges/download_odonat_znieff.sh "$RUNNER_TEMP/ges-fauna.xlsx"
+          echo "GES_FAUNA_SOURCE=$RUNNER_TEMP/ges-fauna.xlsx" >> "$GITHUB_ENV"
+
+      - name: Download DREAL Grand Est ZNIEFF flora v1.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ges/download_odonat_znieff_flora.sh "$RUNNER_TEMP/ges-flora.xlsx"
+          echo "GES_FLORA_SOURCE=$RUNNER_TEMP/ges-flora.xlsx" >> "$GITHUB_ENV"
+
+      - name: Build Grand Est fauna and flora packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ges-packages"
+          python data-pipeline/regions/ges/build_odonat_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$GES_FAUNA_SOURCE" \
+            --out "$RUNNER_TEMP/ges-packages/ges-znieff-fauna.json" \
+            --checked-at 2026-08-25 \
+            --min-match-rate 0.98
+          python data-pipeline/regions/ges/build_odonat_znieff_flora.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$GES_FLORA_SOURCE" \
+            --out "$RUNNER_TEMP/ges-packages/ges-znieff-flora.json" \
+            --checked-at 2026-08-25 \
+            --min-match-rate 0.98
+          echo "GES_PACKAGES_DIR=$RUNNER_TEMP/ges-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional packages and sentinels
+        shell: bash
+        run: |
+          REGIONAL_DIR="$GES_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 2) throw new Error(`2 paquets Grand Est attendus, reçu ${packages.length}`)
+          const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
+          const fauna = byId['dreal-ges-odonat-znieff-fauna-2026-v2.2']
+          const flora = byId['dreal-ges-znieff-flora-2024-08-v1.0']
+          if (!fauna || !flora) throw new Error('Sources Grand Est inattendues')
+          if (fauna.source.sha256 !== '8b5e6026c844c3ca469d4adc9e75fd6e74532a1f6ad68c2ad8d08d54e00f5dfa') throw new Error('SHA-256 Grand Est faune inattendu')
+          if (flora.source.sha256 !== 'd95b53ebaff27683b58476f8cd4dd39b59190fd3f9e571da284e6d936174af1d') throw new Error('SHA-256 Grand Est flore inattendu')
+
+          const faunaReplacement = fauna.replaces.find((rule) => rule.region === 'GES' && rule.category === 'znieff' && rule.realm === 'fauna')
+          if (!faunaReplacement || !Array.isArray(faunaReplacement.cdRefs) || faunaReplacement.cdRefs.length < 400) throw new Error('Override Grand Est faune insuffisamment ciblé')
+          if (fauna.statuses.length < 500) throw new Error(`Volume Grand Est faune anormalement faible: ${fauna.statuses.length}`)
+          const rhino = fauna.statuses.filter((status) => status.cdRef === 60313)
+          if (!rhino.find((status) => status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui')) {
+            throw new Error('Sentinelle Rhinolophus hipposideros: statut EDZ régional absent')
+          }
+          if (!rhino.some((status) => status.label === 'Condition de surcotation ZNIEFF')) {
+            throw new Error('Sentinelle Rhinolophus: condition de surcotation absente')
+          }
+
+          const floraReplacement = flora.replaces.find((rule) => rule.region === 'GES' && rule.category === 'znieff' && rule.realm === 'flora')
+          if (!floraReplacement || !Array.isArray(floraReplacement.cdRefs) || floraReplacement.cdRefs.length < 400) throw new Error('Override Grand Est flore insuffisamment ciblé')
+          if (flora.statuses.length < 1_000) throw new Error(`Volume Grand Est flore anormalement faible: ${flora.statuses.length}`)
+          const achillea = flora.statuses.filter((status) => status.cdRef === 79914)
+          if (!achillea.find((status) => status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui')) {
+            throw new Error('Sentinelle Achillea nobilis: statut EDZ régional absent')
+          }
+          if (!achillea.some((status) => status.label === 'Priorité ZNIEFF' && status.scope === 'partial' && status.scopeLabel === 'Massif vosgien')) {
+            throw new Error('Sentinelle Achillea nobilis: priorité Vosges absente')
+          }
+          console.log({
+            fauna: { statuses: fauna.statuses.length, replacementRefs: faunaReplacement.cdRefs.length },
+            flora: { statuses: flora.statuses.length, replacementRefs: floraReplacement.cdRefs.length },
+          })
+          NODE
+
+      - name: Upload normalized packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: ges-znieff-regional-packages
+          path: ${{ env.GES_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7

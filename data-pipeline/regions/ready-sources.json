@@ -1,0 +1,307 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-08-25",
+  "policy": {
+    "requiredState": "READY",
+    "failClosed": true,
+    "recordSha256": true,
+    "requireTaxrefDiagnostics": true
+  },
+  "sources": [
+    {
+      "id": "dreal-ara-znieff",
+      "region": "ARA",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/les-especes-et-habitats-determinantes-des-znieff-a19735.html",
+      "resources": [
+        {
+          "kind": "ods",
+          "version": "2023-06",
+          "url": "https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods",
+          "archiveUrl": "https://web.archive.org/web/20260513033231/https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods",
+          "archiveCapturedAt": "2026-05-13",
+          "sha256": "ab505dcac9297257e8432743c4f60f5a41a7c3f527880d917d6b55f65ddf4f86"
+        }
+      ]
+    },
+    {
+      "id": "dreal-bfc-statuts-2026-03-03",
+      "region": "BFC",
+      "categories": [
+        "znieff",
+        "red_list_regional"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/statut-des-especes-a10460.html",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "2026-03-03",
+          "url": "https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/IMG/xlsx/260303_sp_statuts_bfc.xlsx",
+          "sha256": "4c16ef90ccfa016a7715aac7dc195e1e897ce27763f50937df5b687173e1ee02"
+        }
+      ]
+    },
+    {
+      "id": "arb-bfc-statuts-2023-12-19",
+      "region": "BFC",
+      "categories": [
+        "znieff",
+        "red_list_regional"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "state": "WITNESS",
+      "publicationPolicy": "schema-witness-smoke-only",
+      "landingPage": "https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/statut-des-especes-a10460.html",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "2023-12-19",
+          "url": "https://www.arb-bfc.fr/content/uploads/2024/06/231219_sp_statuts_bfc_a_diffuser.xlsx",
+          "sha256": "0912139a6f6b6902d6be22e383471b971782502e155b5ae83526bddacbcac073",
+          "note": "Témoin de schéma ; ne pas publier à la place de dreal-bfc-statuts-2026-03-03"
+        }
+      ]
+    },
+    {
+      "id": "oeb-bretagne-znieff",
+      "region": "BRE",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "landingPage": "https://data.bretagne-environnement.fr/datasets/especes-determinantes-pour-les-znieff-en-bretagne",
+      "resources": [
+        {
+          "kind": "csv",
+          "url": "https://www.data.gouv.fr/api/1/datasets/r/4ada0b2b-d56e-44a9-8532-9ca2335c625b"
+        }
+      ]
+    },
+    {
+      "id": "oeb-bretagne-lrr",
+      "region": "BRE",
+      "categories": [
+        "red_list_regional"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "landingPage": "https://data.bretagne-environnement.fr/datasets/especes-en-listes-rouges-regionales-pour-la-bretagne",
+      "resources": [
+        {
+          "kind": "csv",
+          "url": "https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96"
+        }
+      ]
+    },
+    {
+      "id": "dreal-cvl-lrr",
+      "region": "CVL",
+      "categories": [
+        "red_list_regional"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "landingPage": "https://www.centre-val-de-loire.developpement-durable.gouv.fr/listes-rouges-en-region-centre-val-de-loire-a1451.html",
+      "resourceDiscovery": "group-specific official publications"
+    },
+    {
+      "id": "dreal-ges-znieff-fauna-2026-06",
+      "region": "GES",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.grand-est.developpement-durable.gouv.fr/les-nouvelles-listes-d-especes-determinantes-a22851.html",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "LEDZfauna v2.2 - juin 2026",
+          "url": "https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx",
+          "canonicalUrl": "https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_faunev2_2_juin2026.xlsx",
+          "mirrorLandingUrl": "https://www.odonat-grandest.fr/znieff-documents-telechargeables/",
+          "sha256": "8b5e6026c844c3ca469d4adc9e75fd6e74532a1f6ad68c2ad8d08d54e00f5dfa"
+        }
+      ]
+    },
+    {
+      "id": "dreal-ges-znieff-flora-2024-08",
+      "region": "GES",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.grand-est.developpement-durable.gouv.fr/les-nouvelles-listes-d-especes-determinantes-a22851.html",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "LEDZflora v1.0 - août 2024",
+          "url": "https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_florev1_08_2024_2_.xlsx",
+          "sha256": "d95b53ebaff27683b58476f8cd4dd39b59190fd3f9e571da284e6d936174af1d"
+        }
+      ]
+    },
+    {
+      "id": "drieat-idf-znieff",
+      "region": "IDF",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "landingPage": "https://www.drieat.ile-de-france.developpement-durable.gouv.fr/liste-des-habitats-et-especes-determinants-de-a3340.html",
+      "resources": [
+        {
+          "kind": "csv",
+          "url": "https://www.drieat.ile-de-france.developpement-durable.gouv.fr/IMG/csv/inpn_-_liste_des_especes_determinantes_de_l_inventaire_znieff_-_region_ile-de-france_-_2024-10-18.csv"
+        }
+      ]
+    },
+    {
+      "id": "normandie-lrr-unifiees",
+      "region": "NOR",
+      "categories": [
+        "red_list_regional"
+      ],
+      "realms": [
+        "fauna"
+      ],
+      "landingPage": "https://www.normandie.developpement-durable.gouv.fr/les-listes-rouges-dans-le-monde-et-en-normandie-a6663.html",
+      "resourceDiscovery": "ANBDD / DREAL group-specific unified LRR"
+    },
+    {
+      "id": "dreal-naq-znieff-ready-groups",
+      "region": "NAQ",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "landingPage": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/les-listes-neo-aquitaines-a11234.html",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "group": "characees",
+          "url": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/IMG/xlsx/cbn_2023-characees_determinantes_znieff_de_nouvelle-aquitaine.xlsx"
+        },
+        {
+          "kind": "xlsx",
+          "group": "oiseaux-nicheurs",
+          "url": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/IMG/xlsx/20230316_restitutiontableaued_oiseauxnich_synth.xlsx"
+        },
+        {
+          "kind": "xlsx",
+          "group": "araignees",
+          "url": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/IMG/xlsx/listedeteraraigneesna.xlsx"
+        },
+        {
+          "kind": "xlsx",
+          "group": "amphibiens",
+          "url": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/IMG/xlsx/202409_listeespecesdeterminantesamphibiensnouvelle-aquitaine.xlsx"
+        },
+        {
+          "kind": "xlsx",
+          "group": "reptiles",
+          "url": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/IMG/xlsx/202409_listeespecesdeterminantesreptilesnouvelle-aquitaine.xlsx"
+        },
+        {
+          "kind": "xlsx",
+          "group": "mollusques-continentaux",
+          "url": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/IMG/xlsx/tab_mollusques.xlsx"
+        },
+        {
+          "kind": "xlsx",
+          "group": "orthopteres",
+          "url": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/IMG/xlsx/bonifait_duhaze-2026_orthopteres-determinants-znieff-na.xlsx",
+          "sha256": "9fdcea3444ff414d2bc12b1654dd33a1d6d8041b3766091cc031445727323388"
+        },
+        {
+          "kind": "xlsx",
+          "group": "oiseaux-marins",
+          "url": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/IMG/xlsx/tableau_dz_oiseaux_marins.xlsx"
+        }
+      ]
+    },
+    {
+      "id": "dreal-pdl-znieff-2018",
+      "region": "PDL",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "landingPage": "https://www.pays-de-la-loire.developpement-durable.gouv.fr/les-listes-des-especes-determinantes-et-habitats-a4613.html",
+      "resources": [
+        {
+          "kind": "ods",
+          "realm": "fauna",
+          "url": "https://www.pays-de-la-loire.developpement-durable.gouv.fr/IMG/ods/liste_pdl__2018_faune_vf.ods"
+        },
+        {
+          "kind": "ods",
+          "realm": "flora",
+          "url": "https://www.pays-de-la-loire.developpement-durable.gouv.fr/IMG/ods/liste_pdl__2018_flore_vf.ods"
+        }
+      ]
+    },
+    {
+      "id": "dreal-pac-znieff",
+      "region": "PAC",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "landingPage": "https://www.paca.developpement-durable.gouv.fr/actualisation-de-l-inventaire-a9673.html",
+      "resourceDiscovery": "official fauna XLSX + flora XLS"
+    },
+    {
+      "id": "dreal-pac-lrr",
+      "region": "PAC",
+      "categories": [
+        "red_list_regional"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "landingPage": "https://www.paca.developpement-durable.gouv.fr/listes-rouges-regionales-a7296.html",
+      "resourceDiscovery": "group-specific XLSX tables"
+    }
+  ]
+}

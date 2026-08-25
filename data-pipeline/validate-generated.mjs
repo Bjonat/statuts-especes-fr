@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { UNPUBLISHABLE_SOURCE_IDS } from './regional.mjs'
 
 function parseArgs(argv) {
   const args = {}
@@ -38,6 +39,11 @@ for (const source of manifest.sources) {
   assert.equal(source.official, true, `source officielle: ${source.id}`)
   assert.match(source.checkedAt ?? '', /^\d{4}-\d{2}-\d{2}$/, `date de vérification: ${source.id}`)
   assert.equal('url' in source, false, `pas de lien documentaire embarqué: ${source.id}`)
+  assert.equal(
+    UNPUBLISHABLE_SOURCE_IDS.has(source.id),
+    false,
+    `témoin de schéma non publiable embarqué: ${source.id}`,
+  )
 }
 
 const flora = await readJson(path.join(directory, manifest.files.taxa.flora.file))
@@ -47,7 +53,12 @@ assert.ok(flora.length > 20_000, 'volume flore plausible')
 assert.ok(fauna.length > 50_000, 'volume faune plausible')
 assert.ok(definitions.length > 100, 'dictionnaire de statuts plausible')
 assert.ok(definitions.every((definition) => !('citation' in definition) && !('documentUrl' in definition)), 'aucune citation longue ni URL documentaire dans les définitions')
-assert.ok(definitions.every((definition) => typeof definition.value === 'string' && definition.value.length <= 80), 'valeurs de statuts compactes pour le terrain')
+const longValues = definitions.filter((definition) => typeof definition.value !== 'string' || definition.value.length > 80)
+assert.equal(
+  longValues.length,
+  0,
+  `valeurs de statuts compactes pour le terrain: ${JSON.stringify(longValues.slice(0, 5), null, 2)}`,
+)
 
 async function loadLinks(realm, region) {
   return readJson(path.join(directory, manifest.files.statusLinks[realm][region].file))
@@ -92,17 +103,27 @@ assert.equal(alcedo?.scientificName, 'Alcedo atthis', 'Martin-pêcheur présent 
 const cvlFlora = await loadStatuses('flora', 'CVL')
 const naqFlora = await loadStatuses('flora', 'NAQ')
 const cvlFauna = await loadStatuses('fauna', 'CVL')
+const gesFauna = await loadStatuses('fauna', 'GES')
+const gesFlora = await loadStatuses('flora', 'GES')
+const bfcFauna = await loadStatuses('fauna', 'BFC')
 
 const naqZnieffSourceId = 'obv-na-znieff-flore-2019-v1.2'
 if (manifest.sources.some((source) => source.id === naqZnieffSourceId)) {
   const naqZnieff = naqFlora.filter((status) => status.category === 'znieff')
-  assert.ok(naqZnieff.length >= 1_200, 'ZNIEFF flore NAQ régional: volume plausible >= 1 200 statuts')
-  assert.ok(
-    naqZnieff.every((status) => status.sourceId === naqZnieffSourceId),
-    'ZNIEFF flore NAQ: aucune relation BDC résiduelle quand le référentiel régional est chargé',
+  const regionalNaqZnieff = naqZnieff.filter((status) => status.sourceId === naqZnieffSourceId)
+  const coveredCdRefs = new Set(regionalNaqZnieff.map((status) => status.cdRef))
+  const residualBdcOnCoveredTaxa = naqZnieff.filter(
+    (status) => status.sourceId !== naqZnieffSourceId && coveredCdRefs.has(status.cdRef),
+  )
+
+  assert.ok(regionalNaqZnieff.length >= 1_200, 'ZNIEFF flore NAQ régional: volume plausible >= 1 200 statuts')
+  assert.equal(
+    residualBdcOnCoveredTaxa.length,
+    0,
+    'ZNIEFF flore NAQ: aucun statut BDC résiduel pour les CD_REF couverts par le référentiel régional',
   )
   assert.ok(
-    naqZnieff.some((status) => status.scope === 'partial' && status.scopeLabel),
+    regionalNaqZnieff.some((status) => status.scope === 'partial' && status.scopeLabel),
     'ZNIEFF flore NAQ: les restrictions biogéographiques/départementales sont conservées',
   )
 }
@@ -138,12 +159,66 @@ const alcedoNationalProtection = findStatus(
 )
 assert.ok(alcedoNationalProtection, 'Alcedo atthis: protection nationale disponible en Centre-Val de Loire')
 
+const gesZnieffSourceId = 'dreal-ges-odonat-znieff-fauna-2026-v2.2'
+if (manifest.sources.some((source) => source.id === gesZnieffSourceId)) {
+  const gesZnieff = gesFauna.filter((status) => status.category === 'znieff' && status.sourceId === gesZnieffSourceId)
+  const rhino = gesZnieff.filter((status) => status.cdRef === 60313)
+  assert.ok(
+    rhino.some((status) => status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui'),
+    'Rhinolophus hipposideros: déterminante ZNIEFF Grand Est',
+  )
+  assert.ok(
+    rhino.some((status) => status.label === 'Priorité ZNIEFF' && status.scope === 'partial' && status.scopeLabel === 'Massif vosgien'),
+    'Rhinolophus hipposideros: priorité Vosges conservée comme portée partielle',
+  )
+}
+
+const gesFloraZnieffSourceId = 'dreal-ges-znieff-flora-2024-08-v1.0'
+if (manifest.sources.some((source) => source.id === gesFloraZnieffSourceId)) {
+  const gesFloraZnieff = gesFlora.filter((status) => status.category === 'znieff' && status.sourceId === gesFloraZnieffSourceId)
+  const achillea = gesFloraZnieff.filter((status) => status.cdRef === 79914)
+  assert.ok(
+    achillea.some((status) => status.label === 'Déterminante ZNIEFF' && status.scope === 'regional' && status.value === 'Oui'),
+    'Achillea nobilis: déterminante ZNIEFF Grand Est flore',
+  )
+  assert.ok(
+    achillea.some((status) => status.label === 'Priorité ZNIEFF' && status.scope === 'partial' && status.scopeLabel === 'Massif vosgien'),
+    'Achillea nobilis: priorité Vosges conservée comme portée partielle',
+  )
+}
+
+const bfcSourceId = 'dreal-bfc-statuts-2026-03-03'
+if (manifest.sources.some((source) => source.id === bfcSourceId)) {
+  const triturus = bfcFauna.filter((status) => status.cdRef === 139 && status.sourceId === bfcSourceId)
+  assert.ok(
+    triturus.some((status) => status.category === 'znieff' && status.scope === 'regional' && status.value === 'Oui'),
+    'Triturus cristatus: déterminante ZNIEFF Bourgogne-Franche-Comté',
+  )
+  assert.ok(
+    triturus.some((status) => status.category === 'red_list_regional' && status.scope === 'partial' && status.scopeLabel === 'ancienne région Bourgogne' && status.value === 'VU'),
+    'Triturus cristatus: LRR Bourgogne partielle',
+  )
+  assert.ok(
+    triturus.some((status) => status.category === 'red_list_regional' && status.scope === 'partial' && status.scopeLabel === 'ancienne région Franche-Comté' && status.value === 'VU'),
+    'Triturus cristatus: LRR Franche-Comté partielle',
+  )
+}
+
 console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- définitions de statut: ${definitions.length.toLocaleString('fr-FR')}`)
 if (manifest.sources.some((source) => source.id === naqZnieffSourceId)) {
   console.log('- enrichissement régional: ZNIEFF flore Nouvelle-Aquitaine v1.2 (2019)')
+}
+if (manifest.sources.some((source) => source.id === gesZnieffSourceId)) {
+  console.log('- enrichissement régional: ZNIEFF faune Grand Est v2.2 (juin 2026)')
+}
+if (manifest.sources.some((source) => source.id === gesFloraZnieffSourceId)) {
+  console.log('- enrichissement régional: ZNIEFF flore Grand Est v1.0 (août 2024)')
+}
+if (manifest.sources.some((source) => source.id === bfcSourceId)) {
+  console.log('- enrichissement régional: tableur maître BFC 03/03/2026')
 }
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {

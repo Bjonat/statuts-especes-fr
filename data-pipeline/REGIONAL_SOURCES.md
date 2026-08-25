@@ -36,17 +36,18 @@ Règles impératives :
 | `PENDING_PUBLICATION` | Travail récent/avis validé, mais jeu de données final à attendre. |
 | `RESEARCH_REQUIRED` | Pas encore de source structurée consolidée suffisamment fiable identifiée. |
 | `DO_NOT_IMPORT` | Source connue mais non validée, ambiguë ou impropre à une publication officielle. |
+| `WITNESS` | Fichier officiel exploitable pour préparer un adaptateur ou un smoke-test de schéma, interdit à la publication tant qu'un millésime plus récent n'est pas validé. |
 
 ## 3. Matrice de travail métropolitaine
 
 | Région | ZNIEFF | Listes rouges régionales | Autres attributs régionaux | Priorité d'enrichissement |
 |---|---|---|---|---|
 | Auvergne-Rhône-Alpes (`ARA`) | `READY` | `PARTIAL` | À documenter selon CBN | Haute |
-| Bourgogne-Franche-Comté (`BFC`) | `READY` via tableur maître | `READY` via tableur maître / sources groupe | Tableur maître de statuts | **Très haute** |
+| Bourgogne-Franche-Comté (`BFC`) | `IMPORTED` via tableur maître 2026 | `IMPORTED` via tableur maître 2026 | Tableur maître de statuts | **Très haute** |
 | Bretagne (`BRE`) | `READY` | `READY` | Responsabilité biologique régionale disponible | **Très haute** |
 | Centre-Val de Loire (`CVL`) | `READY_WHEN_AVAILABLE` | `READY` | Rareté/indigénat CBNBP à qualifier | Haute |
 | Corse (`COR`) | `RESEARCH_REQUIRED` pour consolidation | `PARTIAL` | À documenter | Moyenne |
-| Grand Est (`GES`) | `READY` | `PARTIAL` selon groupes | Anciennes régions à préserver | **Très haute** |
+| Grand Est (`GES`) | `IMPORTED` faune et flore vasculaire | `PARTIAL` selon groupes | Anciennes régions à préserver | **Très haute** |
 | Hauts-de-France (`HDF`) | `PARTIAL` | `PARTIAL` | Anciennes régions à préserver | Moyenne |
 | Île-de-France (`IDF`) | `READY` | `PARTIAL` selon groupes | À compléter via ARB/CBNBP | Haute |
 | Normandie (`NOR`) | `PARTIAL` | `READY` selon groupes unifiés | Anciennes régions à préserver | Haute |
@@ -85,27 +86,30 @@ Règles impératives :
 
 ### BFC — Bourgogne-Franche-Comté
 
-#### Tableur maître des statuts — `READY` — priorité très haute
+#### Tableur maître des statuts — `IMPORTED` pour 2026 — priorité très haute
 
-- **Producteur** : DREAL Bourgogne-Franche-Comté.
-- **Page officielle** : https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/statut-des-especes-a10460.html
-- **Ressource repérée** : `20260303_Statuts_Especes_BFC_xls.xlsx` (~4,6 Mio), millésime 03/03/2026.
-- **Contenu annoncé** : espèces de Bourgogne-Franche-Comté, réglementations et évaluations biologiques.
-- **Intérêt** : candidat prioritaire à un connecteur régional unique capable d'alimenter plusieurs catégories : ZNIEFF, listes rouges, protections/évaluations et éventuellement d'autres attributs patrimoniaux selon les colonnes.
+- **Producteur** : DREAL Bourgogne-Franche-Comté / ARB BFC / Sigogne.
+- **Page officielle DREAL** : https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/statut-des-especes-a10460.html
+- **Ressource officielle actuelle** : `260303_sp_statuts_bfc.xlsx`, millésime 03/03/2026.
+- **SHA-256** : `4c16ef90ccfa016a7715aac7dc195e1e897ce27763f50937df5b687173e1ee02`.
+- **Identifiant pipeline** : `dreal-bfc-statuts-2026-03-03`.
+- **Schéma** : ~28 352 taxons, `CD_REF` TAXREF, ZNIEFF BFC unifiée, LRR Bourgogne et Franche-Comté séparées, LRR BFC unifiées pour certains groupes (papillons, odonates, syrphes…), protections et autres attributs.
+- **Décision pipeline** : millésime DREAL 2026 publié. ZNIEFF en portée régionale ; LRR Bourgogne / Franche-Comté en portées partielles ; LRR BFC unifiée en portée régionale lorsqu'elle est renseignée. Le témoin ARB 2023 reste disponible pour smoke de schéma uniquement (`WITNESS`).
+- **Sentinelle** : `Triturus cristatus` (`CD_REF 139`) — ZNIEFF `Déterminante stricte`, LRR `VU` Bourgogne et `VU` Franche-Comté.
 
-#### ZNIEFF — `READY`
+#### ZNIEFF — `IMPORTED`
 
 - **Page ressources** : https://www.bourgogne-franche-comte.developpement-durable.gouv.fr/ressources-a10417.html
-- La DREAL renvoie le suivi des taxons déterminants vers le tableur « statuts espèces », annoncé comme évolutif.
+- Importées depuis le tableur maître 2026.
 
-#### Listes rouges — `READY` / selon groupes
+#### Listes rouges — `IMPORTED` / selon groupes
 
 - Utiliser en priorité les données du tableur maître lorsque la provenance et le millésime du groupe y sont explicites.
-- Vérifier les publications spécifiques lorsqu'elles sont plus récentes ; par exemple certaines évaluations faunistiques ont été validées/publiées en 2025-2026.
+- Les LRR unifiées BFC et les LRR d'anciennes régions coexistent sans chevauchement de taxons dans le millésime 2026.
 
 #### Action suivante
 
-**Région candidate n°1 après NAQ** : télécharger le tableur maître 2026, cartographier ses colonnes, mesurer sa couverture et déterminer quelles catégories BDC il peut remplacer sans perte d'information.
+Surveiller les prochaines mises à jour du tableur maître ; conserver les portées partielles Bourgogne / Franche-Comté tant qu'une LRR unifiée n'existe pas pour le groupe.
 
 ---
 
@@ -188,13 +192,20 @@ Chercher le fichier opérationnel utilisé pour l'inventaire ZNIEFF corse avant 
 
 ### GES — Grand Est
 
-#### ZNIEFF — `READY`
+#### ZNIEFF — `IMPORTED` pour la faune et la flore vasculaire
 
 - **DREAL Grand Est** : https://www.grand-est.developpement-durable.gouv.fr/les-nouvelles-listes-d-especes-determinantes-a22851.html
 - **Page vérifiée** : mise à jour indiquée au 16/07/2026.
-- **Faune** : tableur `LISTES EDZ AEE FAUNE v2.2 - 06 2026.xlsx`.
-- **Flore vasculaire** : tableur `LISTES EDZ AEE FLORE v1_08 2024.xlsx`.
+- **Faune — source utilisée par le projet** : LEDZfauna v2.2, juin 2026 ; URL DREAL en premier, miroir ODONAT Grand Est en secours.
+- **Fichier faune** : https://www.odonat-grandest.fr/wp-content/uploads/2026/08/listes_especes-determinantes-znieff_grand-est_juin2026.xlsx
+- **SHA-256 faune** : `8b5e6026c844c3ca469d4adc9e75fd6e74532a1f6ad68c2ad8d08d54e00f5dfa`.
+- **Identifiant pipeline faune** : `dreal-ges-odonat-znieff-fauna-2026-v2.2`.
+- **Flore vasculaire** : LEDZflora v1.0, août 2024 — importée.
+- **Fichier flore** : https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/listes_edz_aee_florev1_08_2024_2_.xlsx
+- **SHA-256 flore** : `d95b53ebaff27683b58476f8cd4dd39b59190fd3f9e571da284e6d936174af1d`.
+- **Identifiant pipeline flore** : `dreal-ges-znieff-flora-2024-08-v1.0`.
 - Les listes intègrent des niveaux de priorité et plusieurs entités naturelles ; conserver ces portées/qualificatifs plutôt que de les écraser.
+- Ne pas extraire l'annexe PDF comme substitut d'un tableur officiel.
 
 #### Listes rouges — `PARTIAL` selon groupes
 
@@ -207,7 +218,7 @@ Chercher le fichier opérationnel utilisé pour l'inventaire ZNIEFF corse avant 
 
 #### Action suivante
 
-Importer ZNIEFF flore/faune, puis LRR unifiées groupe par groupe en laissant les anciennes régions explicites pour le reste.
+Importer les LRR unifiées groupe par groupe en laissant les anciennes régions explicites pour le reste.
 
 ---
 
@@ -288,7 +299,7 @@ Importer les LRR unifiées sans attendre, puis traiter les ZNIEFF historiques av
 - **Fichier** : https://obv-na.fr/ofsa/ressources/4_ref_bioeval/CBN_2019-Liste_ED_ZNIEFF_flore_Nouvelle-Aquitaine_v1.2_tb.xlsx
 - **État projet** : intégrée dans la PR d'enrichissement régional ; raccord TAXREF v18 mesuré à 99,27 % lors du développement initial.
 
-**Autres listes unifiées repérées sur le portail DREAL** : characées 2023, végétations 2023, habitats naturels 2024, mammifères marins/tortues marines 2020, oiseaux nicheurs 2023, araignées 2023, amphibiens/reptiles 2024, mollusques continentaux 2025, orthoptères 2026, oiseaux marins 2026. Vérifier le fichier machine de chaque groupe avant import.
+**Autres listes unifiées repérées sur le portail DREAL** : characées 2023, végétations 2023, habitats naturels 2024, mammifères marins/tortues marines 2020, oiseaux nicheurs 2023, araignées 2023, amphibiens/reptiles 2024, mollusques continentaux 2025, orthoptères 2026 (`bonifait_duhaze-2026_orthopteres-determinants-znieff-na.xlsx`, SHA-256 `9fdcea34…`), oiseaux marins 2026. Adaptateurs encore à écrire pour ces groupes.
 
 #### Listes rouges — `PARTIAL` + `PENDING_PUBLICATION`
 
@@ -390,6 +401,8 @@ Cette section doit être relue avant chaque nouvelle vague d'enrichissement.
 
 | Sujet | État au 21/08/2026 | Action |
 |---|---|---|
+| Tableur maître BFC 03/03/2026 | Importé ; SHA-256 `4c16ef90…` | Surveiller les prochaines versions DREAL |
+| ZNIEFF flore Grand Est 08/2024 | Importée ; SHA-256 `d95b53eb…` | Surveiller les révisions LEDZflora |
 | ZNIEFF CVL 2026 | Source officielle identifiée mais DREAL renvoie une page de maintenance aux runners GitHub | Retester le fichier, ne pas utiliser 2025 comme faux 2026 |
 | ZNIEFF Occitanie flore/faune | Fichiers officiels identifiés mais même maintenance DREAL | Retester, éventuellement qualifier le comportement HTTP/User-Agent sans changer de source |
 | NAQ flore LRR 2026 | Avis CSRPN repéré | Attendre la publication finale exploitable |
@@ -422,11 +435,11 @@ Pour chaque nouvelle source ou nouveau millésime :
 
 À données accessibles et validées égales :
 
-1. **Nouvelle-Aquitaine** — poursuivre les groupes ZNIEFF unifiés après la flore déjà intégrée.
-2. **Bourgogne-Franche-Comté** — analyser le tableur maître `Statuts_Especes_BFC` 2026, potentiellement très riche.
-3. **Bretagne** — exploiter les CSV OEB ZNIEFF/LRR et la responsabilité biologique régionale.
-4. **Grand Est** — ZNIEFF 2026/2024 puis LRR unifiées groupe par groupe.
-5. **PACA** — ZNIEFF + LRR structurées.
+1. **Nouvelle-Aquitaine** — poursuivre les groupes ZNIEFF unifiés après la flore déjà intégrée (orthoptères 2026 : URL corrigée, adaptateur à écrire).
+2. **Bretagne** — exploiter les CSV OEB ZNIEFF/LRR et la responsabilité biologique régionale.
+3. **Grand Est** — LRR unifiées groupe par groupe (ZNIEFF faune/flore déjà importées).
+4. **PACA** — ZNIEFF + LRR structurées.
+5. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
 6. **Île-de-France** — CSV ZNIEFF puis LRR par groupe.
 7. **Centre-Val de Loire** et **Occitanie** — dès retour effectif des fichiers DREAL.
 8. **Normandie**, **Hauts-de-France**, **Pays de la Loire**, **ARA**, **Corse** — avec une attention particulière aux portées historiques ou aux trous de consolidation.
