@@ -1,0 +1,96 @@
+name: Normandie ZNIEFF HN flora smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/nor/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/nor-znieff-smoke.yml'
+
+jobs:
+  probe-nor-znieff-hn:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install workbook readers
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download Digitale catalogue
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/nor/download_digitale_znieff.sh "$RUNNER_TEMP/digitale-znieff.xlsx"
+          echo "NOR_ZNIEFF_SOURCE=$RUNNER_TEMP/digitale-znieff.xlsx" >> "$GITHUB_ENV"
+
+      - name: Build Haute-Normandie ZNIEFF package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nor-znieff-packages"
+          python data-pipeline/regions/nor/build_digitale_znieff_hn.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$NOR_ZNIEFF_SOURCE" \
+            --out "$RUNNER_TEMP/nor-znieff-packages/nor-znieff-hn-flora.json" \
+            --checked-at 2026-08-25 \
+            --min-match-rate 0.97
+          echo "NOR_ZNIEFF_PACKAGES_DIR=$RUNNER_TEMP/nor-znieff-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional package contract and sentinels
+        shell: bash
+        run: |
+          REGIONAL_DIR="$NOR_ZNIEFF_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 1) throw new Error(`1 paquet ZNIEFF NOR attendu, reçu ${packages.length}`)
+          const pkg = packages[0]
+          if (pkg.source.id !== 'cbnhdf-digitale-znieff-hn-flora-2026-03-31') {
+            throw new Error(`Identifiant inattendu: ${pkg.source.id}`)
+          }
+          if (pkg.source.sha256 !== '71ae71b770f7b3911349e501caaaa65ac7dba8172d12b96ef4b90d5056995c95') {
+            throw new Error(`SHA-256 inattendu: ${pkg.source.sha256}`)
+          }
+          if (pkg.statuses.length < 500) throw new Error(`Volume ZNIEFF HN anormalement faible: ${pkg.statuses.length}`)
+          const rule = pkg.replaces[0]
+          if (!rule || rule.region !== 'NOR' || rule.category !== 'znieff' || rule.realm !== 'flora' || !rule.cdRefs?.length) {
+            throw new Error('Override ZNIEFF HN invalide')
+          }
+          const osmunda = pkg.statuses.find((s) => s.cdRef === 111815 && s.value === 'Oui' && s.scope === 'partial' && s.scopeLabel === 'Haute-Normandie')
+          if (!osmunda) throw new Error('Sentinelle Osmunda regalis absente')
+          const narcissus = pkg.statuses.find((s) => s.cdRef === 109297 && s.value === 'Oui (pro parte)' && s.scope === 'partial')
+          if (!narcissus) throw new Error('Sentinelle Narcissus pseudonarcissus (pro parte) absente')
+          console.log({ statuses: pkg.statuses.length, covered: rule.cdRefs.length })
+          NODE
+
+      - name: Upload normalized package
+        uses: actions/upload-artifact@v4
+        with:
+          name: nor-znieff-hn-flora-package
+          path: ${{ env.NOR_ZNIEFF_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7
