@@ -173,12 +173,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 \
-            'https://geonature.arb-idf.fr/geonature/api/media/exports/schedules/Statuts_des_taxons_STyt8fLcp03L11.csv' \
-            -o "$RUNNER_TEMP/idf-statuts.csv"
-          grep -q '"zdet"' "$RUNNER_TEMP/idf-statuts.csv"
-          grep -q '"cd_nom"' "$RUNNER_TEMP/idf-statuts.csv"
-          sha256sum "$RUNNER_TEMP/idf-statuts.csv"
+          bash data-pipeline/regions/idf/download_geonat_statuts.sh "$RUNNER_TEMP/idf-statuts.csv"
           echo "IDF_SOURCE=$RUNNER_TEMP/idf-statuts.csv" >> "$GITHUB_ENV"
 
       - name: Download regional Centre-Val de Loire LRR sources
@@ -255,6 +250,7 @@ jobs:
           python data-pipeline/regions/bre/build_oeb.py --taxref "$TAXREF_FILE" --znieff "$BRE_ZNIEFF_FILE" --lrr "$BRE_LRR_FILE" --responsabilite "$BRE_RESPONSABILITE_FILE" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/nor/build_anbdd_lrr.py --taxref "$TAXREF_FILE" --input-dir "$NOR_LRR_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/idf/build_geonat_znieff.py --taxref "$TAXREF_FILE" --source "$IDF_SOURCE" --out "$REGIONAL_DIR/idf-znieff.json" --min-match-rate 0.97
+          python data-pipeline/regions/idf/build_geonat_lrr.py --taxref "$TAXREF_FILE" --source "$IDF_SOURCE" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/cvl/build_arb_lrr.py --taxref "$TAXREF_FILE" --odonates "$CVL_LRR_DIR/odonates-2022.pdf" --papillons "$CVL_LRR_DIR/papillons-2024.pdf" --coleopteres "$CVL_LRR_DIR/coleopteres-2025.pdf" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           python data-pipeline/regions/ges/build_odonat_znieff.py --taxref "$TAXREF_FILE" --source "$GES_ZNIEFF_FAUNA_FILE" --out "$REGIONAL_DIR/ges-znieff-fauna.json" --min-match-rate 0.98
           python data-pipeline/regions/ges/build_odonat_znieff_flora.py --taxref "$TAXREF_FILE" --source "$GES_ZNIEFF_FLORA_FILE" --out "$REGIONAL_DIR/ges-znieff-flora.json" --min-match-rate 0.98
@@ -295,6 +291,10 @@ jobs:
             'anbdd-normandie-lrr-amphibiens-2022', 'anbdd-normandie-lrr-reptiles-2022',
             'anbdd-normandie-lrr-odonates-2022', 'anbdd-normandie-lrr-orthopteres-2022',
             'anbdd-normandie-lrr-rhopaloceres-2022', 'arb-idf-geonat-statuts-znieff-2026',
+            'arb-idf-lrr-amphibiens-2023', 'arb-idf-lrr-reptiles-2023',
+            'arb-idf-lrr-oiseaux-nicheurs-2018', 'arb-idf-lrr-chiropteres-2017',
+            'arb-idf-lrr-odonates-2014', 'arb-idf-lrr-rhopaloceres-zygenes-2016',
+            'arb-idf-lrr-orthopteroides-2018', 'arb-idf-lrr-flore-vasculaire-2014',
             'arb-cvl-lrr-odonates-2022', 'arb-cvl-lrr-papillons-2024',
             'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
             'dreal-ges-odonat-znieff-fauna-2026-v2.2',

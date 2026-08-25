@@ -49,7 +49,7 @@ Règles impératives :
 | Corse (`COR`) | `RESEARCH_REQUIRED` pour consolidation | `PARTIAL` | À documenter | Moyenne |
 | Grand Est (`GES`) | `IMPORTED` faune et flore vasculaire | `IMPORTED` 10 groupes faune unifiés ; `PARTIAL` reste | Anciennes régions à préserver | **Haute** (flore LRR / historiques) |
 | Hauts-de-France (`HDF`) | `PARTIAL` | `PARTIAL` | Anciennes régions à préserver | Moyenne |
-| Île-de-France (`IDF`) | `READY` | `PARTIAL` selon groupes | À compléter via ARB/CBNBP | Haute |
+| Île-de-France (`IDF`) | `IMPORTED` (GeoNat) | `IMPORTED` 8 groupes via GeoNat ; poissons PDF hors vague | — | Surveiller GeoNat + poissons |
 | Normandie (`NOR`) | `PARTIAL` | `READY` selon groupes unifiés | Anciennes régions à préserver | Haute |
 | Nouvelle-Aquitaine (`NAQ`) | `IMPORTED` flore vasculaire + groupes unifiés | `PARTIAL` / nouveaux travaux 2026 en attente | EEE 2022 actuellement bloquée | **Très haute** |
 | Occitanie (`OCC`) | `READY_WHEN_AVAILABLE` | `PARTIAL` / travaux 2026 en attente | Zones biogéographiques à conserver | **Très haute** |
@@ -256,23 +256,24 @@ Construire d'abord un modèle de portées historiques robuste, puis importer les
 
 ### IDF — Île-de-France
 
-#### ZNIEFF — `READY`
+#### ZNIEFF — `IMPORTED`
 
-- **Producteur** : DRIEAT Île-de-France.
-- **Page officielle** : https://www.drieat.ile-de-france.developpement-durable.gouv.fr/liste-des-habitats-et-especes-determinants-de-a3340.html
-- **Page vérifiée** : mise à jour indiquée au 23/07/2026.
-- **Format** : CSV disponible pour la liste des espèces déterminantes ZNIEFF.
-- La liste est mise à jour de façon continue et des ajouts 2026 sont signalés pour certains groupes.
+- **Producteur opérationnel** : ARB Île-de-France / GeoNat'îdF (`arb-idf-geonat-statuts-znieff-2026`).
+- **CSV GeoNat** : https://geonature.arb-idf.fr/geonature/api/media/exports/schedules/Statuts_des_taxons_STyt8fLcp03L11.csv
+- **DRIEAT** conserve une page ZNIEFF de référence ; le pipeline utilise l'export GeoNat (CD_NOM + zdet).
 
-#### Listes rouges — `PARTIAL` selon groupes
+#### Listes rouges — `IMPORTED` (8 groupes GeoNat) + `PARTIAL` poissons
 
 - **ARB Île-de-France — publications** : https://www.arb-idf.fr/nos-ressources/publications/
-- Les LRR sont publiées groupe par groupe et avec des millésimes différents ; utiliser la publication officielle la plus récente pour chaque groupe.
-- Ne pas chercher à fabriquer un « millésime LRR IDF » unique si les groupes n'ont pas été évalués ensemble.
+- **Source machine** : même CSV GeoNat, colonne `lrr` ; SHA-256 `1466cacc…4b8d62`.
+- **Groupes importés** : amphibiens 2023, reptiles 2023, oiseaux nicheurs 2018, chiroptères 2017, odonates 2014, rhopalocères/zygènes 2016, orthoptéroïdes 2018, flore vasculaire 2014.
+- **Identifiants** : `arb-idf-lrr-<groupe>-…` (~1 906 statuts, raccord TAXREF 100 %).
+- **Hors vague** : poissons LRR 2022 (PDF ARB uniquement, absent de GeoNat).
+- Les sous-types PDF `NAa`/`NAb` sont collapsés en `NA` dans GeoNat.
 
 #### Action suivante
 
-Importer d'abord le CSV ZNIEFF DRIEAT ; construire ensuite une matrice LRR par groupe avec ARB/GeoNat'ÎDF/organismes producteurs.
+Surveiller les révisions GeoNat ; brancher les poissons dès disponibilité machine ou via adaptateur PDF dédié.
 
 ---
 
@@ -464,12 +465,11 @@ Pour chaque nouvelle source ou nouveau millésime :
 
 À données accessibles et validées égales :
 
-1. **Île-de-France** — LRR par groupe (ZNIEFF déjà faite).
-2. **Normandie** — ZNIEFF (LRR déjà faites).
-3. **Grand Est** — reste LRR mammifères/flore/historiques (10 groupes faune déjà importés).
-4. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
-5. **Centre-Val de Loire** et **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
-6. **Hauts-de-France**, **ARA LRR**, **Corse** — portées historiques / consolidation.
-7. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune / BRE** — déjà importés ; surveiller révisions.
+1. **Normandie** — ZNIEFF (LRR déjà faites).
+2. **Grand Est** — reste LRR mammifères/flore/historiques (10 groupes faune déjà importés).
+3. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
+4. **Centre-Val de Loire** et **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
+5. **Hauts-de-France**, **ARA LRR**, **Corse** — portées historiques / consolidation.
+6. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune / BRE / IDF** — déjà importés ; surveiller révisions.
 
 Cet ordre n'est pas une hiérarchie écologique : il vise le meilleur rapport **fiabilité de la source / caractère structuré / gain métier / coût d'adaptation**.

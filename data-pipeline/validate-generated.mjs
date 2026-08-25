@@ -391,6 +391,46 @@ if (manifest.sources.some((source) => source.id === 'dreal-pdl-znieff-flore-2018
   )
 }
 
+const idfFauna = await loadStatuses('fauna', 'IDF')
+const idfFlora = await loadStatuses('flora', 'IDF')
+const idfLrrChecks = [
+  {
+    id: 'arb-idf-lrr-amphibiens-2023',
+    realmStatuses: idfFauna,
+    cdRef: 212,
+    value: 'EN',
+    message: 'Bombina variegata: LRR amphibiens Île-de-France EN',
+  },
+  {
+    id: 'arb-idf-lrr-oiseaux-nicheurs-2018',
+    realmStatuses: idfFauna,
+    cdRef: 974,
+    value: 'EN',
+    message: 'Podiceps nigricollis: LRR oiseaux nicheurs Île-de-France EN',
+  },
+  {
+    id: 'arb-idf-lrr-flore-vasculaire-2014',
+    realmStatuses: idfFlora,
+    cdRef: 80037,
+    value: 'EN',
+    message: 'Aconitum napellus: LRR flore vasculaire Île-de-France EN',
+  },
+]
+for (const check of idfLrrChecks) {
+  if (!manifest.sources.some((source) => source.id === check.id)) continue
+  assert.ok(
+    findStatus(
+      check.realmStatuses,
+      check.cdRef,
+      (status) =>
+        status.category === 'red_list_regional' &&
+        status.sourceId === check.id &&
+        status.value === check.value,
+    ),
+    check.message,
+  )
+}
+
 console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
@@ -421,6 +461,9 @@ if (manifest.sources.some((source) => source.id === 'dreal-pdl-znieff-faune-2018
 }
 if (manifest.sources.some((source) => source.id === 'oeb-bretagne-responsabilite-csv-2026-07-29')) {
   console.log('- enrichissement régional: responsabilité biologique Bretagne OEB 2025')
+}
+if (manifest.sources.some((source) => source.id === 'arb-idf-lrr-amphibiens-2023')) {
+  console.log('- enrichissement régional: LRR Île-de-France via GeoNat (8 groupes)')
 }
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {
