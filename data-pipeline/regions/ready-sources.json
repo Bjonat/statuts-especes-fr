@@ -287,20 +287,47 @@
       ]
     },
     {
-      "id": "dreal-pac-znieff",
+      "id": "dreal-pac-znieff-fauna-2024-01",
       "region": "PAC",
       "categories": [
         "znieff"
       ],
       "realms": [
-        "flora",
         "fauna"
       ],
+      "state": "IMPORTED",
       "landingPage": "https://www.paca.developpement-durable.gouv.fr/actualisation-de-l-inventaire-a9673.html",
-      "resourceDiscovery": "official fauna XLSX + flora XLS"
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "2024-01",
+          "url": "https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/znieff_faune_janv-2024.xlsx",
+          "sha256": "d38ffb58944a998ac937146fcdeed606b0e40cd178cdc2bf467726f81a672375"
+        }
+      ]
     },
     {
-      "id": "dreal-pac-lrr",
+      "id": "dreal-pac-znieff-flora-2016",
+      "region": "PAC",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.paca.developpement-durable.gouv.fr/actualisation-de-l-inventaire-a9673.html",
+      "resources": [
+        {
+          "kind": "xls",
+          "version": "2016",
+          "url": "https://www.paca.developpement-durable.gouv.fr/IMG/xls/znieff_flore_2016.xls",
+          "sha256": "1c39c39f36ca97659e6b534d7e5a7c385ea3e9e470679c6d360f6e3cc8d6204c"
+        }
+      ]
+    },
+    {
+      "id": "dreal-pac-lrr-groups",
       "region": "PAC",
       "categories": [
         "red_list_regional"
@@ -309,8 +336,46 @@
         "flora",
         "fauna"
       ],
+      "state": "IMPORTED",
       "landingPage": "https://www.paca.developpement-durable.gouv.fr/listes-rouges-regionales-a7296.html",
-      "resourceDiscovery": "group-specific XLSX tables"
+      "resources": [
+        {
+          "kind": "xlsx",
+          "group": "oiseaux",
+          "url": "https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/liste_rouge_avifaune_paca_csrpn_janv2020.xlsx",
+          "sha256": "c63509fe1ac9a0c444c6771bc5913d4f0749a8adca7f52985859faf155ea8369"
+        },
+        {
+          "kind": "xlsx",
+          "group": "odonates",
+          "url": "https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lr_paca_odonates_2017_web.xlsx",
+          "sha256": "bf80fe46a613e6a1002802b8e919526669ee0bce01e69a901d8264411bf00fc6"
+        },
+        {
+          "kind": "xlsx",
+          "group": "papillons",
+          "url": "https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/tableau_simplifie_lrr-pap_2024.xlsx",
+          "sha256": "937ac5296de2dac5118013c63b22fe5cc4564e2520a3d4506a0ece0d2142e973"
+        },
+        {
+          "kind": "xlsx",
+          "group": "flore",
+          "url": "https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/LR_PACA_Flore_2015_web.xlsx",
+          "sha256": "99b44c10f572521e83999543abf14a9c38c75d9a56a4c2540c1d6dc72c9a440a"
+        },
+        {
+          "kind": "xlsx",
+          "group": "herpetofaune",
+          "url": "https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lrr_paca_reptiles_amphibiens_2016.xlsx",
+          "sha256": "fe81c5f6a4e3708838e8bb85e15df389e02970e6ca63c86201a9b9d556790ba9"
+        },
+        {
+          "kind": "xlsx",
+          "group": "orthopteres",
+          "url": "https://www.paca.developpement-durable.gouv.fr/IMG/xlsx/lr_paca_orthop_2018_web.xlsx",
+          "sha256": "5d07840fadce9dab531f9317ead43ad0b7f3afb1e2c702ae48583d32687364ad"
+        }
+      ]
     }
   ]
 }

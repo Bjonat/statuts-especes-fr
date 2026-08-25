@@ -218,6 +218,13 @@ jobs:
           bash data-pipeline/regions/bfc/download_arb_statuts.sh "$RUNNER_TEMP/bfc-statuts.xlsx"
           echo "BFC_SOURCE=$RUNNER_TEMP/bfc-statuts.xlsx" >> "$GITHUB_ENV"
 
+      - name: Download regional PACA ZNIEFF and LRR sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/pac/download_sources.sh "$RUNNER_TEMP/pac-sources"
+          echo "PAC_SOURCES_DIR=$RUNNER_TEMP/pac-sources" >> "$GITHUB_ENV"
+
       - name: Build regional packages
         shell: bash
         run: |
@@ -236,6 +243,8 @@ jobs:
           python data-pipeline/regions/ges/build_odonat_znieff.py --taxref "$TAXREF_FILE" --source "$GES_ZNIEFF_FAUNA_FILE" --out "$REGIONAL_DIR/ges-znieff-fauna.json" --min-match-rate 0.98
           python data-pipeline/regions/ges/build_odonat_znieff_flora.py --taxref "$TAXREF_FILE" --source "$GES_ZNIEFF_FLORA_FILE" --out "$REGIONAL_DIR/ges-znieff-flora.json" --min-match-rate 0.98
           python data-pipeline/regions/bfc/build_arb_statuts.py --taxref "$TAXREF_FILE" --source "$BFC_SOURCE" --out "$REGIONAL_DIR/bfc-statuts.json" --min-match-rate 0.97
+          python data-pipeline/regions/pac/build_znieff.py --taxref "$TAXREF_FILE" --input-dir "$PAC_SOURCES_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
+          python data-pipeline/regions/pac/build_lrr.py --taxref "$TAXREF_FILE" --input-dir "$PAC_SOURCES_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           echo "REGIONAL_DIR=$REGIONAL_DIR" >> "$GITHUB_ENV"
 
       - name: Diagnose official source volumes
@@ -280,6 +289,15 @@ jobs:
             'dreal-naq-znieff-mollusques-2025',
             'dreal-naq-znieff-orthopteres-2026',
             'dreal-naq-znieff-oiseaux-marins-2026',
+            'dreal-pac-znieff-fauna-2024-01',
+            'dreal-pac-znieff-flora-2016',
+            'dreal-pac-lrr-oiseaux-2020',
+            'dreal-pac-lrr-odonates-2017',
+            'dreal-pac-lrr-papillons-2024',
+            'dreal-pac-lrr-flore-2015',
+            'dreal-pac-lrr-amphibiens-2016',
+            'dreal-pac-lrr-reptiles-2016',
+            'dreal-pac-lrr-orthopteres-2018',
           ]
           if (process.env.NAQ_REGIONAL_AVAILABLE === 'true') required.push('obv-na-znieff-flore-2019-v1.2')
           const ids = new Set(manifest.sources.map((source) => source.id))

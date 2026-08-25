@@ -276,6 +276,30 @@ for (const check of naqGroupChecks) {
   }
 }
 
+const pacFauna = await loadStatuses('fauna', 'PAC')
+const pacFlora = await loadStatuses('flora', 'PAC')
+const pacChecks = [
+  { id: 'dreal-pac-znieff-fauna-2024-01', statuses: pacFauna, cdRef: 139, value: 'Déterminante', message: 'Triturus cristatus: ZNIEFF PACA Déterminante' },
+  { id: 'dreal-pac-znieff-fauna-2024-01', statuses: pacFauna, cdRef: 60313, value: 'Remarquable', message: 'Rhinolophus hipposideros: ZNIEFF PACA Remarquable' },
+  { id: 'dreal-pac-znieff-flora-2016', statuses: pacFlora, cdRef: 610608, value: 'Déterminante', message: 'Acis nicaeensis: ZNIEFF PACA flore Déterminante' },
+  { id: 'dreal-pac-lrr-oiseaux-2020', statuses: pacFauna, cdRef: 2657, value: 'CR', message: 'Aquila fasciata: LRR PACA oiseaux CR' },
+  { id: 'dreal-pac-lrr-odonates-2017', statuses: pacFauna, cdRef: 65397, value: 'CR', message: 'Somatochlora arctica: LRR PACA odonates CR' },
+  { id: 'dreal-pac-lrr-papillons-2024', statuses: pacFauna, cdRef: 53341, value: 'RE', message: 'Gegenes pumilio: LRR PACA papillons RE' },
+  { id: 'dreal-pac-lrr-flore-2015', statuses: pacFlora, cdRef: 79903, value: 'RE', message: 'Achillea ligustica: LRR PACA flore RE' },
+  { id: 'dreal-pac-lrr-amphibiens-2016', statuses: pacFauna, cdRef: 139, value: 'CR', message: 'Triturus cristatus: LRR PACA amphibiens CR' },
+  { id: 'dreal-pac-lrr-reptiles-2016', statuses: pacFauna, cdRef: 78141, value: 'RE', message: 'Vipera berus: LRR PACA reptiles RE' },
+  { id: 'dreal-pac-lrr-orthopteres-2018', statuses: pacFauna, cdRef: 66052, value: 'CR', message: 'Prionotropis rhodanica: LRR PACA orthoptères CR' },
+]
+for (const check of pacChecks) {
+  if (!manifest.sources.some((source) => source.id === check.id)) continue
+  assert.ok(
+    check.statuses.some(
+      (status) => status.sourceId === check.id && status.cdRef === check.cdRef && status.value === check.value,
+    ),
+    check.message,
+  )
+}
+
 console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
@@ -294,6 +318,9 @@ if (manifest.sources.some((source) => source.id === gesFloraZnieffSourceId)) {
 }
 if (manifest.sources.some((source) => source.id === bfcSourceId)) {
   console.log('- enrichissement régional: tableur maître BFC 03/03/2026')
+}
+if (manifest.sources.some((source) => source.id === 'dreal-pac-znieff-fauna-2024-01')) {
+  console.log('- enrichissement régional: ZNIEFF + LRR Provence-Alpes-Côte d’Azur')
 }
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {
