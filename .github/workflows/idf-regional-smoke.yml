@@ -37,15 +37,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          URL='https://geonature.arb-idf.fr/geonature/api/media/exports/schedules/Statuts_des_taxons_STyt8fLcp03L11.csv'
-          curl --fail --location --retry 3 "$URL" -o "$RUNNER_TEMP/idf-statuts.csv"
-          test -s "$RUNNER_TEMP/idf-statuts.csv"
-          grep -q '"zdet"' "$RUNNER_TEMP/idf-statuts.csv"
-          grep -q '"cd_nom"' "$RUNNER_TEMP/idf-statuts.csv"
-          sha256sum "$RUNNER_TEMP/idf-statuts.csv"
+          bash data-pipeline/regions/idf/download_geonat_statuts.sh "$RUNNER_TEMP/idf-statuts.csv"
           echo "IDF_SOURCE=$RUNNER_TEMP/idf-statuts.csv" >> "$GITHUB_ENV"
 
-      - name: Build IDF ZNIEFF package
+      - name: Build IDF ZNIEFF and LRR packages
         shell: bash
         run: |
           set -euo pipefail
@@ -55,6 +50,12 @@ jobs:
             --source "$IDF_SOURCE" \
             --out "$RUNNER_TEMP/idf-packages/idf-znieff.json" \
             --min-match-rate 0.97
+          python data-pipeline/regions/idf/build_geonat_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$IDF_SOURCE" \
+            --out-dir "$RUNNER_TEMP/idf-packages" \
+            --checked-at 2026-08-25 \
+            --min-match-rate 0.97
           echo "IDF_PACKAGES_DIR=$RUNNER_TEMP/idf-packages" >> "$GITHUB_ENV"
 
       - name: Validate regional package contract
@@ -63,21 +64,49 @@ jobs:
           REGIONAL_DIR="$IDF_PACKAGES_DIR" node --input-type=module - <<'NODE'
           import { loadRegionalPackages } from './data-pipeline/regional.mjs'
           const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
-          if (packages.length !== 1) throw new Error(`1 paquet IDF attendu, reçu ${packages.length}`)
-          const pkg = packages[0]
-          if (pkg.source.id !== 'arb-idf-geonat-statuts-znieff-2026') throw new Error('Source IDF inattendue')
-          if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error('SHA-256 IDF absent')
-          if (pkg.statuses.length < 500) throw new Error(`Volume ZNIEFF IDF anormalement faible: ${pkg.statuses.length}`)
-          if (!pkg.replaces.every((rule) => rule.region === 'IDF' && rule.category === 'znieff' && Array.isArray(rule.cdRefs) && rule.cdRefs.length > 0)) {
-            throw new Error('Overrides ZNIEFF IDF non ciblés')
+          if (packages.length !== 9) throw new Error(`9 paquets IDF attendus, reçu ${packages.length}`)
+          const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
+          const znieff = byId['arb-idf-geonat-statuts-znieff-2026']
+          if (!znieff) throw new Error('Paquet ZNIEFF IDF absent')
+          if (znieff.statuses.length < 500) throw new Error(`Volume ZNIEFF IDF anormalement faible: ${znieff.statuses.length}`)
+
+          const lrrIds = [
+            'arb-idf-lrr-amphibiens-2023',
+            'arb-idf-lrr-reptiles-2023',
+            'arb-idf-lrr-oiseaux-nicheurs-2018',
+            'arb-idf-lrr-chiropteres-2017',
+            'arb-idf-lrr-odonates-2014',
+            'arb-idf-lrr-rhopaloceres-zygenes-2016',
+            'arb-idf-lrr-orthopteroides-2018',
+            'arb-idf-lrr-flore-vasculaire-2014',
+          ]
+          for (const id of lrrIds) {
+            const pkg = byId[id]
+            if (!pkg) throw new Error(`Paquet LRR absent: ${id}`)
+            if (pkg.source.sha256 !== '1466cacc15e65384ed66c67f6266ae6fcd1d27d45fee8367e133f1d23f4b8d62') {
+              throw new Error(`SHA-256 LRR inattendu: ${id}`)
+            }
+            if (!pkg.statuses.length) throw new Error(`Paquet vide: ${id}`)
+            const rule = pkg.replaces[0]
+            if (!rule || rule.region !== 'IDF' || rule.category !== 'red_list_regional' || !rule.cdRefs?.length) {
+              throw new Error(`Override LRR invalide: ${id}`)
+            }
           }
-          console.log({ statuses: pkg.statuses.length, diagnostics: pkg.diagnostics })
+          const bombina = byId['arb-idf-lrr-amphibiens-2023'].statuses.find((s) => s.cdRef === 212 && s.value === 'EN')
+          if (!bombina) throw new Error('Sentinelle Bombina variegata absente')
+          const podiceps = byId['arb-idf-lrr-oiseaux-nicheurs-2018'].statuses.find((s) => s.cdRef === 974 && s.value === 'EN')
+          if (!podiceps) throw new Error('Sentinelle Podiceps nigricollis absente')
+          const aconitum = byId['arb-idf-lrr-flore-vasculaire-2014'].statuses.find((s) => s.cdRef === 80037 && s.value === 'EN')
+          if (!aconitum) throw new Error('Sentinelle Aconitum napellus absente')
+          const lrrStatuses = lrrIds.reduce((sum, id) => sum + byId[id].statuses.length, 0)
+          if (lrrStatuses < 1_500) throw new Error(`Volume LRR IDF anormalement faible: ${lrrStatuses}`)
+          console.log({ packages: packages.length, znieff: znieff.statuses.length, lrrStatuses })
           NODE
 
-      - name: Upload normalized package
+      - name: Upload normalized packages
         uses: actions/upload-artifact@v4
         with:
-          name: idf-znieff-regional-package
+          name: idf-regional-packages
           path: ${{ env.IDF_PACKAGES_DIR }}/*.json
           if-no-files-found: error
           retention-days: 7

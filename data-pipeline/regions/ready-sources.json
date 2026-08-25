@@ -270,6 +270,8 @@
         "flora",
         "fauna"
       ],
+      "state": "IMPORTED",
+      "notes": "Pipeline opérationnel via GeoNat (arb-idf-geonat-statuts-znieff-2026), pas le CSV DRIEAT brut",
       "landingPage": "https://www.drieat.ile-de-france.developpement-durable.gouv.fr/liste-des-habitats-et-especes-determinants-de-a3340.html",
       "resources": [
         {
@@ -277,6 +279,28 @@
           "url": "https://www.drieat.ile-de-france.developpement-durable.gouv.fr/IMG/csv/inpn_-_liste_des_especes_determinantes_de_l_inventaire_znieff_-_region_ile-de-france_-_2024-10-18.csv"
         }
       ]
+    },
+    {
+      "id": "arb-idf-geonat-lrr",
+      "region": "IDF",
+      "categories": [
+        "red_list_regional"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.arb-idf.fr/nos-ressources/publications/",
+      "resources": [
+        {
+          "kind": "csv",
+          "version": "export GeoNat'îdF (colonne lrr) — SHA figé 2026-08-25",
+          "url": "https://geonature.arb-idf.fr/geonature/api/media/exports/schedules/Statuts_des_taxons_STyt8fLcp03L11.csv",
+          "sha256": "1466cacc15e65384ed66c67f6266ae6fcd1d27d45fee8367e133f1d23f4b8d62"
+        }
+      ],
+      "notes": "8 paquets par groupe ; poissons LRR 2022 absents de GeoNat (PDF only)."
     },
     {
       "id": "normandie-lrr-unifiees",
