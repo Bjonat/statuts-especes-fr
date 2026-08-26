@@ -196,6 +196,20 @@ jobs:
           bash data-pipeline/regions/ges/download_odonat_lrr.sh "$RUNNER_TEMP/ges-lrr"
           echo "GES_LRR_DIR=$RUNNER_TEMP/ges-lrr" >> "$GITHUB_ENV"
 
+      - name: Download regional Grand Est historical LRR sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ges/download_hist_lrr.sh "$RUNNER_TEMP/ges-hist-lrr"
+          echo "GES_HIST_LRR_DIR=$RUNNER_TEMP/ges-hist-lrr" >> "$GITHUB_ENV"
+
+      - name: Download regional Nouvelle-Aquitaine LRR araignées
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/naq/download_lrr_araignees.sh "$RUNNER_TEMP/naq-lrr-araignees"
+          echo "NAQ_LRR_ARAIGNEES_DIR=$RUNNER_TEMP/naq-lrr-araignees" >> "$GITHUB_ENV"
+
       - name: Download regional BFC master status workbook
         shell: bash
         run: |
@@ -216,6 +230,27 @@ jobs:
           set -euo pipefail
           bash data-pipeline/regions/pdl/download_znieff.sh "$RUNNER_TEMP/pdl-znieff"
           echo "PDL_ZNIEFF_DIR=$RUNNER_TEMP/pdl-znieff" >> "$GITHUB_ENV"
+
+      - name: Download regional Occitanie ZNIEFF sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/occ/download_znieff.sh "$RUNNER_TEMP/occ-znieff"
+          echo "OCC_ZNIEFF_DIR=$RUNNER_TEMP/occ-znieff" >> "$GITHUB_ENV"
+
+      - name: Download regional Hauts-de-France Digitale ZNIEFF sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/hdf/download_digitale_znieff.sh "$RUNNER_TEMP/hdf-digitale"
+          echo "HDF_DIGITALE_DIR=$RUNNER_TEMP/hdf-digitale" >> "$GITHUB_ENV"
+
+      - name: Download regional Hauts-de-France LRR sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/hdf/download_lrr.sh "$RUNNER_TEMP/hdf-lrr"
+          echo "HDF_LRR_DIR=$RUNNER_TEMP/hdf-lrr" >> "$GITHUB_ENV"
 
       - name: Build regional packages
         run: |
@@ -293,6 +328,16 @@ jobs:
             --input-dir "$GES_LRR_DIR" \
             --out-dir "$REGIONAL_DIR" \
             --min-match-rate 0.97
+          python data-pipeline/regions/ges/build_hist_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$GES_HIST_LRR_DIR" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
+          python data-pipeline/regions/naq/build_lrr_araignees.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$NAQ_LRR_ARAIGNEES_DIR" \
+            --out "$REGIONAL_DIR/naq-lrr-araignees.json" \
+            --min-match-rate 0.97
           python data-pipeline/regions/bfc/build_arb_statuts.py \
             --taxref "$TAXREF_FILE" \
             --source "$BFC_SOURCE" \
@@ -313,6 +358,21 @@ jobs:
             --input-dir "$PDL_ZNIEFF_DIR" \
             --out-dir "$REGIONAL_DIR" \
             --min-match-rate 0.97
+          python data-pipeline/regions/occ/build_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$OCC_ZNIEFF_DIR" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
+          python data-pipeline/regions/hdf/build_digitale_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$HDF_DIGITALE_DIR" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
+          python data-pipeline/regions/hdf/build_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$HDF_LRR_DIR" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
 
       - name: Run tests
         run: npm test
@@ -331,6 +391,8 @@ jobs:
             'dreal-ara-lrr-amphibiens-2024', 'dreal-ara-lrr-reptiles-2024',
             'dreal-ara-lrr-chiropteres-2024', 'dreal-ara-lrr-oiseaux-nicheurs-2024',
             'dreal-ara-lrr-mammiferes-2024',
+            'dreal-occ-znieff-flora-2023', 'dreal-occ-znieff-bryophytes-2023',
+            'dreal-occ-znieff-characees-2023', 'dreal-occ-znieff-fauna-2024-07',
             'obv-na-znieff-flore-2019-v1.2',
             'oeb-bretagne-znieff-csv-2026-01-29',
             'oeb-bretagne-lrr-csv-2026-01-29',
@@ -368,6 +430,9 @@ jobs:
             'dreal-ges-odonat-lrr-decapodes-2025',
             'dreal-ges-odonat-lrr-papillons-jour-2025',
             'dreal-ges-odonat-lrr-poissons-2024',
+            'dreal-ges-hist-lrr-alsace-mammiferes-2014',
+            'dreal-ges-hist-lrr-ca-flore-2018',
+            'dreal-naq-lrr-araignees-2025',
             'dreal-bfc-statuts-2026-03-03',
             'dreal-naq-znieff-characees-2023',
             'dreal-naq-znieff-oiseaux-nicheurs-2023',
@@ -388,6 +453,14 @@ jobs:
             'dreal-pac-lrr-orthopteres-2018',
             'dreal-pdl-znieff-faune-2018',
             'dreal-pdl-znieff-flore-2018',
+            'cbnhdf-digitale-znieff-hdf-flora-2026-03-31',
+            'cbnhdf-digitale-znieff-hdf-bryophytes-2026-03-31',
+            'irpn-hdf-lrr-oiseaux-nicheurs-2024',
+            'irpn-hdf-lrr-papillons-jour-2024',
+            'irpn-hdf-lrr-mollusques-2024',
+            'irpn-hdf-lrr-poissons-ecrevisses-2025',
+            'irpn-hdf-lrr-orthopteres-2025',
+            'irpn-hdf-lrr-coccinelles-2025',
           ]
           const ids = new Set(manifest.sources.map((source) => source.id))
           for (const id of required) {
@@ -440,6 +513,8 @@ jobs:
             'dreal-ara-lrr-amphibiens-2024', 'dreal-ara-lrr-reptiles-2024',
             'dreal-ara-lrr-chiropteres-2024', 'dreal-ara-lrr-oiseaux-nicheurs-2024',
             'dreal-ara-lrr-mammiferes-2024',
+            'dreal-occ-znieff-flora-2023', 'dreal-occ-znieff-bryophytes-2023',
+            'dreal-occ-znieff-characees-2023', 'dreal-occ-znieff-fauna-2024-07',
             'obv-na-znieff-flore-2019-v1.2',
             'oeb-bretagne-znieff-csv-2026-01-29',
             'oeb-bretagne-lrr-csv-2026-01-29',
@@ -477,6 +552,9 @@ jobs:
             'dreal-ges-odonat-lrr-decapodes-2025',
             'dreal-ges-odonat-lrr-papillons-jour-2025',
             'dreal-ges-odonat-lrr-poissons-2024',
+            'dreal-ges-hist-lrr-alsace-mammiferes-2014',
+            'dreal-ges-hist-lrr-ca-flore-2018',
+            'dreal-naq-lrr-araignees-2025',
             'dreal-bfc-statuts-2026-03-03',
             'dreal-naq-znieff-characees-2023',
             'dreal-naq-znieff-oiseaux-nicheurs-2023',
@@ -497,6 +575,14 @@ jobs:
             'dreal-pac-lrr-orthopteres-2018',
             'dreal-pdl-znieff-faune-2018',
             'dreal-pdl-znieff-flore-2018',
+            'cbnhdf-digitale-znieff-hdf-flora-2026-03-31',
+            'cbnhdf-digitale-znieff-hdf-bryophytes-2026-03-31',
+            'irpn-hdf-lrr-oiseaux-nicheurs-2024',
+            'irpn-hdf-lrr-papillons-jour-2024',
+            'irpn-hdf-lrr-mollusques-2024',
+            'irpn-hdf-lrr-poissons-ecrevisses-2025',
+            'irpn-hdf-lrr-orthopteres-2025',
+            'irpn-hdf-lrr-coccinelles-2025',
           ]
           const ids = new Set(dataManifest.sources.map((source) => source.id))
           for (const id of required) {

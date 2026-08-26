@@ -1,0 +1,112 @@
+name: OCC ZNIEFF regional source smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/occ/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/occ-znieff-smoke.yml'
+
+jobs:
+  build-occ-znieff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install XLSX reader
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download OCC ZNIEFF sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/occ/download_znieff.sh "$RUNNER_TEMP/occ-znieff"
+          echo "OCC_ZNIEFF_DIR=$RUNNER_TEMP/occ-znieff" >> "$GITHUB_ENV"
+
+      - name: Build OCC ZNIEFF packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/occ-znieff-packages"
+          python data-pipeline/regions/occ/build_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$OCC_ZNIEFF_DIR" \
+            --out-dir "$RUNNER_TEMP/occ-znieff-packages" \
+            --checked-at 2026-08-26 \
+            --min-match-rate 0.97
+          echo "OCC_ZNIEFF_PACKAGES_DIR=$RUNNER_TEMP/occ-znieff-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional packages and sentinels
+        shell: bash
+        run: |
+          REGIONAL_DIR="$OCC_ZNIEFF_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 4) throw new Error(`4 paquets OCC ZNIEFF attendus, reçu ${packages.length}`)
+          const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
+          const required = [
+            'dreal-occ-znieff-flora-2023',
+            'dreal-occ-znieff-bryophytes-2023',
+            'dreal-occ-znieff-characees-2023',
+            'dreal-occ-znieff-fauna-2024-07',
+          ]
+          for (const id of required) {
+            const pkg = byId[id]
+            if (!pkg) throw new Error(`Source absente: ${id}`)
+            if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${id}`)
+            if ('url' in pkg.source) throw new Error(`Champ url interdit: ${id}`)
+            const rule = pkg.replaces[0]
+            if (!rule || rule.region !== 'OCC' || rule.category !== 'znieff' || !rule.cdRefs?.length) {
+              throw new Error(`Override invalide: ${id}`)
+            }
+          }
+          const statuses = packages.reduce((sum, pkg) => sum + pkg.statuses.length, 0)
+          if (statuses < 3000) throw new Error(`Volume OCC ZNIEFF anormalement faible: ${statuses}`)
+          const flora = byId['dreal-occ-znieff-flora-2023']
+          if (!flora.statuses.some((s) => s.cdRef === 610735 && s.value === 'Déterminante' && s.scope === 'partial' && s.scopeLabel === 'Méditerranée')) {
+            throw new Error('Sentinelle Achillea maritima Méditerranée absente')
+          }
+          const fauna = byId['dreal-occ-znieff-fauna-2024-07']
+          if (!fauna.statuses.some((s) => s.cdRef === 2657 && s.value === 'Déterminante' && s.scope === 'regional')) {
+            throw new Error('Sentinelle Aquila fasciata absente')
+          }
+          const chara = byId['dreal-occ-znieff-characees-2023']
+          if (!chara.statuses.some((s) => s.cdRef === 73555 && s.scopeLabel === 'Bassin aquitain')) {
+            throw new Error('Sentinelle Chara fragifera absente')
+          }
+          console.log({ packages: packages.length, statuses })
+          NODE
+
+      - name: Upload normalized packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: occ-znieff-regional-packages
+          path: ${{ env.OCC_ZNIEFF_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,103 @@
+name: Hauts-de-France Digitale ZNIEFF smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/hdf/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/hdf-digitale-smoke.yml'
+
+jobs:
+  build-hdf-digitale-znieff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install XLSX reader
+        run: python -m pip install --disable-pip-version-check openpyxl
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download Hauts-de-France Digitale ZNIEFF sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/hdf/download_digitale_znieff.sh "$RUNNER_TEMP/hdf-digitale"
+          echo "HDF_DIGITALE_DIR=$RUNNER_TEMP/hdf-digitale" >> "$GITHUB_ENV"
+
+      - name: Build Hauts-de-France Digitale ZNIEFF packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hdf-digitale-packages"
+          python data-pipeline/regions/hdf/build_digitale_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$HDF_DIGITALE_DIR" \
+            --out-dir "$RUNNER_TEMP/hdf-digitale-packages" \
+            --checked-at 2026-08-26 \
+            --min-match-rate 0.97
+          echo "HDF_DIGITALE_PACKAGES_DIR=$RUNNER_TEMP/hdf-digitale-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional packages and sentinels
+        shell: bash
+        run: |
+          REGIONAL_DIR="$HDF_DIGITALE_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 2) throw new Error(`2 paquets ZNIEFF HDF attendus, reçu ${packages.length}`)
+          const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
+          const required = [
+            'cbnhdf-digitale-znieff-hdf-flora-2026-03-31',
+            'cbnhdf-digitale-znieff-hdf-bryophytes-2026-03-31',
+          ]
+          for (const id of required) {
+            const pkg = byId[id]
+            if (!pkg) throw new Error(`Source absente: ${id}`)
+            if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${id}`)
+            if ('url' in pkg.source) throw new Error(`Champ url interdit: ${id}`)
+            const rule = pkg.replaces[0]
+            if (!rule || rule.region !== 'HDF' || rule.category !== 'znieff' || rule.realm !== 'flora' || !rule.cdRefs?.length) {
+              throw new Error(`Override invalide: ${id}`)
+            }
+          }
+          const flora = byId['cbnhdf-digitale-znieff-hdf-flora-2026-03-31']
+          if (flora.statuses.length < 800) throw new Error(`Volume ZNIEFF flore HDF anormalement faible: ${flora.statuses.length}`)
+          const bryophytes = byId['cbnhdf-digitale-znieff-hdf-bryophytes-2026-03-31']
+          if (bryophytes.statuses.length < 300) throw new Error(`Volume ZNIEFF bryophytes HDF anormalement faible: ${bryophytes.statuses.length}`)
+          const achillea = flora.statuses.find((s) => s.cdRef === 79921 && s.value === 'Oui' && s.scope === 'partial' && s.scopeLabel === 'Hauts-de-France')
+          if (!achillea) throw new Error('Sentinelle Achillea ptarmica absente')
+          const statuses = packages.reduce((sum, pkg) => sum + pkg.statuses.length, 0)
+          console.log({ packages: packages.length, statuses })
+          NODE
+
+      - name: Upload normalized packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdf-digitale-znieff-packages
+          path: ${{ env.HDF_DIGITALE_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7
