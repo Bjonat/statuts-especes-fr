@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ZNIEFF flore / bryophytes Hauts-de-France via catalogues Digitale CBNHDF."""
+"""ZNIEFF flore vasculaire et bryophytes Hauts-de-France via catalogue Digitale CBNHDF."""
 from __future__ import annotations
 
 import argparse
@@ -15,13 +15,10 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 LANDING_URL = "https://www.cbnhdf.fr/je-telecharge"
-DREAL_LANDING = (
-    "https://www.hauts-de-france.developpement-durable.gouv.fr/"
-    "les-zones-naturelles-d-interet-ecologique-faunistique-et-a11760.html"
-)
-PRODUCER = "Conservatoire botanique national des Hauts-de-France / CSRPN"
-TERRITORY = "HDF"
+PRODUCER = "Conservatoire botanique national des Hauts-de-France / CSRPN Hauts-de-France"
 SCOPE_LABEL = "Hauts-de-France"
+TERRITORY = "HDF"
+# [Oui] = erreur / douteux / cultivé uniquement — hors publication déterminante.
 VALUE_BY_CODE = {
     "Oui": "Oui",
     "(Oui)": "Oui (disparu/présumé)",
@@ -36,11 +33,12 @@ SOURCES = [
         "filename": "digitale-flora.xlsx",
         "sheet": "REG-DIGITALE-BS-BIF-FVF-PV_4.0",
         "id": "cbnhdf-digitale-znieff-hdf-flora-2026-03-31",
-        "name": "Espèces déterminantes ZNIEFF flore Hauts-de-France",
+        "name": "Espèces déterminantes ZNIEFF flore vasculaire Hauts-de-France",
         "version": "Digitale BS-BIF-FVF-PV 4.0 (2026-03-31)",
-        "sha256": "71ae71b770f7b3911349e501caaaa65ac7dba8172d12b96ef4b90d5056995c95",
         "sourceUrl": "https://www.cbnhdf.fr/system/files/2026-05/DIGITALE_BS-BIF-FVF_PV_4.0_20260331.xlsx",
-        "min_statuses": 800,
+        "sha256": "71ae71b770f7b3911349e501caaaa65ac7dba8172d12b96ef4b90d5056995c95",
+        "minVolume": 800,
+        "outName": "hdf-znieff-flora.json",
     },
     {
         "key": "bryophytes",
@@ -49,15 +47,17 @@ SOURCES = [
         "id": "cbnhdf-digitale-znieff-hdf-bryophytes-2026-03-31",
         "name": "Espèces déterminantes ZNIEFF bryophytes Hauts-de-France",
         "version": "Digitale BS-BIF-FVF-MH 4.0 (2026-03-31)",
-        "sha256": "810cc4cc9458721710a826d009884698fcf9b06d059af41153197c12470cb3bc",
         "sourceUrl": "https://www.cbnhdf.fr/system/files/2026-05/DIGITALE_BS-BIF-FVF_MH_4.0_20260331.xlsx",
-        "min_statuses": 250,
+        "sha256": "810cc4cc9458721710a826d009884698fcf9b06d059af41153197c12470cb3bc",
+        "minVolume": 300,
+        "outName": "hdf-znieff-bryophytes.json",
     },
 ]
 
 
 def clean(value: object) -> str:
-    return re.sub(r"\s+", " ", str(value or "").replace("\xa0", " ")).strip()
+    text = str(value or "").replace("\xa0", " ")
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def normalize(value: object) -> str:
@@ -86,25 +86,78 @@ def as_int(value: object) -> int | None:
 
 def read_rows(path: Path, sheet_name: str) -> list[dict[str, object]]:
     workbook = load_workbook(path, read_only=True, data_only=True)
-    if sheet_name not in workbook.sheetnames:
+    try:
+        if sheet_name not in workbook.sheetnames:
+            raise SystemExit(f"{path.name}: feuille absente ({sheet_name})")
+        worksheet = workbook[sheet_name]
+        iterator = worksheet.iter_rows(values_only=True)
+        header = [clean(value) for value in next(iterator)]
+        required = {"CH_Territoire", "CH_DetermZNIEFF", "CD_REF_TAXREF"}
+        if not required.issubset(set(header)):
+            raise SystemExit(f"{path.name}: colonnes manquantes {sorted(required - set(header))}")
+        rows = []
+        for values in iterator:
+            row = {header[index]: values[index] if index < len(values) else None for index in range(len(header))}
+            rows.append(row)
+        return rows
+    finally:
         workbook.close()
-        raise SystemExit(f"Feuille absente: {sheet_name}")
-    worksheet = workbook[sheet_name]
-    iterator = worksheet.iter_rows(values_only=True)
-    header = [clean(value) for value in next(iterator)]
-    required = {"CH_Territoire", "CH_DetermZNIEFF", "CD_REF_TAXREF"}
-    if not required.issubset(set(header)):
-        workbook.close()
-        raise SystemExit(f"Colonnes manquantes: {sorted(required - set(header))}")
-    rows = []
-    for values in iterator:
-        row = {header[index]: values[index] if index < len(values) else None for index in range(len(header))}
-        rows.append(row)
-    workbook.close()
-    return rows
 
 
-def taxref_lookup(path: Path, wanted_codes: set[int]):
+def select_rows(rows: list[dict[str, object]]):
+    selected = []
+    raw_codes: Counter = Counter()
+    for row in rows:
+        if clean(row.get("CH_Territoire")) != TERRITORY:
+            continue
+        code = clean(row.get("CH_DetermZNIEFF"))
+        raw_codes[code or "<vide>"] += 1
+        value = VALUE_BY_CODE.get(code)
+        if not value:
+            continue
+        if len(value) > MAX_VALUE_LENGTH:
+            continue
+        cd_ref = as_int(row.get("CD_REF_TAXREF"))
+        if cd_ref is None:
+            continue
+        selected.append(
+            {
+                "cd_ref": cd_ref,
+                "value": value,
+                "name": clean(row.get("CH_NomCompletTAXREF") or row.get("CH_NomComp")),
+                "raw": code,
+            }
+        )
+    return selected, raw_codes
+
+
+def parse_all(input_dir: Path) -> dict[str, dict]:
+    parsed = {}
+    for source in SOURCES:
+        path = input_dir / source["filename"]
+        digest = sha256(path)
+        if digest != source["sha256"]:
+            raise SystemExit(f"{source['filename']}: SHA-256 Digitale inattendu: {digest}")
+        rows = read_rows(path, source["sheet"])
+        selected, raw_codes = select_rows(rows)
+        parsed[source["key"]] = {
+            "selected": selected,
+            "raw_codes": raw_codes,
+            "rows_source": len(rows),
+            "digest": digest,
+        }
+    return parsed
+
+
+def wanted_from_parsed(parsed: dict[str, dict]) -> set[int]:
+    codes: set[int] = set()
+    for entry in parsed.values():
+        for row in entry["selected"]:
+            codes.add(row["cd_ref"])
+    return codes
+
+
+def taxref_lookup(path: Path, wanted_codes: set[int]) -> dict[int, str | None]:
     by_cd_ref: dict[int, str | None] = {}
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
@@ -120,41 +173,16 @@ def taxref_lookup(path: Path, wanted_codes: set[int]):
     return by_cd_ref
 
 
-def build_package(source, taxref_path: Path, input_dir: Path, checked_at: str):
-    source_path = input_dir / source["filename"]
-    digest = sha256(source_path)
-    if digest != source["sha256"]:
-        raise SystemExit(f"SHA-256 Digitale inattendu: {digest}")
-
-    rows = read_rows(source_path, source["sheet"])
-    selected = []
-    raw_codes = Counter()
-    for row in rows:
-        if clean(row.get("CH_Territoire")) != TERRITORY:
-            continue
-        code = clean(row.get("CH_DetermZNIEFF"))
-        raw_codes[code or "<vide>"] += 1
-        value = VALUE_BY_CODE.get(code)
-        if not value or len(value) > MAX_VALUE_LENGTH:
-            continue
-        cd_ref = as_int(row.get("CD_REF_TAXREF"))
-        if cd_ref is None:
-            continue
-        selected.append(
-            {
-                "cd_ref": cd_ref,
-                "value": value,
-                "name": clean(row.get("CH_NomCompletTAXREF") or row.get("CH_NomComp")),
-            }
-        )
-
-    by_cd_ref = taxref_lookup(taxref_path, {row["cd_ref"] for row in selected})
-    stats = Counter()
-    values = Counter()
+def build_package(source: dict, entry: dict, by_cd_ref: dict[int, str | None], checked_at: str) -> dict:
+    stats: Counter = Counter()
+    stats["rows_source"] = entry["rows_source"]
+    stats["rows_hdf_znieff"] = len(entry["selected"])
+    values: Counter = Counter()
     statuses = []
     seen = set()
     unresolved = []
-    for row in selected:
+
+    for row in entry["selected"]:
         realm = by_cd_ref.get(row["cd_ref"])
         if realm is None:
             stats["unmatched"] += 1
@@ -196,19 +224,23 @@ def build_package(source, taxref_path: Path, input_dir: Path, checked_at: str):
             "publicationYear": 2026,
             "official": True,
             "checkedAt": checked_at,
-            "sha256": digest,
+            "sha256": entry["digest"],
             "landingPage": LANDING_URL,
             "sourceUrl": source["sourceUrl"],
-            "mirrorLandingPage": DREAL_LANDING,
         },
         "replaces": [
-            {"region": "HDF", "category": "znieff", "realm": "flora", "cdRefs": covered_refs},
+            {
+                "region": "HDF",
+                "category": "znieff",
+                "realm": "flora",
+                "cdRefs": covered_refs,
+            },
         ],
         "statuses": sorted(statuses, key=lambda status: (status["cdRef"], status["value"])),
         "diagnostics": {
             **dict(stats),
             "matchRate": round(match_rate, 6),
-            "rawDetermValues": dict(sorted(raw_codes.items())),
+            "rawDetermValues": dict(sorted(entry["raw_codes"].items())),
             "values": dict(sorted(values.items())),
             "unresolvedSample": unresolved,
         },
@@ -224,24 +256,38 @@ def main():
     parser.add_argument("--min-match-rate", type=float, default=0.97)
     args = parser.parse_args()
 
+    input_dir = Path(args.input_dir)
     out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    total = 0
+    parsed = parse_all(input_dir)
+    wanted_codes = wanted_from_parsed(parsed)
+    by_cd_ref = taxref_lookup(Path(args.taxref), wanted_codes)
+
+    total_statuses = 0
     for source in SOURCES:
-        package = build_package(source, Path(args.taxref), Path(args.input_dir), args.checked_at)
+        package = build_package(source, parsed[source["key"]], by_cd_ref, args.checked_at)
         diagnostics = package["diagnostics"]
         print(json.dumps({"source": source["id"], **diagnostics}, ensure_ascii=False, indent=2))
         if diagnostics["matchRate"] < args.min_match_rate:
-            raise SystemExit(f"{source['id']}: raccord insuffisant {diagnostics['matchRate']:.2%}")
-        if len(package["statuses"]) < source["min_statuses"]:
             raise SystemExit(
-                f"{source['id']}: volume trop faible {len(package['statuses'])} < {source['min_statuses']}"
+                f"{source['id']}: taux de raccord TAXREF insuffisant "
+                f"{diagnostics['matchRate']:.2%} < {args.min_match_rate:.2%}"
             )
-        output = out_dir / f"hdf-znieff-{source['key']}.json"
-        output.write_text(json.dumps(package, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
-        total += len(package["statuses"])
+        if not package["statuses"]:
+            raise SystemExit(f"{source['id']}: aucun statut ZNIEFF Hauts-de-France produit")
+        if len(package["statuses"]) < source["minVolume"]:
+            raise SystemExit(
+                f"{source['id']}: volume ZNIEFF Hauts-de-France anormalement faible: {len(package['statuses'])}"
+            )
+        out_dir.mkdir(parents=True, exist_ok=True)
+        output = out_dir / source["outName"]
+        output.write_text(
+            json.dumps(package, ensure_ascii=False, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        total_statuses += len(package["statuses"])
         print(f"Paquet écrit: {output} - {len(package['statuses'])} statuts")
-    print(f"HDF Digitale ZNIEFF: {len(SOURCES)} paquets, {total} statuts")
+
+    print(f"Hauts-de-France ZNIEFF Digitale: {len(SOURCES)} paquets, {total_statuses} statuts")
 
 
 if __name__ == "__main__":

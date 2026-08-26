@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Listes rouges régionales IRPN Hauts-de-France — multi-groupes faune."""
+"""Listes rouges régionales unifiées Hauts-de-France (IRPN) — multi-groupes faune."""
 from __future__ import annotations
 
 import argparse
@@ -16,8 +16,11 @@ from xml.etree import ElementTree as ET
 
 from openpyxl import load_workbook
 
-LANDING_URL = "https://irpn.drealnpdc.fr/"
-PRODUCER = "IRPN / partenaires naturalistes / CSRPN Hauts-de-France"
+LANDING_URL = "https://irpn.drealnpdc.fr/listes-rouges/listes-rouges-regionales/"
+PRODUCER = (
+    "IRPN Hauts-de-France (GON / Picardie Nature / ARFDPPMA Hauts-de-France) / "
+    "DREAL Hauts-de-France / CSRPN Hauts-de-France / partenaires"
+)
 REALM_BY_KINGDOM = {"animalia": "fauna", "plantae": "flora"}
 VALID_LRR_CATEGORY = re.compile(r"^(?:EX|EW|RE|CR\*?|EN|VU|NT|LC|DD|NE|NA[a-z]{0,3})$")
 NS = {
@@ -25,73 +28,51 @@ NS = {
     "text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
 }
 TABLE_NS = NS["table"]
-
 CODE_HEADERS = ("CDNOM", "CD_NOM")
-CATEGORY_HEADERS = ("CATEGORIE_HAUTS-DE-FRANCE",)
 NAME_HEADERS = ("NOM_SCIENTIFIQUE",)
+CATEGORY_HEADERS = ("CATEGORIE_HAUTS-DE-FRANCE",)
 
-# Chaque paquet IRPN correspond à un classeur téléchargé par download_lrr.sh.
 FILES = {
     "oiseaux": {
         "filename": "oiseaux.xlsx",
-        "sheet": "BASE_LRHDF_OIS_N",
         "sha256": "72cd2b60ed47120ab08f722bfdd4256d69bdba424722499dc3062a5e0705879a",
-        "sourceUrl": (
-            "https://irpn.drealnpdc.fr/wp-content/uploads/2024/04/"
-            "LRR_oiseaux_nicheurs_HdF_synthese.xlsx"
-        ),
+        "sourceUrl": "https://irpn.drealnpdc.fr/wp-content/uploads/2024/04/LRR_oiseaux_nicheurs_HdF_synthese.xlsx",
     },
     "papillons": {
         "filename": "papillons.xlsx",
-        "sheet": "BASE_LRHDF_PAP_J",
         "sha256": "9cea00c3bd53fcbda1f2cee2fd42312efe0b1fcbf7ddc21e8708c62c643090d7",
-        "sourceUrl": (
-            "https://irpn.drealnpdc.fr/wp-content/uploads/2024/03/"
-            "LRR_papillons-de-jour_synthese_mars-1.xlsx"
-        ),
-    },
-    "orthopteres": {
-        "filename": "orthopteres.xlsx",
-        "sheet": "BASE_LRHDF_ORTHOP",
-        "sha256": "ee2263c415105457826952c87e15e36830f4a4640a9e65b71e5209009ffb6e7b",
-        "sourceUrl": (
-            "http://www.picardie-nature.org/IMG/xlsx/"
-            "lrr_orthopteres-mantodea_phasmida.xlsx"
-        ),
-    },
-    "coccinelles": {
-        "filename": "coccinelles.xlsx",
-        "sheet": "BASE_LRHDF_COCCINELL",
-        "sha256": "6be17093692130b2833e4d54d9e7ec051356c132a6231da6fea567608798f565",
-        "sourceUrl": (
-            "http://www.picardie-nature.org/IMG/xlsx/"
-            "lrr_coccinelles_synthese_septembre.xlsx"
-        ),
+        "sourceUrl": "https://irpn.drealnpdc.fr/wp-content/uploads/2024/03/LRR_papillons-de-jour_synthese_mars-1.xlsx",
     },
     "mollusques": {
         "filename": "mollusques.ods",
-        "sheet": "BASE_LRHDF_MOL_C",
         "sha256": "bc30243f569fc7e9b1807c8cdc8c653da20458a81e81be1a6768c36a88ae3ee1",
-        "sourceUrl": (
-            "https://irpn.drealnpdc.fr/wp-content/uploads/2025/02/"
-            "LRR_mollusques_HdF_synthese.ods"
-        ),
+        "sourceUrl": "https://irpn.drealnpdc.fr/wp-content/uploads/2025/02/LRR_mollusques_HdF_synthese.ods",
     },
     "poissons": {
         "filename": "poissons.ods",
-        "sheet": "BASE_LRHDF_POI_ED",
         "sha256": "a1202ece93abf61268bdfcaa1bdda0a83c05ae8f29f0032955323dc2e6d14df0",
-        "sourceUrl": (
-            "https://irpn.drealnpdc.fr/wp-content/uploads/2025/09/"
-            "LRR_poissons_ecrevisses_eau-douce_HDF.ods"
-        ),
+        "sourceUrl": "https://irpn.drealnpdc.fr/wp-content/uploads/2025/09/LRR_poissons_ecrevisses_eau-douce_HDF.ods",
+    },
+    "orthopteres": {
+        "filename": "orthopteres.xlsx",
+        "sha256": "ee2263c415105457826952c87e15e36830f4a4640a9e65b71e5209009ffb6e7b",
+        "sourceUrl": "http://www.picardie-nature.org/IMG/xlsx/lrr_orthopteres-mantodea_phasmida.xlsx",
+    },
+    "coccinelles": {
+        "filename": "coccinelles.xlsx",
+        "sha256": "6be17093692130b2833e4d54d9e7ec051356c132a6231da6fea567608798f565",
+        "sourceUrl": "http://www.picardie-nature.org/IMG/xlsx/lrr_coccinelles_synthese_septembre.xlsx",
     },
 }
 
+# Le tableur poissons.ods porte deux onglets BASE_ distincts (poissons + écrevisses) :
+# le paquet unifié « poissons-ecrevisses » doit couvrir les deux pour correspondre au titre IRPN.
 SOURCES = [
     {
         "key": "oiseaux-nicheurs",
         "file_key": "oiseaux",
+        "kind": "xlsx",
+        "sheets": ["BASE_LRHDF_OIS_N"],
         "id": "irpn-hdf-lrr-oiseaux-nicheurs-2024",
         "name": "Liste rouge Oiseaux nicheurs Hauts-de-France",
         "version": "2024",
@@ -100,6 +81,8 @@ SOURCES = [
     {
         "key": "papillons-jour",
         "file_key": "papillons",
+        "kind": "xlsx",
+        "sheets": ["BASE_LRHDF_PAP_J"],
         "id": "irpn-hdf-lrr-papillons-jour-2024",
         "name": "Liste rouge Papillons de jour Hauts-de-France",
         "version": "2024",
@@ -108,6 +91,8 @@ SOURCES = [
     {
         "key": "mollusques",
         "file_key": "mollusques",
+        "kind": "ods",
+        "sheets": ["BASE_LRHDF_MOL_C"],
         "id": "irpn-hdf-lrr-mollusques-2024",
         "name": "Liste rouge Mollusques continentaux Hauts-de-France",
         "version": "2024",
@@ -116,6 +101,8 @@ SOURCES = [
     {
         "key": "poissons-ecrevisses",
         "file_key": "poissons",
+        "kind": "ods",
+        "sheets": ["BASE_LRHDF_POI_ED", "BASE_LRHDF_ECR_ED"],
         "id": "irpn-hdf-lrr-poissons-ecrevisses-2025",
         "name": "Liste rouge Poissons et écrevisses d'eau douce Hauts-de-France",
         "version": "2025",
@@ -124,14 +111,18 @@ SOURCES = [
     {
         "key": "orthopteres",
         "file_key": "orthopteres",
+        "kind": "xlsx",
+        "sheets": ["BASE_LRHDF_ORTHOP"],
         "id": "irpn-hdf-lrr-orthopteres-2025",
-        "name": "Liste rouge Orthoptères, mantes et phasmes Hauts-de-France",
+        "name": "Liste rouge Orthoptères, Mantes et Phasmes Hauts-de-France",
         "version": "2025",
         "year": 2025,
     },
     {
         "key": "coccinelles",
         "file_key": "coccinelles",
+        "kind": "xlsx",
+        "sheets": ["BASE_LRHDF_COCCINELL"],
         "id": "irpn-hdf-lrr-coccinelles-2025",
         "name": "Liste rouge Coccinelles Hauts-de-France",
         "version": "2025",
@@ -147,8 +138,7 @@ def clean(value: object) -> str:
 def normalize(value: object) -> str:
     text = unicodedata.normalize("NFKD", clean(value))
     text = "".join(char for char in text if not unicodedata.combining(char))
-    text = text.replace("×", "x")
-    return text.casefold()
+    return text.replace("×", "x").casefold()
 
 
 def sha256(path: Path) -> str:
@@ -192,6 +182,15 @@ def normalize_category(value: object) -> str | None:
     return None
 
 
+def column_index(headers, alternatives):
+    normalized = [normalize(value) for value in headers]
+    for alternative in alternatives:
+        target = normalize(alternative)
+        if target in normalized:
+            return normalized.index(target)
+    return None
+
+
 def ods_sheet_rows(path: Path, sheet_name: str) -> list[list[str]]:
     with zipfile.ZipFile(path) as archive:
         root = ET.fromstring(archive.read("content.xml"))
@@ -204,79 +203,69 @@ def ods_sheet_rows(path: Path, sheet_name: str) -> list[list[str]]:
             for cell in table_row.findall("table:table-cell", NS):
                 repeat = int(cell.get(f"{{{TABLE_NS}}}number-columns-repeated") or 1)
                 text = clean("".join(cell.itertext()))
-                cells.extend([text] * min(repeat, 20))
+                cells.extend([text] * min(repeat, 30))
             if any(cells):
                 rows.append(cells)
         return rows
     raise RuntimeError(f"{path.name}: onglet introuvable {sheet_name}")
 
 
-def xlsx_sheet_rows(path: Path, sheet_name: str) -> list[list[object]]:
-    workbook = load_workbook(path, read_only=True, data_only=True)
-    try:
-        if sheet_name not in workbook.sheetnames:
-            raise RuntimeError(f"{path.name}: onglet introuvable {sheet_name}")
-        rows = [list(row) for row in workbook[sheet_name].iter_rows(values_only=True)]
-    finally:
-        workbook.close()
-    return rows
-
-
-def sheet_rows(path: Path, sheet_name: str) -> list[list[object]]:
-    if path.suffix.lower() == ".ods":
-        return ods_sheet_rows(path, sheet_name)
-    return xlsx_sheet_rows(path, sheet_name)
-
-
-def column_index(headers: list[object], candidates: tuple[str, ...]) -> int | None:
-    normalized = [normalize(value) for value in headers]
-    for candidate in candidates:
-        target = normalize(candidate)
-        if target in normalized:
-            return normalized.index(target)
-    return None
-
-
-def find_header_row(rows: list[list[object]]) -> int:
-    for index, headers in enumerate(rows[:10]):
-        if (
-            column_index(headers, CODE_HEADERS) is not None
-            and column_index(headers, CATEGORY_HEADERS) is not None
-            and column_index(headers, NAME_HEADERS) is not None
-        ):
-            return index
-    raise RuntimeError("ligne d'en-tête introuvable (CDNOM/CD_NOM, CATEGORIE_HAUTS-DE-FRANCE, NOM_SCIENTIFIQUE)")
-
-
-def read_file_rows(file_key: str, meta: dict, input_dir: Path) -> list[dict]:
-    path = input_dir / meta["filename"]
-    rows = sheet_rows(path, meta["sheet"])
-    header_index = find_header_row(rows)
-    headers = rows[header_index]
-    code_index = column_index(headers, CODE_HEADERS)
-    category_index = column_index(headers, CATEGORY_HEADERS)
-    name_index = column_index(headers, NAME_HEADERS)
-    if code_index is None or category_index is None or name_index is None:
-        raise RuntimeError(f"{meta['filename']}: colonnes CDNOM/CATEGORIE/NOM_SCIENTIFIQUE introuvables")
-
+def rows_from_values(header, value_rows, sheet_label: str) -> list[dict]:
+    code_index = column_index(header, CODE_HEADERS)
+    name_index = column_index(header, NAME_HEADERS)
+    category_index = column_index(header, CATEGORY_HEADERS)
+    if code_index is None or category_index is None:
+        raise RuntimeError(f"{sheet_label}: colonnes CDNOM/CATEGORIE_HAUTS-DE-FRANCE introuvables")
     parsed = []
-    for values in rows[header_index + 1 :]:
-        category = normalize_category(values[category_index] if category_index < len(values) else None)
+    for values in value_rows:
+        if values is None:
+            continue
+        category_raw = values[category_index] if category_index < len(values) else None
+        category = normalize_category(category_raw)
         if category is None:
             continue
-        parsed.append(
-            {
-                "code": as_int(values[code_index] if code_index < len(values) else None),
-                "name": clean(values[name_index] if name_index < len(values) else ""),
-                "category": category,
-            }
-        )
-    if not parsed:
-        raise RuntimeError(f"{meta['filename']}: aucune ligne de statut exploitable ({file_key})")
+        code = as_int(values[code_index] if code_index < len(values) else None)
+        if code is None:
+            continue
+        name = clean(values[name_index]) if name_index is not None and name_index < len(values) else ""
+        parsed.append({"code": code, "name": name, "category": category})
     return parsed
 
 
-def parse_all(input_dir: Path) -> dict[str, list[dict]]:
+def read_xlsx_sheet(path: Path, sheet_name: str) -> list[dict]:
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    try:
+        if sheet_name not in workbook.sheetnames:
+            raise RuntimeError(f"{path.name}: feuille absente ({sheet_name})")
+        sheet = workbook[sheet_name]
+        rows_iterator = sheet.iter_rows(values_only=True)
+        header = [clean(value) for value in next(rows_iterator)]
+        return rows_from_values(header, rows_iterator, f"{path.name}/{sheet_name}")
+    finally:
+        workbook.close()
+
+
+def read_ods_sheet(path: Path, sheet_name: str) -> list[dict]:
+    rows = ods_sheet_rows(path, sheet_name)
+    if not rows:
+        raise RuntimeError(f"{path.name}/{sheet_name}: onglet vide")
+    header, *body = rows
+    return rows_from_values(header, body, f"{path.name}/{sheet_name}")
+
+
+def read_source_rows(path: Path, source: dict) -> list[dict]:
+    rows: list[dict] = []
+    for sheet_name in source["sheets"]:
+        if source["kind"] == "xlsx":
+            rows.extend(read_xlsx_sheet(path, sheet_name))
+        else:
+            rows.extend(read_ods_sheet(path, sheet_name))
+    if not rows:
+        raise RuntimeError(f"{source['id']}: aucune ligne de statut exploitable")
+    return rows
+
+
+def parse_all(input_dir: Path):
     for meta in FILES.values():
         path = input_dir / meta["filename"]
         actual = sha256(path)
@@ -284,21 +273,18 @@ def parse_all(input_dir: Path) -> dict[str, list[dict]]:
             raise SystemExit(f"{path.name}: SHA-256 inattendu {actual} != {meta['sha256']}")
 
     parsed: dict[str, list[dict]] = {}
-    for file_key, meta in FILES.items():
-        parsed[file_key] = read_file_rows(file_key, meta, input_dir)
-    return parsed
-
-
-def wanted_from_parsed(parsed: dict[str, list[dict]]):
     codes: set[int] = set()
     names: set[str] = set()
-    for rows in parsed.values():
+    for source in SOURCES:
+        path = input_dir / FILES[source["file_key"]]["filename"]
+        rows = read_source_rows(path, source)
+        parsed[source["key"]] = rows
         for row in rows:
             if row["code"] is not None:
                 codes.add(row["code"])
             if row["name"]:
                 names.add(normalize(row["name"]))
-    return codes, names
+    return parsed, codes, names
 
 
 def taxref_lookup(path: Path, wanted_codes: set[int], wanted_names: set[str]):
@@ -307,8 +293,8 @@ def taxref_lookup(path: Path, wanted_codes: set[int], wanted_names: set[str]):
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle, delimiter="\t")
         for row in reader:
-            cd_nom_raw = str(row.get("CD_NOM") or "").strip()
-            cd_ref_raw = str(row.get("CD_REF") or "").strip()
+            cd_nom_raw = clean(row.get("CD_NOM"))
+            cd_ref_raw = clean(row.get("CD_REF"))
             if not cd_nom_raw.isdigit() or not cd_ref_raw.isdigit():
                 continue
             realm = REALM_BY_KINGDOM.get(normalize(row.get("REGNE")))
@@ -364,12 +350,7 @@ def build_package(source, rows, input_dir: Path, by_cd_nom, by_name, checked_at:
             stats[mode] += 1
             if len(stats["unresolvedSample"]) < 30:
                 stats["unresolvedSample"].append(
-                    {
-                        "code": row["code"],
-                        "taxon": row["name"],
-                        "category": row["category"],
-                        "reason": mode,
-                    }
+                    {"code": row["code"], "taxon": row["name"], "category": row["category"], "reason": mode}
                 )
             continue
         if realm != "fauna":
@@ -415,12 +396,7 @@ def build_package(source, rows, input_dir: Path, by_cd_nom, by_name, checked_at:
             "sourceUrl": file_meta["sourceUrl"],
         },
         "replaces": [
-            {
-                "region": "HDF",
-                "category": "red_list_regional",
-                "realm": "fauna",
-                "cdRefs": covered_refs,
-            },
+            {"region": "HDF", "category": "red_list_regional", "realm": "fauna", "cdRefs": covered_refs},
         ],
         "statuses": sorted(statuses, key=lambda status: (status["cdRef"], status["value"])),
         "diagnostics": stats,
@@ -438,15 +414,12 @@ def main():
 
     input_dir = Path(args.input_dir)
     out_dir = Path(args.out_dir)
-    parsed = parse_all(input_dir)
-    wanted_codes, wanted_names = wanted_from_parsed(parsed)
+    parsed, wanted_codes, wanted_names = parse_all(input_dir)
     by_cd_nom, by_name = taxref_lookup(Path(args.taxref), wanted_codes, wanted_names)
 
     total_statuses = 0
     for source in SOURCES:
-        package = build_package(
-            source, parsed[source["file_key"]], input_dir, by_cd_nom, by_name, args.checked_at
-        )
+        package = build_package(source, parsed[source["key"]], input_dir, by_cd_nom, by_name, args.checked_at)
         diagnostics = package["diagnostics"]
         print(json.dumps({"source": source["id"], **diagnostics}, ensure_ascii=False, indent=2))
         if diagnostics["matchRate"] < args.min_match_rate:
@@ -456,8 +429,6 @@ def main():
             )
         if not package["statuses"]:
             raise SystemExit(f"{source['id']}: aucun statut produit")
-        if "url" in package["source"]:
-            raise SystemExit(f"{source['id']}: champ url interdit")
         out_dir.mkdir(parents=True, exist_ok=True)
         output = out_dir / f"hdf-lrr-{source['key']}.json"
         output.write_text(
@@ -467,7 +438,7 @@ def main():
         total_statuses += len(package["statuses"])
         print(f"Paquet écrit: {output} - {len(package['statuses'])} statuts")
 
-    print(f"Hauts-de-France LRR IRPN: {len(SOURCES)} paquets, {total_statuses} statuts")
+    print(f"Hauts-de-France LRR: {len(SOURCES)} paquets, {total_statuses} statuts")
 
 
 if __name__ == "__main__":
