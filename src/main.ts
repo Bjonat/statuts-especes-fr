@@ -1,7 +1,7 @@
 import './styles.css'
 import { loadDataStore } from './catalog'
 import { searchTaxa } from './search'
-import type { Realm, RegionCode, StatusCategory, Taxon, TaxonStatus } from './types'
+import type { Realm, RegionCode, SourceDataset, StatusCategory, Taxon, TaxonStatus } from './types'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -22,22 +22,26 @@ let installPrompt: BeforeInstallPromptEvent | null = null
 let iosInstallHelpVisible = false
 
 const state: {
+  screen: 'home' | 'sources'
   realm: Realm | null
   region: RegionCode
   query: string
   selectedTaxon: Taxon | null
   taxa: Taxon[]
   statuses: TaxonStatus[]
+  regionSources: SourceDataset[]
   loading: boolean
   error: string | null
   offlineReady: boolean
 } = {
+  screen: 'home',
   realm: null,
   region: defaultRegion,
   query: '',
   selectedTaxon: null,
   taxa: [],
   statuses: [],
+  regionSources: [],
   loading: false,
   error: null,
   offlineReady: dataStore.datasetVersion === 'demo',
@@ -261,6 +265,7 @@ async function loadRealmData(realm: Realm, region: RegionCode): Promise<void> {
 }
 
 async function chooseRealm(realm: Realm): Promise<void> {
+  state.screen = 'home'
   state.realm = realm
   state.query = ''
   state.selectedTaxon = null
@@ -274,8 +279,52 @@ async function changeRegion(region: RegionCode): Promise<void> {
   state.selectedTaxon = null
   state.statuses = []
   localStorage.setItem('region', region)
+  if (state.screen === 'sources') {
+    await loadRegionSources(region)
+    return
+  }
   if (state.realm) await loadRealmData(state.realm, region)
   else render()
+}
+
+async function loadRegionSources(region: RegionCode): Promise<void> {
+  state.loading = true
+  state.error = null
+  render()
+
+  try {
+    const regionSources = await dataStore.listSourcesForRegion(region)
+    if (state.screen !== 'sources' || state.region !== region) return
+    state.regionSources = regionSources
+    state.loading = false
+    render()
+  } catch {
+    if (state.screen !== 'sources' || state.region !== region) return
+    state.loading = false
+    state.error = navigator.onLine
+      ? 'Impossible de charger la liste des sources. Réessayez.'
+      : "Ce jeu de données n'est pas encore disponible hors connexion sur cet appareil."
+    render()
+  }
+}
+
+async function openSources(): Promise<void> {
+  state.screen = 'sources'
+  state.realm = null
+  state.query = ''
+  state.selectedTaxon = null
+  state.taxa = []
+  state.statuses = []
+  state.regionSources = []
+  await loadRegionSources(state.region)
+}
+
+function closeSources(): void {
+  state.screen = 'home'
+  state.loading = false
+  state.error = null
+  state.regionSources = []
+  render()
 }
 
 function bindRegionSelect(): void {
@@ -303,6 +352,7 @@ function renderRealmChoice(): void {
           </button>
         </div>
         ${installMarkup()}
+        <button class="sources-button" id="open-sources" type="button">Sources</button>
         <div class="home-status">${offlineBadge()}</div>
       </section>
       ${renderDataNotice()}
@@ -314,7 +364,67 @@ function renderRealmChoice(): void {
       void chooseRealm(button.dataset.realm as Realm)
     })
   })
+  document.querySelector<HTMLButtonElement>('#open-sources')?.addEventListener('click', () => {
+    void openSources()
+  })
   bindInstallAction()
+}
+
+function renderSources(): void {
+  const region = regions.find((item) => item.code === state.region)
+
+  root.innerHTML = `
+    <main class="shell">
+      <header class="topbar">
+        <button class="link-button" id="back-home" type="button">← Accueil</button>
+        ${offlineBadge()}
+      </header>
+
+      <section class="panel" aria-labelledby="sources-title">
+        <p class="eyebrow">Provenance</p>
+        <h1 id="sources-title">Sources</h1>
+        <p class="intro">Référentiels utilisés pour ${escapeHtml(region?.name ?? state.region)}.</p>
+
+        <label class="field-label" for="region-select">Région</label>
+        <select id="region-select" class="field-control">${regionOptions()}</select>
+
+        ${
+          state.loading
+            ? '<p class="empty-state" aria-live="polite">Chargement des sources…</p>'
+            : state.error
+              ? `<p class="empty-state" role="alert">${escapeHtml(state.error)}</p>
+                 <button class="primary-button" id="retry-sources" type="button">Réessayer</button>`
+              : state.regionSources.length
+                ? `<ul class="source-list">
+                    ${state.regionSources
+                      .map(
+                        (source) => `
+                          <li class="source-item">
+                            <p class="source-name">${escapeHtml(cleanDisplayText(source.name))}</p>
+                            <p class="source-meta">${escapeHtml(cleanDisplayText(source.producer))}</p>
+                            <p class="source-meta">
+                              Version ${escapeHtml(cleanDisplayText(source.version))}
+                              ${source.publicationYear ? ` · ${source.publicationYear}` : ''}
+                              ${source.checkedAt ? ` · vérifié le ${escapeHtml(formatCheckedDate(source.checkedAt))}` : ''}
+                            </p>
+                          </li>
+                        `,
+                      )
+                      .join('')}
+                  </ul>`
+                : '<p class="empty-state">Aucune source listée pour cette région dans le jeu chargé.</p>'
+        }
+      </section>
+
+      ${renderDataNotice()}
+    </main>
+  `
+
+  bindRegionSelect()
+  document.querySelector<HTMLButtonElement>('#back-home')?.addEventListener('click', closeSources)
+  document.querySelector<HTMLButtonElement>('#retry-sources')?.addEventListener('click', () => {
+    void loadRegionSources(state.region)
+  })
 }
 
 function renderLoading(): void {
@@ -334,6 +444,7 @@ function renderLoading(): void {
 
   document.querySelector<HTMLButtonElement>('#cancel-loading')?.addEventListener('click', () => {
     state.realm = null
+    state.screen = 'home'
     state.loading = false
     state.error = null
     render()
@@ -358,6 +469,7 @@ function renderError(): void {
 
   document.querySelector<HTMLButtonElement>('#error-back')?.addEventListener('click', () => {
     state.realm = null
+    state.screen = 'home'
     state.error = null
     render()
   })
@@ -425,6 +537,7 @@ function renderSearch(): void {
 
   document.querySelector<HTMLButtonElement>('#change-realm')?.addEventListener('click', () => {
     state.realm = null
+    state.screen = 'home'
     state.query = ''
     state.selectedTaxon = null
     render()
@@ -505,6 +618,11 @@ function renderDetail(): void {
 }
 
 function render(): void {
+  if (state.screen === 'sources') {
+    renderSources()
+    return
+  }
+
   if (!state.realm) {
     renderRealmChoice()
     return
