@@ -152,6 +152,53 @@ h2 {
   line-height: 1.45;
 }
 
+.sources-button {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 10px;
+  border: 1px solid #cfd2c8;
+  border-radius: 11px;
+  padding: 10px 16px;
+  background: #fafbf7;
+  color: #34422f;
+  font-weight: 750;
+}
+
+.sources-button:hover,
+.sources-button:focus-visible {
+  outline: 3px solid #c9d6be;
+  outline-offset: 2px;
+}
+
+.source-list {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  border-top: 1px solid #ecece7;
+}
+
+.source-item {
+  padding: 14px 2px;
+  border-bottom: 1px solid #ecece7;
+}
+
+.source-name {
+  margin: 0 0 4px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.source-meta {
+  margin: 0;
+  color: #646b60;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.source-meta + .source-meta {
+  margin-top: 2px;
+}
+
 .topbar {
   min-height: 48px;
   margin-bottom: 12px;

@@ -24,3 +24,13 @@ export function hydrateStatusLinks(
     }
   })
 }
+
+/** Identifiants de sources réellement cités par les liens de statut d'une région. */
+export function collectSourceIdsFromLinks(definitions: StatusDefinition[], links: StatusLink[]): Set<string> {
+  const ids = new Set<string>()
+  for (const [, definitionId] of links) {
+    const sourceId = definitions[definitionId]?.sourceId
+    if (sourceId) ids.add(sourceId)
+  }
+  return ids
+}
