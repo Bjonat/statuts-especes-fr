@@ -85,6 +85,13 @@ jobs:
           bash data-pipeline/regions/ara/download_dreal_znieff.sh "$RUNNER_TEMP/ara-znieff.ods"
           echo "ARA_ZNIEFF_FILE=$RUNNER_TEMP/ara-znieff.ods" >> "$GITHUB_ENV"
 
+      - name: Download regional Auvergne-Rhône-Alpes LRR sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ara/download_lrr.sh "$RUNNER_TEMP/ara-lrr"
+          echo "ARA_LRR_DIR=$RUNNER_TEMP/ara-lrr" >> "$GITHUB_ENV"
+
       - name: Download regional ZNIEFF flora Nouvelle-Aquitaine
         shell: bash
         run: |
@@ -217,6 +224,11 @@ jobs:
             --ods "$ARA_ZNIEFF_FILE" \
             --out "$REGIONAL_DIR/ara-znieff.json" \
             --min-match-rate 0.97
+          python data-pipeline/regions/ara/build_lrr.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$ARA_LRR_DIR" \
+            --out-dir "$REGIONAL_DIR" \
+            --min-match-rate 0.97
           python data-pipeline/regions/naq/build_znieff.py \
             --taxref "$TAXREF_FILE" \
             --workbook "$NAQ_ZNIEFF_FILE" \
@@ -316,6 +328,9 @@ jobs:
           const manifest = JSON.parse(fs.readFileSync('public/data/manifest.json', 'utf8'))
           const required = [
             'dreal-ara-znieff-2023-06',
+            'dreal-ara-lrr-amphibiens-2024', 'dreal-ara-lrr-reptiles-2024',
+            'dreal-ara-lrr-chiropteres-2024', 'dreal-ara-lrr-oiseaux-nicheurs-2024',
+            'dreal-ara-lrr-mammiferes-2024',
             'obv-na-znieff-flore-2019-v1.2',
             'oeb-bretagne-znieff-csv-2026-01-29',
             'oeb-bretagne-lrr-csv-2026-01-29',
@@ -422,6 +437,9 @@ jobs:
           if (dataManifest.official !== true || dataManifest.regions.length !== 13) process.exit(1)
           const required = [
             'dreal-ara-znieff-2023-06',
+            'dreal-ara-lrr-amphibiens-2024', 'dreal-ara-lrr-reptiles-2024',
+            'dreal-ara-lrr-chiropteres-2024', 'dreal-ara-lrr-oiseaux-nicheurs-2024',
+            'dreal-ara-lrr-mammiferes-2024',
             'obv-na-znieff-flore-2019-v1.2',
             'oeb-bretagne-znieff-csv-2026-01-29',
             'oeb-bretagne-lrr-csv-2026-01-29',
