@@ -1,4 +1,4 @@
-name: Hauts-de-France Digitale ZNIEFF smoke test
+name: Hauts-de-France ZNIEFF smoke test
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ on:
       - '.github/workflows/hdf-digitale-smoke.yml'
 
 jobs:
-  build-hdf-digitale-znieff:
+  build-hdf-znieff:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -42,62 +42,82 @@ jobs:
           test -n "$TAXREF_FILE"
           echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
 
-      - name: Download Hauts-de-France Digitale ZNIEFF sources
+      - name: Download Hauts-de-France ZNIEFF sources
         shell: bash
         run: |
           set -euo pipefail
-          bash data-pipeline/regions/hdf/download_digitale_znieff.sh "$RUNNER_TEMP/hdf-digitale"
-          echo "HDF_DIGITALE_DIR=$RUNNER_TEMP/hdf-digitale" >> "$GITHUB_ENV"
+          bash data-pipeline/regions/hdf/download_digitale_znieff.sh "$RUNNER_TEMP/hdf-znieff"
+          echo "HDF_ZNIEFF_DIR=$RUNNER_TEMP/hdf-znieff" >> "$GITHUB_ENV"
 
-      - name: Build Hauts-de-France Digitale ZNIEFF packages
+      - name: Build Hauts-de-France ZNIEFF packages
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/hdf-digitale-packages"
+          mkdir -p "$RUNNER_TEMP/hdf-znieff-packages"
           python data-pipeline/regions/hdf/build_digitale_znieff.py \
             --taxref "$TAXREF_FILE" \
-            --input-dir "$HDF_DIGITALE_DIR" \
-            --out-dir "$RUNNER_TEMP/hdf-digitale-packages" \
+            --input-dir "$HDF_ZNIEFF_DIR" \
+            --out-dir "$RUNNER_TEMP/hdf-znieff-packages" \
             --checked-at 2026-08-26 \
             --min-match-rate 0.97
-          echo "HDF_DIGITALE_PACKAGES_DIR=$RUNNER_TEMP/hdf-digitale-packages" >> "$GITHUB_ENV"
+          echo "HDF_ZNIEFF_PACKAGES_DIR=$RUNNER_TEMP/hdf-znieff-packages" >> "$GITHUB_ENV"
 
       - name: Validate regional packages and sentinels
         shell: bash
         run: |
-          REGIONAL_DIR="$HDF_DIGITALE_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          REGIONAL_DIR="$HDF_ZNIEFF_PACKAGES_DIR" node --input-type=module - <<'NODE'
           import { loadRegionalPackages } from './data-pipeline/regional.mjs'
           const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
-          if (packages.length !== 2) throw new Error(`2 paquets ZNIEFF HDF attendus, reçu ${packages.length}`)
+          if (packages.length !== 4) throw new Error(`4 paquets ZNIEFF HDF attendus, reçu ${packages.length}`)
           const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
           const required = [
-            'cbnhdf-digitale-znieff-hdf-flora-2026-03-31',
-            'cbnhdf-digitale-znieff-hdf-bryophytes-2026-03-31',
+            ['cbnhdf-digitale-znieff-hdf-flora-2026-03-31', 'flora', 'Hauts-de-France'],
+            ['cbnhdf-digitale-znieff-hdf-bryophytes-2026-03-31', 'flora', 'Hauts-de-France'],
+            ['dreal-hdf-znieff-fauna-picardie-2020', 'fauna', 'Picardie'],
+            ['dreal-hdf-znieff-fauna-npdc-2014-2015', 'fauna', 'Nord-Pas-de-Calais'],
           ]
-          for (const id of required) {
+          for (const [id, realm, scope] of required) {
             const pkg = byId[id]
             if (!pkg) throw new Error(`Source absente: ${id}`)
             if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${id}`)
             if ('url' in pkg.source) throw new Error(`Champ url interdit: ${id}`)
             const rule = pkg.replaces[0]
-            if (!rule || rule.region !== 'HDF' || rule.category !== 'znieff' || rule.realm !== 'flora' || !rule.cdRefs?.length) {
+            if (!rule || rule.region !== 'HDF' || rule.category !== 'znieff' || rule.realm !== realm || !rule.cdRefs?.length) {
               throw new Error(`Override invalide: ${id}`)
             }
+            if (pkg.statuses.some((status) => status.scope !== 'partial' || status.scopeLabel !== scope)) {
+              throw new Error(`Portée invalide: ${id}`)
+            }
           }
+
           const flora = byId['cbnhdf-digitale-znieff-hdf-flora-2026-03-31']
-          if (flora.statuses.length < 800) throw new Error(`Volume ZNIEFF flore HDF anormalement faible: ${flora.statuses.length}`)
           const bryophytes = byId['cbnhdf-digitale-znieff-hdf-bryophytes-2026-03-31']
+          const picardie = byId['dreal-hdf-znieff-fauna-picardie-2020']
+          const npdc = byId['dreal-hdf-znieff-fauna-npdc-2014-2015']
+          if (flora.statuses.length < 800) throw new Error(`Volume ZNIEFF flore HDF anormalement faible: ${flora.statuses.length}`)
           if (bryophytes.statuses.length < 300) throw new Error(`Volume ZNIEFF bryophytes HDF anormalement faible: ${bryophytes.statuses.length}`)
-          const achillea = flora.statuses.find((s) => s.cdRef === 79921 && s.value === 'Oui' && s.scope === 'partial' && s.scopeLabel === 'Hauts-de-France')
+          if (picardie.statuses.length !== 449) throw new Error(`449 statuts Picardie attendus, reçu ${picardie.statuses.length}`)
+          if (npdc.statuses.length !== 378) throw new Error(`378 statuts NPdC attendus, reçu ${npdc.statuses.length}`)
+          if (picardie.diagnostics.sourceRowsOutsideTaxref !== 0) throw new Error('Picardie: ligne hors TAXREF inattendue')
+          if (npdc.diagnostics.sourceRowsOutsideTaxref !== 1) throw new Error('NPdC: ligne hors TAXREF officielle non tracée')
+          if (npdc.diagnostics.remappedToTaxref18 !== 1) throw new Error(`NPdC: 1 remapping TAXREF attendu, reçu ${npdc.diagnostics.remappedToTaxref18}`)
+
+          const achillea = flora.statuses.find((s) => s.cdRef === 79921 && s.value === 'Oui' && s.scopeLabel === 'Hauts-de-France')
           if (!achillea) throw new Error('Sentinelle Achillea ptarmica absente')
+          const triturusPicardie = picardie.statuses.find((s) => s.cdRef === 139 && s.scopeLabel === 'Picardie')
+          const triturusNpdc = npdc.statuses.find((s) => s.cdRef === 139 && s.scopeLabel === 'Nord-Pas-de-Calais')
+          if (!triturusPicardie || !triturusNpdc) throw new Error('Sentinelle Triturus cristatus absente des deux portées historiques')
+          const yarrellii = npdc.statuses.find((s) => s.cdRef === 3945)
+          if (!yarrellii) throw new Error('Remapping TAXREF Motacilla yarrellii 961306 -> 3945 absent')
+
           const statuses = packages.reduce((sum, pkg) => sum + pkg.statuses.length, 0)
-          console.log({ packages: packages.length, statuses })
+          console.log({ packages: packages.length, statuses, picardie: picardie.statuses.length, npdc: npdc.statuses.length })
           NODE
 
       - name: Upload normalized packages
         uses: actions/upload-artifact@v4
         with:
-          name: hdf-digitale-znieff-packages
-          path: ${{ env.HDF_DIGITALE_PACKAGES_DIR }}/*.json
+          name: hdf-znieff-packages
+          path: ${{ env.HDF_ZNIEFF_PACKAGES_DIR }}/*.json
           if-no-files-found: error
           retention-days: 7
