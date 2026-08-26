@@ -1,0 +1,108 @@
+name: Hauts-de-France historical fauna ZNIEFF smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/hdf/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/hdf-znieff-fauna-smoke.yml'
+
+jobs:
+  build-hdf-znieff-fauna:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download official historical fauna ZNIEFF lists
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/hdf/download_znieff_fauna.sh "$RUNNER_TEMP/hdf-znieff-fauna"
+          echo "HDF_ZNIEFF_FAUNA_DIR=$RUNNER_TEMP/hdf-znieff-fauna" >> "$GITHUB_ENV"
+
+      - name: Build historical fauna ZNIEFF packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hdf-znieff-fauna-packages"
+          python data-pipeline/regions/hdf/build_znieff_fauna.py \
+            --taxref "$TAXREF_FILE" \
+            --input-dir "$HDF_ZNIEFF_FAUNA_DIR" \
+            --out-dir "$RUNNER_TEMP/hdf-znieff-fauna-packages" \
+            --checked-at 2026-08-26 \
+            --min-match-rate 0.97
+          echo "HDF_ZNIEFF_FAUNA_PACKAGES_DIR=$RUNNER_TEMP/hdf-znieff-fauna-packages" >> "$GITHUB_ENV"
+
+      - name: Validate package contract and historical scopes
+        shell: bash
+        run: |
+          REGIONAL_DIR="$HDF_ZNIEFF_FAUNA_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 2) throw new Error(`2 paquets ZNIEFF faune attendus, reçu ${packages.length}`)
+          const byId = Object.fromEntries(packages.map((pkg) => [pkg.source.id, pkg]))
+          const picardie = byId['dreal-hdf-znieff-fauna-picardie-2020']
+          const npdc = byId['dreal-hdf-znieff-fauna-npdc-2014-2015']
+          if (!picardie || !npdc) throw new Error('Une source historique HDF est absente')
+
+          for (const [pkg, scope] of [[picardie, 'Picardie'], [npdc, 'Nord-Pas-de-Calais']]) {
+            if (!/^[a-f0-9]{64}$/.test(pkg.source.sha256 ?? '')) throw new Error(`SHA-256 absent: ${pkg.source.id}`)
+            if ('url' in pkg.source) throw new Error(`Champ url interdit: ${pkg.source.id}`)
+            const rule = pkg.replaces[0]
+            if (!rule || rule.region !== 'HDF' || rule.category !== 'znieff' || rule.realm !== 'fauna' || !rule.cdRefs?.length) {
+              throw new Error(`Override invalide: ${pkg.source.id}`)
+            }
+            if (pkg.statuses.some((status) => status.scope !== 'partial' || status.scopeLabel !== scope || status.value !== 'Oui')) {
+              throw new Error(`Portée ou valeur invalide: ${pkg.source.id}`)
+            }
+          }
+
+          if (picardie.statuses.length < 430) throw new Error(`Volume Picardie faible: ${picardie.statuses.length}`)
+          if (npdc.statuses.length < 360) throw new Error(`Volume NPdC faible: ${npdc.statuses.length}`)
+          if (picardie.diagnostics.sourceRowsOutsideTaxref !== 0) throw new Error('Picardie: ligne hors TAXREF inattendue')
+          if (npdc.diagnostics.sourceRowsOutsideTaxref !== 1) throw new Error('NPdC: la ligne officielle hors TaxRef n’est pas conservée dans le diagnostic')
+
+          const triturusPicardie = picardie.statuses.find((status) => status.cdRef === 139 && status.scopeLabel === 'Picardie')
+          const triturusNpdc = npdc.statuses.find((status) => status.cdRef === 139 && status.scopeLabel === 'Nord-Pas-de-Calais')
+          if (!triturusPicardie || !triturusNpdc) throw new Error('Sentinelle Triturus cristatus absente des deux portées historiques')
+
+          console.log({
+            picardie: picardie.statuses.length,
+            npdc: npdc.statuses.length,
+            total: picardie.statuses.length + npdc.statuses.length,
+          })
+          NODE
+
+      - name: Upload normalized packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdf-znieff-fauna-historical-packages
+          path: ${{ env.HDF_ZNIEFF_FAUNA_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7
