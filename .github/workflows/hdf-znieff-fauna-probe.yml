@@ -1,0 +1,92 @@
+name: HDF ZNIEFF fauna source probe
+
+on:
+  push:
+    branches: [feat/hdf-znieff-fauna-historical]
+    paths:
+      - '.github/workflows/hdf-znieff-fauna-probe.yml'
+  workflow_dispatch:
+
+jobs:
+  probe-hdf-fauna:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download official HDF fauna ODS files
+        shell: bash
+        run: |
+          set -euo pipefail
+          PICARDIE='https://www.hauts-de-france.developpement-durable.gouv.fr/IMG/ods/znieff_especesdeterminantes_faune_picardie.ods'
+          NPDC='https://www.hauts-de-france.developpement-durable.gouv.fr/IMG/ods/znieff_especesdeterminantes_faune_npdc.ods'
+          curl --fail --location --retry 3 --user-agent 'statuts-especes-fr/1.0' "$PICARDIE" -o "$RUNNER_TEMP/picardie.ods"
+          curl --fail --location --retry 3 --user-agent 'statuts-especes-fr/1.0' "$NPDC" -o "$RUNNER_TEMP/npdc.ods"
+          file "$RUNNER_TEMP/picardie.ods" "$RUNNER_TEMP/npdc.ods"
+          sha256sum "$RUNNER_TEMP/picardie.ods" "$RUNNER_TEMP/npdc.ods"
+          unzip -tq "$RUNNER_TEMP/picardie.ods"
+          unzip -tq "$RUNNER_TEMP/npdc.ods"
+
+      - name: Inspect ODS sheets and first rows
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import json
+          import zipfile
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+
+          NS = {
+              'office': 'urn:oasis:names:tc:opendocument:xmlns:office:1.0',
+              'table': 'urn:oasis:names:tc:opendocument:xmlns:table:1.0',
+              'text': 'urn:oasis:names:tc:opendocument:xmlns:text:1.0',
+          }
+          T = f"{{{NS['table']}}}"
+
+          def cell_text(cell):
+              parts = []
+              for p in cell.findall('.//text:p', NS):
+                  text = ''.join(p.itertext()).strip()
+                  if text:
+                      parts.append(text)
+              if parts:
+                  return ' '.join(parts)
+              return cell.attrib.get(f"{{{NS['office']}}}value", '')
+
+          def inspect(path):
+              with zipfile.ZipFile(path) as zf:
+                  root = ET.fromstring(zf.read('content.xml'))
+              spreadsheet = root.find('office:body/office:spreadsheet', NS)
+              report = []
+              for table in list(spreadsheet or []):
+                  if table.tag != T + 'table':
+                      continue
+                  name = table.attrib.get(T + 'name', '?')
+                  rows = []
+                  nonempty = 0
+                  for row in table.findall('table:table-row', NS):
+                      values = []
+                      for cell in row:
+                          if cell.tag not in {T + 'table-cell', T + 'covered-table-cell'}:
+                              continue
+                          repeat = int(cell.attrib.get(T + 'number-columns-repeated', '1'))
+                          value = cell_text(cell)
+                          values.extend([value] * min(repeat, 60))
+                          if len(values) >= 60:
+                              break
+                      values = values[:60]
+                      while values and values[-1] == '':
+                          values.pop()
+                      if not any(str(v).strip() for v in values):
+                          continue
+                      nonempty += 1
+                      if len(rows) < 25:
+                          rows.append(values)
+                  report.append({'sheet': name, 'nonemptyRows': nonempty, 'preview': rows})
+              return report
+
+          for label in ('picardie', 'npdc'):
+              print(f'===== {label.upper()} =====')
+              print(json.dumps(inspect(Path(f'/home/runner/work/_temp/{label}.ods')), ensure_ascii=False, indent=2))
+          PY
