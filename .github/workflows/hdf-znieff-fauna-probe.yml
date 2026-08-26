@@ -1,10 +1,11 @@
 name: HDF ZNIEFF fauna source probe
 
 on:
-  push:
-    branches: [feat/hdf-znieff-fauna-historical]
+  pull_request:
+    branches: [main]
     paths:
       - '.github/workflows/hdf-znieff-fauna-probe.yml'
+      - 'data-pipeline/regions/hdf/**'
   workflow_dispatch:
 
 jobs:
