@@ -577,6 +577,162 @@
           "sha256": "5d07840fadce9dab531f9317ead43ad0b7f3afb1e2c702ae48583d32687364ad"
         }
       ]
+    },
+    {
+      "id": "dreal-occ-znieff",
+      "region": "OCC",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.occitanie.developpement-durable.gouv.fr/vers-des-znieff-troisieme-generation-en-occitanie-a24635.html",
+      "notes": "Flore/bryo/chara 2023 + faune 2024-07; portées biogéographiques partielles.",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "2023-02",
+          "url": "https://www.occitanie.developpement-durable.gouv.fr/IMG/xlsx/liste_taxons_det_flore_occitanie_cotation_v13-v16_osmose_public.xlsx",
+          "sha256": "87464cbb51ccc07de54586d10c6071b0a5344027f8c335dea2f06fcb877bb834"
+        },
+        {
+          "kind": "xlsx",
+          "version": "2024-07-25",
+          "url": "https://www.occitanie.developpement-durable.gouv.fr/IMG/xlsx/listes_faune_znieff_20240725.xlsx",
+          "sha256": "ec66eed10fde0e97558c1f2a973fd8480037b722ec4e03814517e5944754d873"
+        }
+      ]
+    },
+    {
+      "id": "dreal-ges-hist-lrr",
+      "region": "GES",
+      "categories": [
+        "red_list_regional"
+      ],
+      "realms": [
+        "fauna",
+        "flora"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.grand-est.developpement-durable.gouv.fr/listes-rouges-grand-est-a22124.html",
+      "notes": "Portées partielles Alsace mammifères 2014 + Champagne-Ardenne flore 2018.",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "2014",
+          "url": "https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/liste_rouge_alsace_mammiferes_2014_tableau.xlsx",
+          "sha256": "be6cbc009ae804b27d360b63d009dd37c7eaf8b416a5316e4978f76886f21e90"
+        },
+        {
+          "kind": "xlsx",
+          "version": "2018",
+          "url": "https://www.grand-est.developpement-durable.gouv.fr/IMG/xlsx/liste_rouge_champagne_ardenne_flore_2018_validee_uicn.xlsx",
+          "sha256": "2017e3dbc1650223f0b6ff847178f2dd9a2c7d49b328369ad297801e62f4818c"
+        }
+      ]
+    },
+    {
+      "id": "dreal-naq-lrr-araignees-2025",
+      "region": "NAQ",
+      "categories": [
+        "red_list_regional"
+      ],
+      "realms": [
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/les-listes-rouges-regionales-a9991.html",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "2025",
+          "url": "https://www.nouvelle-aquitaine.developpement-durable.gouv.fr/IMG/xlsx/tableau_final_evaluation.xlsx",
+          "sha256": "abf2e14d8728c49626b49b38e5f8412659b076001f7befeec464960844f82fb3"
+        }
+      ]
+    },
+    {
+      "id": "cbnhdf-digitale-znieff-hdf",
+      "region": "HDF",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.cbnhdf.fr/je-telecharge",
+      "notes": "Flore vasculaire + bryophytes, filtre CH_Territoire=HDF ; [Oui]/Oui*/(Oui)* exclus ; faune/fonge/characées hors vague.",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "group": "flora",
+          "version": "Digitale BS-BIF-FVF-PV 4.0 (2026-03-31)",
+          "url": "https://www.cbnhdf.fr/system/files/2026-05/DIGITALE_BS-BIF-FVF_PV_4.0_20260331.xlsx",
+          "sha256": "71ae71b770f7b3911349e501caaaa65ac7dba8172d12b96ef4b90d5056995c95"
+        },
+        {
+          "kind": "xlsx",
+          "group": "bryophytes",
+          "version": "Digitale BS-BIF-FVF-MH 4.0 (2026-03-31)",
+          "url": "https://www.cbnhdf.fr/system/files/2026-05/DIGITALE_BS-BIF-FVF_MH_4.0_20260331.xlsx",
+          "sha256": "810cc4cc9458721710a826d009884698fcf9b06d059af41153197c12470cb3bc"
+        }
+      ]
+    },
+    {
+      "id": "irpn-hdf-lrr-unifiees",
+      "region": "HDF",
+      "categories": [
+        "red_list_regional"
+      ],
+      "realms": [
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://irpn.drealnpdc.fr/listes-rouges/listes-rouges-regionales/",
+      "notes": "6 groupes faune unifiés Hauts-de-France ; autres groupes (amphibiens/reptiles, mammifères, araignées, etc.) encore en cours d'évaluation régionale.",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "group": "oiseaux-nicheurs",
+          "url": "https://irpn.drealnpdc.fr/wp-content/uploads/2024/04/LRR_oiseaux_nicheurs_HdF_synthese.xlsx",
+          "sha256": "72cd2b60ed47120ab08f722bfdd4256d69bdba424722499dc3062a5e0705879a"
+        },
+        {
+          "kind": "xlsx",
+          "group": "papillons-jour",
+          "url": "https://irpn.drealnpdc.fr/wp-content/uploads/2024/03/LRR_papillons-de-jour_synthese_mars-1.xlsx",
+          "sha256": "9cea00c3bd53fcbda1f2cee2fd42312efe0b1fcbf7ddc21e8708c62c643090d7"
+        },
+        {
+          "kind": "ods",
+          "group": "mollusques",
+          "url": "https://irpn.drealnpdc.fr/wp-content/uploads/2025/02/LRR_mollusques_HdF_synthese.ods",
+          "sha256": "bc30243f569fc7e9b1807c8cdc8c653da20458a81e81be1a6768c36a88ae3ee1"
+        },
+        {
+          "kind": "ods",
+          "group": "poissons-ecrevisses",
+          "url": "https://irpn.drealnpdc.fr/wp-content/uploads/2025/09/LRR_poissons_ecrevisses_eau-douce_HDF.ods",
+          "sha256": "a1202ece93abf61268bdfcaa1bdda0a83c05ae8f29f0032955323dc2e6d14df0"
+        },
+        {
+          "kind": "xlsx",
+          "group": "orthopteres",
+          "url": "http://www.picardie-nature.org/IMG/xlsx/lrr_orthopteres-mantodea_phasmida.xlsx",
+          "sha256": "ee2263c415105457826952c87e15e36830f4a4640a9e65b71e5209009ffb6e7b"
+        },
+        {
+          "kind": "xlsx",
+          "group": "coccinelles",
+          "url": "http://www.picardie-nature.org/IMG/xlsx/lrr_coccinelles_synthese_septembre.xlsx",
+          "sha256": "6be17093692130b2833e4d54d9e7ec051356c132a6231da6fea567608798f565"
+        }
+      ]
     }
   ]
 }

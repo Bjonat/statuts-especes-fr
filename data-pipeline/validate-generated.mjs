@@ -458,6 +458,106 @@ if (manifest.sources.some((source) => source.id === norZnieffSourceId)) {
   )
 }
 
+const gesHistChecks = [
+  {
+    id: 'dreal-ges-hist-lrr-alsace-mammiferes-2014',
+    statuses: null,
+    realm: 'fauna',
+    region: 'GES',
+    cdRef: 60577,
+    value: 'EN',
+    scopeLabel: 'Alsace',
+    message: 'Canis lupus: LRR Alsace mammifères EN',
+  },
+  {
+    id: 'dreal-ges-hist-lrr-ca-flore-2018',
+    statuses: null,
+    realm: 'flora',
+    region: 'GES',
+    cdRef: 80037,
+    value: 'LC',
+    scopeLabel: 'Champagne-Ardenne',
+    message: 'Aconitum napellus: LRR Champagne-Ardenne flore LC',
+  },
+]
+for (const check of gesHistChecks) {
+  if (!manifest.sources.some((source) => source.id === check.id)) continue
+  const statuses = await loadStatuses(check.realm, check.region)
+  assert.ok(
+    findStatus(
+      statuses,
+      check.cdRef,
+      (status) =>
+        status.category === 'red_list_regional' &&
+        status.sourceId === check.id &&
+        status.value === check.value &&
+        status.scope === 'partial' &&
+        status.scopeLabel === check.scopeLabel,
+    ),
+    check.message,
+  )
+}
+
+if (manifest.sources.some((source) => source.id === 'dreal-naq-lrr-araignees-2025')) {
+  const naqFauna = await loadStatuses('fauna', 'NAQ')
+  assert.ok(
+    findStatus(
+      naqFauna,
+      1223,
+      (status) =>
+        status.category === 'red_list_regional' &&
+        status.sourceId === 'dreal-naq-lrr-araignees-2025' &&
+        status.value === 'CR',
+    ),
+    'Berlandina cinerea: LRR araignées Nouvelle-Aquitaine CR',
+  )
+}
+
+const occFlora = await loadStatuses('flora', 'OCC')
+const occFauna = await loadStatuses('fauna', 'OCC')
+const occChecks = [
+  {
+    id: 'dreal-occ-znieff-flora-2023',
+    statuses: occFlora,
+    cdRef: 610735,
+    value: 'Déterminante',
+    scopeLabel: 'Méditerranée',
+    message: 'Achillea maritima: ZNIEFF Occitanie flore Méditerranée',
+  },
+  {
+    id: 'dreal-occ-znieff-characees-2023',
+    statuses: occFlora,
+    cdRef: 73555,
+    value: 'Déterminante',
+    scopeLabel: 'Bassin aquitain',
+    message: 'Chara fragifera: ZNIEFF Occitanie characées Bassin aquitain',
+  },
+  {
+    id: 'dreal-occ-znieff-fauna-2024-07',
+    statuses: occFauna,
+    cdRef: 2657,
+    value: 'Déterminante',
+    scope: 'regional',
+    message: 'Aquila fasciata: ZNIEFF Occitanie faune',
+  },
+]
+for (const check of occChecks) {
+  if (!manifest.sources.some((source) => source.id === check.id)) continue
+  assert.ok(
+    findStatus(
+      check.statuses,
+      check.cdRef,
+      (status) =>
+        status.category === 'znieff' &&
+        status.sourceId === check.id &&
+        status.value === check.value &&
+        (check.scopeLabel ? status.scopeLabel === check.scopeLabel : true) &&
+        (check.scope ? status.scope === check.scope : true),
+    ),
+    check.message,
+  )
+}
+
 const araFauna = await loadStatuses('fauna', 'ARA')
 const araLrrChecks = [
   {
@@ -537,6 +637,51 @@ if (manifest.sources.some((source) => source.id === cvlZnieffSourceId)) {
   )
 }
 
+const hdfFlora = await loadStatuses('flora', 'HDF')
+const hdfFauna = await loadStatuses('fauna', 'HDF')
+const hdfZnieffSourceId = 'cbnhdf-digitale-znieff-hdf-flora-2026-03-31'
+if (manifest.sources.some((source) => source.id === hdfZnieffSourceId)) {
+  const hdfZnieff = hdfFlora.filter((status) => status.category === 'znieff' && status.sourceId === hdfZnieffSourceId)
+  assert.ok(hdfZnieff.length >= 800, 'ZNIEFF flore Hauts-de-France: volume plausible >= 800')
+  assert.ok(
+    hdfZnieff.every((status) => status.scope === 'partial' && status.scopeLabel === 'Hauts-de-France'),
+    'ZNIEFF flore Hauts-de-France: portée partielle conservée',
+  )
+  assert.ok(
+    findStatus(
+      hdfZnieff,
+      79921,
+      (status) => status.label === 'Déterminante ZNIEFF' && status.value === 'Oui',
+    ),
+    'Achillea ptarmica: déterminante ZNIEFF Hauts-de-France',
+  )
+}
+
+const hdfBryoSourceId = 'cbnhdf-digitale-znieff-hdf-bryophytes-2026-03-31'
+if (manifest.sources.some((source) => source.id === hdfBryoSourceId)) {
+  const hdfBryo = hdfFlora.filter((status) => status.category === 'znieff' && status.sourceId === hdfBryoSourceId)
+  assert.ok(hdfBryo.length >= 300, 'ZNIEFF bryophytes Hauts-de-France: volume plausible >= 300')
+}
+
+const hdfLrrChecks = [
+  { id: 'irpn-hdf-lrr-oiseaux-nicheurs-2024', cdRef: 4127, value: 'RE', message: 'Turdus pilaris: LRR Hauts-de-France oiseaux nicheurs RE' },
+  { id: 'irpn-hdf-lrr-papillons-jour-2024', cdRef: 53425, value: 'RE', message: 'Chazara briseis: LRR Hauts-de-France papillons de jour RE' },
+]
+for (const check of hdfLrrChecks) {
+  if (!manifest.sources.some((source) => source.id === check.id)) continue
+  assert.ok(
+    findStatus(
+      hdfFauna,
+      check.cdRef,
+      (status) =>
+        status.category === 'red_list_regional' &&
+        status.sourceId === check.id &&
+        status.value === check.value,
+    ),
+    check.message,
+  )
+}
+
 console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
@@ -576,6 +721,12 @@ if (manifest.sources.some((source) => source.id === norZnieffSourceId)) {
 }
 if (manifest.sources.some((source) => source.id === 'dreal-cvl-znieff-2026-04')) {
   console.log('- enrichissement régional: ZNIEFF Centre-Val de Loire avril 2026')
+}
+if (manifest.sources.some((source) => source.id === hdfZnieffSourceId)) {
+  console.log('- enrichissement régional: ZNIEFF flore/bryophytes Hauts-de-France (Digitale 4.0)')
+}
+if (manifest.sources.some((source) => source.id === 'irpn-hdf-lrr-oiseaux-nicheurs-2024')) {
+  console.log('- enrichissement régional: LRR Hauts-de-France unifiées (6 groupes faune)')
 }
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {

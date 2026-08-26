@@ -47,12 +47,12 @@ Règles impératives :
 | Bretagne (`BRE`) | `IMPORTED` | `IMPORTED` | Responsabilité biologique `IMPORTED` | Surveiller révisions OEB |
 | Centre-Val de Loire (`CVL`) | `IMPORTED` (DREAL avril 2026) | `READY` (3 LRR + BDC historiques) | Rareté/indigénat CBNBP à qualifier | Moyenne |
 | Corse (`COR`) | `RESEARCH_REQUIRED` pour consolidation | `PARTIAL` | À documenter | Moyenne |
-| Grand Est (`GES`) | `IMPORTED` faune et flore vasculaire | `IMPORTED` 10 groupes faune unifiés ; `PARTIAL` reste | Anciennes régions à préserver | **Haute** (flore LRR / historiques) |
-| Hauts-de-France (`HDF`) | `PARTIAL` | `PARTIAL` | Anciennes régions à préserver | Moyenne |
+| Grand Est (`GES`) | `IMPORTED` faune et flore vasculaire | `IMPORTED` 10 groupes faune unifiés + Alsace mammifères / CA flore historiques ; `PARTIAL` reste | Anciennes régions à préserver | **Haute** |
+| Hauts-de-France (`HDF`) | `IMPORTED` flore/bryo Digitale (portée HDF) ; faune encore partielle | `IMPORTED` 6 LRR IRPN unifiées ; `PARTIAL` reste | Anciennes régions à préserver | Moyenne |
 | Île-de-France (`IDF`) | `IMPORTED` (GeoNat) | `IMPORTED` 8 groupes via GeoNat ; poissons PDF hors vague | — | Surveiller GeoNat + poissons |
 | Normandie (`NOR`) | `PARTIAL` (HN flore Digitale) | `READY` selon groupes unifiés | Anciennes régions à préserver | Haute |
-| Nouvelle-Aquitaine (`NAQ`) | `IMPORTED` flore vasculaire + groupes unifiés | `PARTIAL` / nouveaux travaux 2026 en attente | EEE 2022 actuellement bloquée | **Très haute** |
-| Occitanie (`OCC`) | `READY_WHEN_AVAILABLE` | `PARTIAL` / travaux 2026 en attente | Zones biogéographiques à conserver | **Très haute** |
+| Nouvelle-Aquitaine (`NAQ`) | `IMPORTED` flore vasculaire + groupes unifiés | `IMPORTED` araignées 2025 ; `PARTIAL` / flore 2026 en attente | EEE 2022 actuellement bloquée | **Très haute** |
+| Occitanie (`OCC`) | `IMPORTED` flore/bryo/chara 2023 + faune 2024-07 | `PARTIAL` / travaux 2026 en attente | Zones biogéographiques conservées | **Très haute** |
 | Pays de la Loire (`PDL`) | `IMPORTED` faune/flore 2018 | `RESEARCH_REQUIRED` pour consolidation | Rareté/indigénat à qualifier | Moyenne |
 | Provence-Alpes-Côte d'Azur (`PAC`) | `IMPORTED` faune 2024 + flore 2016 | `IMPORTED` selon groupes publiés | À compléter via CBNMed/CBNA | **Très haute** |
 
@@ -242,20 +242,23 @@ Surveiller les révisions ODONAT ; brancher mammifères / flore dès publication
 
 ### HDF — Hauts-de-France
 
-#### ZNIEFF — `PARTIAL`
+#### ZNIEFF — `IMPORTED` (flore / bryophytes Digitale) ; faune encore `PARTIAL`
 
-- **DREAL Hauts-de-France** : https://www.hauts-de-france.developpement-durable.gouv.fr/Inventaire-des-ZNIEFF-terrestres
-- Les ressources disponibles restent hétérogènes : listes Picardie et Nord-Pas-de-Calais pour certains groupes, méthode/flore plus unifiée, mises à jour par groupe.
-- **Décision pipeline** : ne jamais convertir automatiquement une liste Picardie ou Nord-Pas-de-Calais en statut « Hauts-de-France » complet.
+- **Flore vasculaire** : Digitale CBNHDF PV 4.0 (`cbnhdf-digitale-znieff-hdf-flora-2026-03-31`), filtre `CH_Territoire=HDF`, portée `partial` `Hauts-de-France`, SHA `71ae71b7…`.
+- **Bryophytes** : Digitale MH 4.0 (`cbnhdf-digitale-znieff-hdf-bryophytes-2026-03-31`), SHA `810cc4cc…`.
+- Valeurs : `Oui` / `(Oui)` → disparu/présumé / `pp` → pro parte ; `[Oui]` et variantes `*` exclues.
+- **Faune** : listes Picardie / Nord-Pas-de-Calais encore séparées — ne jamais généraliser à toute la région HDF.
 
-#### Listes rouges — `PARTIAL`
+#### Listes rouges — `IMPORTED` (6 groupes IRPN unifiés)
 
-- **DREAL** : https://www.hauts-de-france.developpement-durable.gouv.fr/Les-listes-rouges-regionales.html
-- Des listes unifiées Hauts-de-France existent pour certains groupes, notamment flore/bryoflore ; pour d'autres, les anciennes évaluations Nord-Pas-de-Calais et Picardie restent les références disponibles en attendant leur remplacement.
+- **Hub IRPN** : https://irpn.drealnpdc.fr/
+- Oiseaux nicheurs 2024, papillons de jour 2024, mollusques 2024, poissons/écrevisses 2025, orthoptères 2025, coccinelles 2025.
+- Identifiants `irpn-hdf-lrr-…` ; raccord TAXREF via `CDNOM`.
+- Flore LRR IRPN encore en PDF uniquement.
 
 #### Action suivante
 
-Construire d'abord un modèle de portées historiques robuste, puis importer les groupes réellement unifiés. HDF est un bon test de non-régression géographique.
+Brancher la faune ZNIEFF en portées historiques Picardie / NPdC si utile ; surveiller les LRR flore machine.
 
 ---
 
@@ -359,25 +362,23 @@ Surveiller la publication finale des LRR / protections flore 2026 ; brancher vé
 
 ### OCC — Occitanie
 
-#### ZNIEFF — `READY_WHEN_AVAILABLE`
+#### ZNIEFF — `IMPORTED`
 
 - **DREAL Occitanie** : https://www.occitanie.developpement-durable.gouv.fr/vers-des-znieff-troisieme-generation-en-occitanie-a24635.html
-- Le portail fournit des classeurs distincts pour habitats, flore déterminante, faune déterminante, champignons et lichens.
-- **Flore — fichier officiel identifié** : https://www.occitanie.developpement-durable.gouv.fr/IMG/xlsx/liste_taxons_det_flore_occitanie_cotation_v13-v16_osmose_public.xlsx
-- **Faune — fichier officiel identifié** : https://www.occitanie.developpement-durable.gouv.fr/IMG/xlsx/listes_faune_znieff_20240725.xlsx
-- **Particularité** : plusieurs zones biogéographiques sont utilisées (Méditerranée, Massif central, Pyrénées, Sud-Ouest). Elles doivent être conservées comme portées métier.
-- **Blocage au 21/08/2026** : les runners GitHub reçoivent actuellement une page HTML de maintenance à la place des XLSX.
-- **Décision pipeline** : sonder les URLs officielles et importer dès que les vrais fichiers redeviennent accessibles ; ne pas substituer silencieusement un ancien millésime.
+- **Flore / bryophytes / characées** : `liste_taxons_det_flore_occitanie_cotation_v13-v16_osmose_public.xlsx` (SHA `87464cbb…`) → `dreal-occ-znieff-flora-2023`, `…-bryophytes-2023`, `…-characees-2023`.
+- **Faune** : `listes_faune_znieff_20240725.xlsx` (SHA `ec66eed1…`) → `dreal-occ-znieff-fauna-2024-07`.
+- Zones Méditerranée / Massif central / Pyrénées / Bassin aquitain (flore) et SO/MED/PYR/MC (faune) en portées `partial` ; faune « Occitanie » en `regional`.
+- Le téléchargeur refuse les pages HTML de maintenance et exige le SHA-256 exact.
+- Hors vague : habitats, champignons, lichens.
 
 #### Listes rouges — `PARTIAL` + `PENDING_PUBLICATION`
 
 - **DREAL — hub LRR Occitanie** : https://www.occitanie.developpement-durable.gouv.fr/les-listes-rouges-regionales-en-occitanie-r8985.html
-- La page centralise des listes unifiées Occitanie et, lorsque nécessaire, les anciennes listes Languedoc-Roussillon / Midi-Pyrénées.
-- Des avis CSRPN 2026 portent notamment sur la flore vasculaire et les amphibiens/reptiles ; ils sont à surveiller mais ne doivent pas être assimilés à une publication finale tant que le dataset correspondant n'est pas sorti.
+- Des avis CSRPN 2026 portent notamment sur la flore vasculaire et les amphibiens/reptiles ; à surveiller tant que le dataset final n'est pas publié.
 
 #### Action suivante
 
-Brancher ZNIEFF flore/faune dès retour des XLSX ; puis intégrer les LRR réellement unifiées groupe par groupe en maintenant les anciennes régions comme portées partielles pour le reste.
+Intégrer les LRR réellement unifiées groupe par groupe ; conserver les anciennes régions Languedoc-Roussillon / Midi-Pyrénées comme portées partielles pour le reste.
 
 ---
 
@@ -440,13 +441,14 @@ Cette section doit être relue avant chaque nouvelle vague d'enrichissement.
 | Tableur maître BFC 03/03/2026 | Importé ; SHA-256 `4c16ef90…` | Surveiller les prochaines versions DREAL |
 | ZNIEFF flore Grand Est 08/2024 | Importée ; SHA-256 `d95b53eb…` | Surveiller les révisions LEDZflora |
 | ZNIEFF CVL 04/2026 | Importée ; SHA-256 `60188545…` | Surveiller les révisions du tableur DREAL |
-| ZNIEFF Occitanie flore/faune | Fichiers officiels identifiés mais même maintenance DREAL | Retester, éventuellement qualifier le comportement HTTP/User-Agent sans changer de source |
+| ZNIEFF Occitanie flore/faune | Importée (2023 flore / 2024-07 faune) | Surveiller révisions ; LRR OCC encore ouvertes |
 | NAQ flore LRR 2026 | Avis CSRPN repéré | Attendre la publication finale exploitable |
 | NAQ protections flore 2026 | Avis/proposition CSRPN repéré | Attendre le texte/référentiel final applicable |
 | NAQ PEE/EEE 2022 | Fichier public mais métadonnées internes « v0.9 non validée » | Ne pas importer avant clarification |
 | ARA LRR vertébrés 2024 | Importée (5 groupes) | Surveiller PDF/machine pour bourdons, poissons, invertébrés |
 | ARA flore LRR unifiée | Travail annoncé, horizon 2027 | Conserver les portées historiques jusqu'à publication |
-| GES LRR faune unifiée (10 groupes) | Importée via ODONAT | Surveiller révisions ; hors périmètre : hivernants, mammifères, flore |
+| GES LRR faune unifiée (10 groupes) | Importée via ODONAT | Surveiller révisions ; hors périmètre : hivernants |
+| GES LRR historiques Alsace mammifères / CA flore | Importées (portées partielles) | Ne pas étendre à tout le Grand Est |
 | GES flore LRR unifiée | Couverture encore incomplète | Conserver les anciennes régions pour les groupes non unifiés |
 | HDF | Nombreux jeux encore issus de Picardie / Nord-Pas-de-Calais | Ne jamais étendre automatiquement à toute la région |
 | Normandie ZNIEFF | Flore HN importée (Digitale) ; BN/faune/unifié encore ouverts | Conserver la portée historique jusqu'à remplacement démontré |
@@ -473,11 +475,11 @@ Pour chaque nouvelle source ou nouveau millésime :
 
 À données accessibles et validées égales :
 
-1. **Grand Est** — reste LRR mammifères/flore/historiques (10 groupes faune déjà importés).
+1. **Grand Est** — reste LRR unifiées mammifères/flore (historiques Alsace/CA déjà importés).
 2. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
-3. **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
-4. **Hauts-de-France**, **ARA LRR restantes**, **Corse** — portées historiques / consolidation.
+3. **Occitanie** — LRR dès publication machine (ZNIEFF déjà importée).
+4. **ARA LRR restantes**, **Corse**, **HDF faune ZNIEFF historique** — consolidation / PDF→machine.
 5. **Normandie** — compléter BN/faune ZNIEFF (HN flore déjà importée).
-6. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune / BRE / IDF / NOR HN flore / CVL** — déjà importés ; surveiller révisions.
+6. **PACA / PDL / NAQ / GES / BRE / IDF / NOR HN / CVL / OCC ZNIEFF / HDF Digitale+LRR / ARA vertébrés** — déjà importés ; surveiller révisions.
 
 Cet ordre n'est pas une hiérarchie écologique : il vise le meilleur rapport **fiabilité de la source / caractère structuré / gain métier / coût d'adaptation**.
