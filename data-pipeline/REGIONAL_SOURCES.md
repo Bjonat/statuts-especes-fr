@@ -45,7 +45,7 @@ Règles impératives :
 | Auvergne-Rhône-Alpes (`ARA`) | `READY` | `PARTIAL` | À documenter selon CBN | Haute |
 | Bourgogne-Franche-Comté (`BFC`) | `IMPORTED` via tableur maître 2026 | `IMPORTED` via tableur maître 2026 | Tableur maître de statuts | **Très haute** |
 | Bretagne (`BRE`) | `IMPORTED` | `IMPORTED` | Responsabilité biologique `IMPORTED` | Surveiller révisions OEB |
-| Centre-Val de Loire (`CVL`) | `READY_WHEN_AVAILABLE` | `READY` | Rareté/indigénat CBNBP à qualifier | Haute |
+| Centre-Val de Loire (`CVL`) | `IMPORTED` (DREAL avril 2026) | `READY` (3 LRR + BDC historiques) | Rareté/indigénat CBNBP à qualifier | Moyenne |
 | Corse (`COR`) | `RESEARCH_REQUIRED` pour consolidation | `PARTIAL` | À documenter | Moyenne |
 | Grand Est (`GES`) | `IMPORTED` faune et flore vasculaire | `IMPORTED` 10 groupes faune unifiés ; `PARTIAL` reste | Anciennes régions à préserver | **Haute** (flore LRR / historiques) |
 | Hauts-de-France (`HDF`) | `PARTIAL` | `PARTIAL` | Anciennes régions à préserver | Moyenne |
@@ -149,15 +149,15 @@ Surveiller les révisions OEB (CSV data.gouv) ; ne pas réimporter les listes d'
 
 ### CVL — Centre-Val de Loire
 
-#### ZNIEFF — `READY_WHEN_AVAILABLE`
+#### ZNIEFF — `IMPORTED`
 
 - **Producteur** : DREAL Centre-Val de Loire.
 - **Page officielle** : https://www.centre-val-de-loire.developpement-durable.gouv.fr/habitats-et-especes-determinantes-a4278.html
-- **Dernier millésime identifié** : tableur 2026, mise à jour de la page le 02/04/2026.
-- **Fichier officiel identifié** : https://www.centre-val-de-loire.developpement-durable.gouv.fr/IMG/xls/listes_dz_cvl_actual_avril_2026.xls
-- **Format** : XLS, un onglet par groupe.
-- **Blocage au 21/08/2026** : depuis les runners GitHub, l'URL renvoie momentanément une page HTML de maintenance au lieu du XLS.
-- **Décision pipeline** : garder cette URL comme source officielle à sonder ; **aucun fallback vers un millésime plus ancien ne doit être publié comme 2026**.
+- **Millésime** : tableur avril 2026 (`listes_dz_cvl_actual_avril_2026.xls`).
+- **SHA-256** : `6018854543765120bed896317671aed73c22b145416a29fa6040cca3a19c18c5`.
+- **Identifiant** : `dreal-cvl-znieff-2026-04` (~1 495 statuts, raccord TAXREF ~99,6 %).
+- Flore vasculaire + bryophytes + 12 groupes faune ; habitats et fonge hors import.
+- Conditions de déterminance ≤ 80 caractères conservées ; 8 libellés trop longs omis.
 
 #### Listes rouges — `READY`
 
@@ -171,7 +171,7 @@ Surveiller les révisions OEB (CSV data.gouv) ; ne pas réimporter les listes d'
 
 #### Action suivante
 
-Reprendre le connecteur ZNIEFF 2026 dès que le serveur DREAL sert à nouveau le vrai XLS, puis qualifier un jeu CBNBP récent pour rareté/indigénat.
+Surveiller les révisions du tableur ZNIEFF ; qualifier un jeu CBNBP récent pour rareté/indigénat.
 
 ---
 
@@ -434,7 +434,7 @@ Cette section doit être relue avant chaque nouvelle vague d'enrichissement.
 |---|---|---|
 | Tableur maître BFC 03/03/2026 | Importé ; SHA-256 `4c16ef90…` | Surveiller les prochaines versions DREAL |
 | ZNIEFF flore Grand Est 08/2024 | Importée ; SHA-256 `d95b53eb…` | Surveiller les révisions LEDZflora |
-| ZNIEFF CVL 2026 | Source officielle identifiée mais DREAL renvoie une page de maintenance aux runners GitHub | Retester le fichier, ne pas utiliser 2025 comme faux 2026 |
+| ZNIEFF CVL 04/2026 | Importée ; SHA-256 `60188545…` | Surveiller les révisions du tableur DREAL |
 | ZNIEFF Occitanie flore/faune | Fichiers officiels identifiés mais même maintenance DREAL | Retester, éventuellement qualifier le comportement HTTP/User-Agent sans changer de source |
 | NAQ flore LRR 2026 | Avis CSRPN repéré | Attendre la publication finale exploitable |
 | NAQ protections flore 2026 | Avis/proposition CSRPN repéré | Attendre le texte/référentiel final applicable |
@@ -469,9 +469,9 @@ Pour chaque nouvelle source ou nouveau millésime :
 
 1. **Grand Est** — reste LRR mammifères/flore/historiques (10 groupes faune déjà importés).
 2. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
-3. **Centre-Val de Loire** et **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
+3. **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
 4. **Hauts-de-France**, **ARA LRR**, **Corse** — portées historiques / consolidation.
 5. **Normandie** — compléter BN/faune ZNIEFF (HN flore déjà importée).
-6. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune / BRE / IDF / NOR HN flore** — déjà importés ; surveiller révisions.
+6. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune / BRE / IDF / NOR HN flore / CVL** — déjà importés ; surveiller révisions.
 
 Cet ordre n'est pas une hiérarchie écologique : il vise le meilleur rapport **fiabilité de la source / caractère structuré / gain métier / coût d'adaptation**.

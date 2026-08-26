@@ -1,6 +1,6 @@
 # Audit des sources — Centre-Val de Loire
 
-État vérifié le 21/08/2026.
+État vérifié le 26/08/2026.
 
 Ce document fixe quelles sources peuvent être utilisées dans le MVP et avec quel niveau de confiance. Le principe est simple : **une donnée ancienne n'est jamais présentée comme fraîche uniquement parce qu'elle est encore diffusée par un organisme institutionnel**.
 
@@ -32,13 +32,16 @@ Ces deux archives sont téléchargées et testées directement par les workflows
 - Dernière mise à jour publiée : **02/04/2026**
 - Format : tableur XLS, un onglet par groupe taxonomique
 - Contenu : flore, faune et habitats déterminants ; plusieurs groupes ont des millésimes d'actualisation propres
-- Statut MVP : **READY_WHEN_AVAILABLE**
+- Statut MVP : **IMPORTED** (`dreal-cvl-znieff-2026-04`)
 - Source : https://www.centre-val-de-loire.developpement-durable.gouv.fr/habitats-et-especes-determinantes-a4278.html
 - Fichier : https://www.centre-val-de-loire.developpement-durable.gouv.fr/IMG/xls/listes_dz_cvl_actual_avril_2026.xls
+- SHA-256 : `6018854543765120bed896317671aed73c22b145416a29fa6040cca3a19c18c5`
 
-Au 21/08/2026, le frontal DREAL renvoie aux runners GitHub une page de maintenance à la place du XLS. Aucun millésime antérieur ne doit être substitué silencieusement au fichier 2026.
+Le téléchargeur `download_znieff.sh` refuse toute page HTML/maintenance et exige ce hash exact.
 
-Règle : lorsque cette source redevient accessible, elle doit pouvoir surcharger ou compléter le statut `ZDET` issu de la BDC pour le territoire Centre-Val de Loire, car elle constitue la publication régionale courante.
+Import espèces uniquement (flore vasculaire, bryophytes, 12 groupes faune). Habitats et fonge hors périmètre. ~1 495 statuts ; raccord TAXREF ~99,6 %. Conditions ≤ 80 caractères conservées (8 omises).
+
+Sentinelles : `Aconitum napellus` (`CD_REF 80037`) ; `Alcedo atthis` (`CD_REF 3571`, condition `zone de nidification`).
 
 ### Listes rouges régionales — audit terminé
 
@@ -138,6 +141,6 @@ La date de synchronisation de l'application ne doit jamais être confondue avec 
 2. tests sentinelles sur des espèces réelles — **fait dans le pipeline** ;
 3. audit des listes rouges par groupe contre BDC v18 — **fait** ;
 4. Odonates 2022, Papillons/Zygènes 2024 et Coléoptères aquatiques 2025 — **intégrés et validés** ;
-5. liste ZNIEFF DREAL 2026 — **en attente du retour du fichier XLS officiel** ;
+5. liste ZNIEFF DREAL 2026 — **intégrée** (`dreal-cvl-znieff-2026-04`) ;
 6. rareté / indigénat CBNBP uniquement avec millésime explicite ;
 7. test terrain sur téléphone en mode avion.

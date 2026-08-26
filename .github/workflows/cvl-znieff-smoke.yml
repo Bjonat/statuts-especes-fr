@@ -1,0 +1,94 @@
+name: CVL ZNIEFF regional smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/cvl/**'
+      - 'data-pipeline/regional.mjs'
+      - '.github/workflows/cvl-znieff-smoke.yml'
+
+jobs:
+  probe-cvl-znieff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install workbook readers
+        run: python -m pip install --disable-pip-version-check xlrd
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download CVL ZNIEFF workbook
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/cvl/download_znieff.sh "$RUNNER_TEMP/cvl-znieff.xls"
+          echo "CVL_ZNIEFF_SOURCE=$RUNNER_TEMP/cvl-znieff.xls" >> "$GITHUB_ENV"
+
+      - name: Build CVL ZNIEFF package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cvl-znieff-packages"
+          python data-pipeline/regions/cvl/build_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$CVL_ZNIEFF_SOURCE" \
+            --out "$RUNNER_TEMP/cvl-znieff-packages/cvl-znieff.json" \
+            --checked-at 2026-08-26 \
+            --min-match-rate 0.97
+          echo "CVL_ZNIEFF_PACKAGES_DIR=$RUNNER_TEMP/cvl-znieff-packages" >> "$GITHUB_ENV"
+
+      - name: Validate regional package contract and sentinels
+        shell: bash
+        run: |
+          REGIONAL_DIR="$CVL_ZNIEFF_PACKAGES_DIR" node --input-type=module - <<'NODE'
+          import { loadRegionalPackages } from './data-pipeline/regional.mjs'
+          const packages = await loadRegionalPackages(process.env.REGIONAL_DIR)
+          if (packages.length !== 1) throw new Error(`1 paquet ZNIEFF CVL attendu, reçu ${packages.length}`)
+          const pkg = packages[0]
+          if (pkg.source.id !== 'dreal-cvl-znieff-2026-04') throw new Error(`Identifiant inattendu: ${pkg.source.id}`)
+          if (pkg.source.sha256 !== '6018854543765120bed896317671aed73c22b145416a29fa6040cca3a19c18c5') {
+            throw new Error(`SHA-256 inattendu: ${pkg.source.sha256}`)
+          }
+          if (pkg.statuses.length < 1_000) throw new Error(`Volume ZNIEFF CVL anormalement faible: ${pkg.statuses.length}`)
+          const realms = new Set(pkg.replaces.map((rule) => rule.realm))
+          if (!realms.has('flora') || !realms.has('fauna')) throw new Error('Overrides flore et faune attendus')
+          const aconitum = pkg.statuses.find((s) => s.cdRef === 80037 && s.label === 'Déterminante ZNIEFF' && s.value === 'Oui')
+          if (!aconitum) throw new Error('Sentinelle Aconitum napellus absente')
+          const alcedo = pkg.statuses.find((s) => s.cdRef === 3571 && s.label === 'Déterminante ZNIEFF' && s.value === 'Oui')
+          if (!alcedo) throw new Error('Sentinelle Alcedo atthis absente')
+          const alcedoCond = pkg.statuses.find((s) => s.cdRef === 3571 && s.label === 'Condition de déterminance' && s.value === 'zone de nidification')
+          if (!alcedoCond) throw new Error('Condition Alcedo atthis absente')
+          console.log({ statuses: pkg.statuses.length, flora: pkg.replaces.find((r) => r.realm === 'flora').cdRefs.length, fauna: pkg.replaces.find((r) => r.realm === 'fauna').cdRefs.length })
+          NODE
+
+      - name: Upload normalized package
+        uses: actions/upload-artifact@v4
+        with:
+          name: cvl-znieff-regional-package
+          path: ${{ env.CVL_ZNIEFF_PACKAGES_DIR }}/*.json
+          if-no-files-found: error
+          retention-days: 7

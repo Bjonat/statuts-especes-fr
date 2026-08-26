@@ -150,6 +150,28 @@
       "resourceDiscovery": "group-specific official publications"
     },
     {
+      "id": "dreal-cvl-znieff-2026-04",
+      "region": "CVL",
+      "categories": [
+        "znieff"
+      ],
+      "realms": [
+        "flora",
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.centre-val-de-loire.developpement-durable.gouv.fr/habitats-et-especes-determinantes-a4278.html",
+      "resources": [
+        {
+          "kind": "xls",
+          "version": "avril 2026",
+          "url": "https://www.centre-val-de-loire.developpement-durable.gouv.fr/IMG/xls/listes_dz_cvl_actual_avril_2026.xls",
+          "sha256": "6018854543765120bed896317671aed73c22b145416a29fa6040cca3a19c18c5"
+        }
+      ],
+      "notes": "Habitats et fonge hors import ; conditions ≤ 80 caractères."
+    },
+    {
       "id": "dreal-ges-znieff-fauna-2026-06",
       "region": "GES",
       "categories": [

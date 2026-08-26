@@ -458,6 +458,37 @@ if (manifest.sources.some((source) => source.id === norZnieffSourceId)) {
   )
 }
 
+const cvlZnieffSourceId = 'dreal-cvl-znieff-2026-04'
+if (manifest.sources.some((source) => source.id === cvlZnieffSourceId)) {
+  const cvlZnieffFlora = cvlFlora.filter((status) => status.category === 'znieff' && status.sourceId === cvlZnieffSourceId)
+  const cvlZnieffFauna = cvlFauna.filter((status) => status.category === 'znieff' && status.sourceId === cvlZnieffSourceId)
+  assert.ok(cvlZnieffFlora.length + cvlZnieffFauna.length >= 1_000, 'ZNIEFF CVL: volume plausible >= 1 000')
+  assert.ok(
+    findStatus(
+      cvlZnieffFlora,
+      80037,
+      (status) => status.label === 'Déterminante ZNIEFF' && status.value === 'Oui' && status.scope === 'regional',
+    ),
+    'Aconitum napellus: déterminante ZNIEFF Centre-Val de Loire',
+  )
+  assert.ok(
+    findStatus(
+      cvlZnieffFauna,
+      3571,
+      (status) => status.label === 'Déterminante ZNIEFF' && status.value === 'Oui',
+    ),
+    'Alcedo atthis: déterminante ZNIEFF Centre-Val de Loire',
+  )
+  assert.ok(
+    findStatus(
+      cvlZnieffFauna,
+      3571,
+      (status) => status.label === 'Condition de déterminance' && status.value === 'zone de nidification',
+    ),
+    'Alcedo atthis: condition de déterminance ZNIEFF CVL',
+  )
+}
+
 console.log('Validation métier des jeux officiels métropolitains: OK')
 console.log(`- flore: ${flora.length.toLocaleString('fr-FR')} taxons`)
 console.log(`- faune: ${fauna.length.toLocaleString('fr-FR')} taxons`)
@@ -494,6 +525,9 @@ if (manifest.sources.some((source) => source.id === 'arb-idf-lrr-amphibiens-2023
 }
 if (manifest.sources.some((source) => source.id === norZnieffSourceId)) {
   console.log('- enrichissement régional: ZNIEFF flore Haute-Normandie (Digitale 4.0)')
+}
+if (manifest.sources.some((source) => source.id === 'dreal-cvl-znieff-2026-04')) {
+  console.log('- enrichissement régional: ZNIEFF Centre-Val de Loire avril 2026')
 }
 console.log('- couverture régionale non nationale:')
 for (const region of regionalCoverage) {
