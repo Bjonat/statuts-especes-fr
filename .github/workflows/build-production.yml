@@ -174,6 +174,13 @@ jobs:
           sha256sum "$RUNNER_TEMP"/cvl-lrr/*.pdf
           echo "CVL_LRR_DIR=$RUNNER_TEMP/cvl-lrr" >> "$GITHUB_ENV"
 
+      - name: Download regional Centre-Val de Loire ZNIEFF source
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/cvl/download_znieff.sh "$RUNNER_TEMP/cvl-znieff.xls"
+          echo "CVL_ZNIEFF_SOURCE=$RUNNER_TEMP/cvl-znieff.xls" >> "$GITHUB_ENV"
+
       - name: Download regional Grand Est ZNIEFF fauna source
         shell: bash
         run: |
@@ -267,6 +274,11 @@ jobs:
             --coleopteres "$CVL_LRR_DIR/coleopteres-2025.pdf" \
             --out-dir "$REGIONAL_DIR" \
             --min-match-rate 0.97
+          python data-pipeline/regions/cvl/build_znieff.py \
+            --taxref "$TAXREF_FILE" \
+            --source "$CVL_ZNIEFF_SOURCE" \
+            --out "$REGIONAL_DIR/cvl-znieff.json" \
+            --min-match-rate 0.97
           python data-pipeline/regions/ges/build_odonat_znieff.py \
             --taxref "$TAXREF_FILE" \
             --source "$GES_ZNIEFF_FAUNA_FILE" \
@@ -341,6 +353,7 @@ jobs:
             'arb-cvl-lrr-odonates-2022',
             'arb-cvl-lrr-papillons-2024',
             'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
+            'dreal-cvl-znieff-2026-04',
             'dreal-ges-odonat-znieff-fauna-2026-v2.2',
             'dreal-ges-znieff-flora-2024-08-v1.0',
             'dreal-ges-odonat-lrr-amphibiens-2023',
@@ -446,6 +459,7 @@ jobs:
             'arb-cvl-lrr-odonates-2022',
             'arb-cvl-lrr-papillons-2024',
             'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
+            'dreal-cvl-znieff-2026-04',
             'dreal-ges-odonat-znieff-fauna-2026-v2.2',
             'dreal-ges-znieff-flora-2024-08-v1.0',
             'dreal-ges-odonat-lrr-amphibiens-2023',
