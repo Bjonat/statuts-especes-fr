@@ -95,11 +95,39 @@ Le workflow `.github/workflows/ara-regional-smoke.yml` vérifie notamment :
 
 ## État pipeline
 
-L'adaptateur ARA est branché dans :
+L'adaptateur ZNIEFF ARA est branché dans :
 
 - le smoke-test régional dédié ;
 - le smoke-test métropolitain ;
 - le build du dataset officiel ;
 - le bundle PWA/FTP de production.
 
-Les listes rouges régionales ARA ne font pas partie de cette intégration. Elles restent un chantier séparé et ne doivent pas être déduites de la source ZNIEFF.
+## Listes rouges régionales — vertébrés unifiés 2024
+
+État vérifié le 26/08/2026.
+
+### Amphibiens, reptiles, chiroptères
+
+- Producteur : LPO Auvergne-Rhône-Alpes / DREAL / CSRPN / ORB.
+- Page DREAL : `https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/2024-08-liste-rouge-des-amphibiens-reptiles-et-a26033.html`.
+- Tableur machine (ARB) : `LR_AURA2024_Chauves-souris_reptiles_amphibiens.xlsx`.
+- SHA-256 : `ae49929b0a3d226fa392850c4fa95d928d5f374f179a01fd9ea5f71feac1a581`.
+- Identifiants : `dreal-ara-lrr-amphibiens-2024`, `dreal-ara-lrr-reptiles-2024`, `dreal-ara-lrr-chiropteres-2024`.
+- Schéma : `Groupe`, `cd_nom`, `Nom scientifique`, `LR AuRA 2024`.
+
+### Oiseaux nicheurs et mammifères terrestres (hors chiroptères)
+
+- Page DREAL : `https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/2024-05-liste-rouge-oiseaux-nicheurs-et-mammiferes-a25597.html`.
+- ODS officiel : `2024-lrr-oisx_mamm_web-dreal.ods`.
+- SHA-256 : `3308ae670319c729f248d444ddfb08b621a02cbc52610c3e4ad2a548eefacd7b`.
+- Identifiants : `dreal-ara-lrr-oiseaux-nicheurs-2024`, `dreal-ara-lrr-mammiferes-2024`.
+- Oiseaux : `cd_nom` présent ; mammifères : raccord par nom scientifique (un taxon ambigu `Mus musculus domesticus` omis).
+- Sous-catégories UICN `NAa` / `NAb` conservées telles quelles.
+
+### Hors vague
+
+- Bourdons 2025, coléoptères saproxyliques 2021, poissons/écrevisses 2023 : PDF ou sans tableur machine stable.
+- Fonge, végétations/habitats, listes d'anciennes régions Auvergne / Rhône-Alpes.
+- Flore vasculaire unifiée : travail annoncé, horizon 2027.
+
+Les LRR ne sont jamais déduites de la source ZNIEFF.

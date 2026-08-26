@@ -458,6 +458,54 @@ if (manifest.sources.some((source) => source.id === norZnieffSourceId)) {
   )
 }
 
+const araFauna = await loadStatuses('fauna', 'ARA')
+const araLrrChecks = [
+  {
+    id: 'dreal-ara-lrr-amphibiens-2024',
+    cdRef: 197,
+    value: 'LC',
+    message: 'Alytes obstetricans: LRR amphibiens Auvergne-Rhône-Alpes LC',
+  },
+  {
+    id: 'dreal-ara-lrr-reptiles-2024',
+    cdRef: 77381,
+    value: 'VU',
+    message: "Emys orbicularis: LRR reptiles Auvergne-Rhône-Alpes VU",
+  },
+  {
+    id: 'dreal-ara-lrr-chiropteres-2024',
+    cdRef: 60345,
+    value: 'LC',
+    message: 'Barbastella barbastellus: LRR chiroptères Auvergne-Rhône-Alpes LC',
+  },
+  {
+    id: 'dreal-ara-lrr-oiseaux-nicheurs-2024',
+    cdRef: 2657,
+    value: 'CR',
+    message: 'Aquila fasciata: LRR oiseaux nicheurs Auvergne-Rhône-Alpes CR',
+  },
+  {
+    id: 'dreal-ara-lrr-mammiferes-2024',
+    cdRef: 61098,
+    value: 'LC',
+    message: 'Capra ibex: LRR mammifères Auvergne-Rhône-Alpes LC',
+  },
+]
+for (const check of araLrrChecks) {
+  if (!manifest.sources.some((source) => source.id === check.id)) continue
+  assert.ok(
+    findStatus(
+      araFauna,
+      check.cdRef,
+      (status) =>
+        status.category === 'red_list_regional' &&
+        status.sourceId === check.id &&
+        status.value === check.value,
+    ),
+    check.message,
+  )
+}
+
 const cvlZnieffSourceId = 'dreal-cvl-znieff-2026-04'
 if (manifest.sources.some((source) => source.id === cvlZnieffSourceId)) {
   const cvlZnieffFlora = cvlFlora.filter((status) => status.category === 'znieff' && status.sourceId === cvlZnieffSourceId)

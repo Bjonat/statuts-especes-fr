@@ -42,7 +42,7 @@ Règles impératives :
 
 | Région | ZNIEFF | Listes rouges régionales | Autres attributs régionaux | Priorité d'enrichissement |
 |---|---|---|---|---|
-| Auvergne-Rhône-Alpes (`ARA`) | `READY` | `PARTIAL` | À documenter selon CBN | Haute |
+| Auvergne-Rhône-Alpes (`ARA`) | `IMPORTED` | `IMPORTED` 5 groupes vertébrés 2024 ; `PARTIAL` reste | À documenter selon CBN | Haute |
 | Bourgogne-Franche-Comté (`BFC`) | `IMPORTED` via tableur maître 2026 | `IMPORTED` via tableur maître 2026 | Tableur maître de statuts | **Très haute** |
 | Bretagne (`BRE`) | `IMPORTED` | `IMPORTED` | Responsabilité biologique `IMPORTED` | Surveiller révisions OEB |
 | Centre-Val de Loire (`CVL`) | `IMPORTED` (DREAL avril 2026) | `READY` (3 LRR + BDC historiques) | Rareté/indigénat CBNBP à qualifier | Moyenne |
@@ -62,25 +62,30 @@ Règles impératives :
 
 ### ARA — Auvergne-Rhône-Alpes
 
-#### ZNIEFF — `READY`
+#### ZNIEFF — `IMPORTED`
 
 - **Producteur** : DREAL Auvergne-Rhône-Alpes.
 - **Page de référence** : https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/les-especes-et-habitats-determinantes-des-znieff-a19735.html
 - **Page vérifiée** : mise à jour indiquée au 07/01/2026.
-- **Ressource** : tableur ODS « Listes d'espèces déterminantes des ZNIEFF en Auvergne-Rhône-Alpes ».
-- **Particularité importante** : listes organisées par groupes et par grandes zones biogéographiques (Massif central, plaine rhodanienne, alpine, méditerranéenne). Ces zones doivent rester des portées explicites dans l'application.
-- **Décision pipeline** : importer dès que le schéma du tableur est stabilisé ; ne pas réduire le résultat à un simple booléen régional si une restriction de zone existe.
+- **Ressource** : ODS `2023-06_listes_especes_determinantes_znieff_aura_internet.ods` (SHA-256 `ab505dca…`).
+- **Identifiant pipeline** : `dreal-ara-znieff-2023-06`.
+- **Particularité importante** : listes organisées par groupes et par grandes zones biogéographiques (Massif central, plaine rhodanienne, alpine, méditerranéenne). Ces zones restent des portées `partial` explicites.
+- **Décision pipeline** : importé ; fallback archive Internet Archive si le frontal DREAL est en maintenance.
 
-#### Listes rouges — `PARTIAL`
+#### Listes rouges — `IMPORTED` (vertébrés 2024) / `PARTIAL` (reste)
 
 - **Page de synthèse officielle** : https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/presentation-et-tableau-de-synthese-des-listes-a22019.html
 - **Page vérifiée** : mise à jour indiquée au 05/01/2026.
-- Plusieurs groupes disposent déjà de listes unifiées Auvergne-Rhône-Alpes ; lorsque ce n'est pas le cas, les anciennes listes Auvergne / Rhône-Alpes restent à considérer séparément.
-- **Flore vasculaire** : une liste rouge unifiée Auvergne-Rhône-Alpes est annoncée comme travail en cours, avec horizon 2027. Ne pas fabriquer de statut régional unifié avant publication.
+- **Importés (échelle AuRA unifiée, 2024)** :
+  - amphibiens, reptiles, chiroptères — XLSX ARB/LPO `LR_AURA2024_Chauves-souris_reptiles_amphibiens.xlsx` (`ae49929b…`) ;
+  - oiseaux nicheurs + mammifères terrestres hors chiroptères — ODS DREAL `2024-lrr-oisx_mamm_web-dreal.ods` (`3308ae67…`).
+- Identifiants : `dreal-ara-lrr-amphibiens-2024`, `…-reptiles-2024`, `…-chiropteres-2024`, `…-oiseaux-nicheurs-2024`, `…-mammiferes-2024`.
+- Plusieurs autres groupes restent en PDF ou sur anciennes régions (Auvergne / Rhône-Alpes) ; la flore vasculaire unifiée est annoncée horizon 2027.
+- **Hors vague** : bourdons 2025 (PDF), coléoptères saproxyliques 2021 (PDF), poissons/écrevisses 2023 (sans tableur machine repéré), fonge, végétations/habitats, listes d'anciennes régions.
 
 #### Action suivante
 
-Écrire un adaptateur ZNIEFF ARA, puis inventorier précisément les groupes disposant déjà d'une LRR unifiée et conserver les anciennes portées pour les autres.
+Surveiller la publication machine des LRR restantes (bourdons, poissons, invertébrés) ; conserver les portées historiques jusqu'à unification ; ne pas fabriquer de LRR flore unifiée avant 2027.
 
 ---
 
@@ -439,6 +444,7 @@ Cette section doit être relue avant chaque nouvelle vague d'enrichissement.
 | NAQ flore LRR 2026 | Avis CSRPN repéré | Attendre la publication finale exploitable |
 | NAQ protections flore 2026 | Avis/proposition CSRPN repéré | Attendre le texte/référentiel final applicable |
 | NAQ PEE/EEE 2022 | Fichier public mais métadonnées internes « v0.9 non validée » | Ne pas importer avant clarification |
+| ARA LRR vertébrés 2024 | Importée (5 groupes) | Surveiller PDF/machine pour bourdons, poissons, invertébrés |
 | ARA flore LRR unifiée | Travail annoncé, horizon 2027 | Conserver les portées historiques jusqu'à publication |
 | GES LRR faune unifiée (10 groupes) | Importée via ODONAT | Surveiller révisions ; hors périmètre : hivernants, mammifères, flore |
 | GES flore LRR unifiée | Couverture encore incomplète | Conserver les anciennes régions pour les groupes non unifiés |
@@ -470,7 +476,7 @@ Pour chaque nouvelle source ou nouveau millésime :
 1. **Grand Est** — reste LRR mammifères/flore/historiques (10 groupes faune déjà importés).
 2. **Bourgogne-Franche-Comté** — surveiller les prochaines versions du tableur maître déjà importé.
 3. **Occitanie** — ZNIEFF / LRR dès fichiers DREAL stables.
-4. **Hauts-de-France**, **ARA LRR**, **Corse** — portées historiques / consolidation.
+4. **Hauts-de-France**, **ARA LRR restantes**, **Corse** — portées historiques / consolidation.
 5. **Normandie** — compléter BN/faune ZNIEFF (HN flore déjà importée).
 6. **PACA / PDL / NAQ / GES ZNIEFF+LRR faune / BRE / IDF / NOR HN flore / CVL** — déjà importés ; surveiller révisions.
 

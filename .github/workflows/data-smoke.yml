@@ -68,6 +68,13 @@ jobs:
           bash data-pipeline/regions/ara/download_dreal_znieff.sh "$RUNNER_TEMP/ara-znieff.ods"
           echo "ARA_ZNIEFF_FILE=$RUNNER_TEMP/ara-znieff.ods" >> "$GITHUB_ENV"
 
+      - name: Download regional Auvergne-Rhône-Alpes LRR sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash data-pipeline/regions/ara/download_lrr.sh "$RUNNER_TEMP/ara-lrr"
+          echo "ARA_LRR_DIR=$RUNNER_TEMP/ara-lrr" >> "$GITHUB_ENV"
+
       - name: Probe ZNIEFF Centre-Val de Loire 2026
         shell: bash
         run: |
@@ -246,6 +253,7 @@ jobs:
           REGIONAL_DIR="$RUNNER_TEMP/regional-packages"
           mkdir -p "$REGIONAL_DIR"
           python data-pipeline/regions/ara/build_dreal_znieff.py --taxref "$TAXREF_FILE" --ods "$ARA_ZNIEFF_FILE" --out "$REGIONAL_DIR/ara-znieff.json" --min-match-rate 0.97
+          python data-pipeline/regions/ara/build_lrr.py --taxref "$TAXREF_FILE" --input-dir "$ARA_LRR_DIR" --out-dir "$REGIONAL_DIR" --min-match-rate 0.97
           if [ "${NAQ_REGIONAL_AVAILABLE:-false}" = 'true' ]; then
             python data-pipeline/regions/naq/build_znieff.py --taxref "$TAXREF_FILE" --workbook "$NAQ_ZNIEFF_FILE" --out "$REGIONAL_DIR/naq-znieff-flora.json"
           fi
@@ -290,6 +298,9 @@ jobs:
           if (!valid) process.exit(1)
           const required = [
             'dreal-ara-znieff-2023-06',
+            'dreal-ara-lrr-amphibiens-2024', 'dreal-ara-lrr-reptiles-2024',
+            'dreal-ara-lrr-chiropteres-2024', 'dreal-ara-lrr-oiseaux-nicheurs-2024',
+            'dreal-ara-lrr-mammiferes-2024',
             'oeb-bretagne-znieff-csv-2026-01-29', 'oeb-bretagne-lrr-csv-2026-01-29',
             'oeb-bretagne-responsabilite-csv-2026-07-29',
             'anbdd-normandie-lrr-oiseaux-nicheurs-2024', 'anbdd-normandie-lrr-mammiferes-2022',

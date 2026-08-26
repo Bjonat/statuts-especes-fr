@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "checkedAt": "2026-08-25",
+  "checkedAt": "2026-08-26",
   "policy": {
     "requiredState": "READY",
     "failClosed": true,
@@ -28,6 +28,42 @@
           "archiveUrl": "https://web.archive.org/web/20260513033231/https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2023-06_listes_especes_determinantes_znieff_aura_internet.ods",
           "archiveCapturedAt": "2026-05-13",
           "sha256": "ab505dcac9297257e8432743c4f60f5a41a7c3f527880d917d6b55f65ddf4f86"
+        }
+      ]
+    },
+    {
+      "id": "dreal-ara-lrr-vertebres-2024",
+      "region": "ARA",
+      "categories": [
+        "red_list_regional"
+      ],
+      "realms": [
+        "fauna"
+      ],
+      "state": "IMPORTED",
+      "landingPage": "https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/presentation-et-tableau-de-synthese-des-listes-a22019.html",
+      "notes": "5 paquets vertébrés AuRA 2024 (amphibiens, reptiles, chiroptères, oiseaux nicheurs, mammifères hors chiro).",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "version": "2024",
+          "url": "https://www.biodiversite-auvergne-rhone-alpes.fr/wp-content/uploads/2023/03/LR_AURA2024_Chauves-souris_reptiles_amphibiens.xlsx",
+          "sha256": "ae49929b0a3d226fa392850c4fa95d928d5f374f179a01fd9ea5f71feac1a581",
+          "groups": [
+            "amphibiens",
+            "reptiles",
+            "chiropteres"
+          ]
+        },
+        {
+          "kind": "ods",
+          "version": "2024",
+          "url": "https://www.auvergne-rhone-alpes.developpement-durable.gouv.fr/IMG/ods/2024-lrr-oisx_mamm_web-dreal.ods",
+          "sha256": "3308ae670319c729f248d444ddfb08b621a02cbc52610c3e4ad2a548eefacd7b",
+          "groups": [
+            "oiseaux-nicheurs",
+            "mammiferes"
+          ]
         }
       ]
     },
