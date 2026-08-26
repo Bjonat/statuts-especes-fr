@@ -46,19 +46,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/nor-lrr"
-          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2025/01/LR_Oiseaux_Nicheurs-_Normandie_2024_telechargement.xlsx' -o "$RUNNER_TEMP/nor-lrr/oiseaux-2024.xlsx"
-          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/05/LR_RHOPALO_tableau-de-synthese_ANBDD.xlsx' -o "$RUNNER_TEMP/nor-lrr/rhopaloceres.xlsx"
-          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/11/Tableau_Liste_Rouge_Mammiferes_Normandie_2022-VF.xlsx' -o "$RUNNER_TEMP/nor-lrr/mammiferes-2022.xlsx"
-          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2023/05/Liste_Rouge_ORTHO_Normandie_ANBDD_2022.xlsx' -o "$RUNNER_TEMP/nor-lrr/orthopteres-2022.xlsx"
-          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/09/Tableau-LR-Amphibiens-Normandie-2022.xlsx' -o "$RUNNER_TEMP/nor-lrr/amphibiens-2022.xlsx"
-          curl --fail --location --retry 3 'https://www.anbdd.fr/wp-content/uploads/2022/09/LR_ODONATES_tableau-de-synthese_pour_ANBDD_VF.xlsx' -o "$RUNNER_TEMP/nor-lrr/odonates.xlsx"
-          curl --fail --location --retry 3 'https://www.anbdd.fr/publication/liste-rouge-des-reptiles-de-normandie/tableau-lr-reptiles-normandie-2022/' -o "$RUNNER_TEMP/nor-lrr/reptiles-2022.xlsx"
-
-          for file in "$RUNNER_TEMP"/nor-lrr/*.xlsx; do
-            test "$(head -c 2 "$file")" = 'PK' || { echo "::error::$file n'est pas un XLSX réel"; exit 1; }
-          done
-          sha256sum "$RUNNER_TEMP"/nor-lrr/*.xlsx
+          bash data-pipeline/regions/nor/download_lrr.sh "$RUNNER_TEMP/nor-lrr"
           echo "NOR_LRR_DIR=$RUNNER_TEMP/nor-lrr" >> "$GITHUB_ENV"
 
       - name: Inspect workbook schemas
@@ -91,10 +79,17 @@ jobs:
           if (statuses < 500) throw new Error(`Volume LRR Normandie anormalement faible: ${statuses}`)
           for (const pkg of packages) {
             if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${pkg.source.id}`)
+            if (!pkg.source.landingPage || !pkg.source.sourceUrl) throw new Error(`landingPage/sourceUrl absents: ${pkg.source.id}`)
+            if ('url' in pkg.source) throw new Error(`champ url interdit: ${pkg.source.id}`)
             if (pkg.replaces.length !== 1 || pkg.replaces[0].region !== 'NOR' || pkg.replaces[0].category !== 'red_list_regional' || pkg.replaces[0].realm !== 'fauna') {
               throw new Error(`Override Normandie invalide: ${pkg.source.id}`)
             }
           }
+          const byId = new Map(packages.map((pkg) => [pkg.source.id, pkg]))
+          const oiseaux = byId.get('anbdd-normandie-lrr-oiseaux-nicheurs-2024')
+          const rhopalo = byId.get('anbdd-normandie-lrr-rhopaloceres-2022')
+          if (!oiseaux?.statuses.some((s) => s.cdRef === 3379 && s.value === 'RE')) throw new Error('Uria aalge RE attendu')
+          if (!rhopalo?.statuses.some((s) => s.cdRef === 53425 && s.value === 'RE')) throw new Error('Chazara briseis RE attendu')
           console.log({ packages: packages.length, statuses })
           NODE
 

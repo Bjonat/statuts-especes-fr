@@ -81,6 +81,8 @@ jobs:
           }
           for (const pkg of packages) {
             if (!pkg.source.sha256 || !/^[a-f0-9]{64}$/.test(pkg.source.sha256)) throw new Error(`SHA-256 absent: ${pkg.source.id}`)
+            if (!pkg.source.landingPage || !pkg.source.sourceUrl) throw new Error(`landingPage/sourceUrl absents: ${pkg.source.id}`)
+            if ('url' in pkg.source) throw new Error(`champ url interdit: ${pkg.source.id}`)
             if (!pkg.replaces.every((rule) => rule.region === 'CVL' && rule.category === 'red_list_regional' && rule.realm === 'fauna' && Array.isArray(rule.cdRefs) && rule.cdRefs.length > 0)) {
               throw new Error(`Override CVL non ciblé: ${pkg.source.id}`)
             }

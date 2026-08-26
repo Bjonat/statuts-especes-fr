@@ -38,6 +38,8 @@ SOURCES = {
         "expectedCategories": {"RE": 2, "CR": 4, "CR*": 1, "EN": 6, "VU": 6, "NT": 6, "LC": 41, "NA": 2},
         "taxrefOrder": "Odonata",
         "producer": "Observatoire régional de la biodiversité / ARB Centre-Val de Loire / CSRPN Centre-Val de Loire",
+        "landingPage": "https://www.centre-val-de-loire.developpement-durable.gouv.fr/listes-rouges-en-region-centre-val-de-loire-a1451.html",
+        "sourceUrl": "https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/2025-01/LRodonatesRCVL2022-VF2ok.pdf",
     },
     "papillons": {
         "id": "arb-cvl-lrr-papillons-2024",
@@ -50,6 +52,8 @@ SOURCES = {
         "taxrefOrder": "Lepidoptera",
         "textMode": "raw",
         "producer": "Observatoire régional de la biodiversité / ARB Centre-Val de Loire / CSRPN Centre-Val de Loire",
+        "landingPage": "https://www.centre-val-de-loire.developpement-durable.gouv.fr/listes-rouges-en-region-centre-val-de-loire-a1451.html",
+        "sourceUrl": "https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/listes%20rouges/LRR-papillons_2024_vf-4.pdf",
     },
     "coleopteres": {
         "id": "ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025",
@@ -61,6 +65,8 @@ SOURCES = {
         "expectedCategories": {"RE": 15, "CR": 7, "EN": 4, "VU": 1, "NT": 4, "LC": 14, "DD": 2},
         "taxrefOrder": "Coleoptera",
         "producer": "Laboratoire d'Éco-entomologie / DREAL Centre-Val de Loire / CSRPN Centre-Val de Loire",
+        "landingPage": "https://www.centre-val-de-loire.developpement-durable.gouv.fr/listes-rouges-en-region-centre-val-de-loire-a1451.html",
+        "sourceUrl": "https://www.laboratoireecoentomologie.com/wp-content/uploads/2026/02/Chapelin-Viscardi-et-al.-2025.-LRR-CVdL-Gyrins-dytiques-donacies.pdf",
     },
 }
 
@@ -316,6 +322,8 @@ def build_one(kind: str, pdf_path: Path, accepted, exact, bare, order_by_ref, ch
             "publicationYear": metadata["publicationYear"],
             "official": True,
             "checkedAt": checked_at,
+            "landingPage": metadata["landingPage"],
+            "sourceUrl": metadata["sourceUrl"],
             "sha256": sha256(pdf_path),
         },
         "replaces": [

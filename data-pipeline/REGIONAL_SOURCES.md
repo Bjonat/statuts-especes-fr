@@ -45,12 +45,12 @@ Règles impératives :
 | Auvergne-Rhône-Alpes (`ARA`) | `IMPORTED` | `IMPORTED` 5 groupes vertébrés 2024 ; `PARTIAL` reste | À documenter selon CBN | Haute |
 | Bourgogne-Franche-Comté (`BFC`) | `IMPORTED` via tableur maître 2026 | `IMPORTED` via tableur maître 2026 | Tableur maître de statuts | **Très haute** |
 | Bretagne (`BRE`) | `IMPORTED` | `IMPORTED` | Responsabilité biologique `IMPORTED` | Surveiller révisions OEB |
-| Centre-Val de Loire (`CVL`) | `IMPORTED` (DREAL avril 2026) | `READY` (3 LRR + BDC historiques) | Rareté/indigénat CBNBP à qualifier | Moyenne |
+| Centre-Val de Loire (`CVL`) | `IMPORTED` (DREAL avril 2026) | `IMPORTED` 3 LRR PDF récentes + BDC historiques | Rareté/indigénat CBNBP à qualifier | Moyenne |
 | Corse (`COR`) | `RESEARCH_REQUIRED` pour consolidation | `PARTIAL` | À documenter | Moyenne |
 | Grand Est (`GES`) | `IMPORTED` faune et flore vasculaire | `IMPORTED` 10 groupes faune unifiés + Alsace mammifères / CA flore historiques ; `PARTIAL` reste | Anciennes régions à préserver | **Haute** |
 | Hauts-de-France (`HDF`) | `IMPORTED` flore/bryo Digitale (portée HDF) ; faune encore partielle | `IMPORTED` 6 LRR IRPN unifiées ; `PARTIAL` reste | Anciennes régions à préserver | Moyenne |
 | Île-de-France (`IDF`) | `IMPORTED` (GeoNat) | `IMPORTED` 8 groupes via GeoNat ; poissons PDF hors vague | — | Surveiller GeoNat + poissons |
-| Normandie (`NOR`) | `PARTIAL` (HN flore Digitale) | `READY` selon groupes unifiés | Anciennes régions à préserver | Haute |
+| Normandie (`NOR`) | `PARTIAL` (HN flore Digitale) | `IMPORTED` 7 groupes ANBDD unifiés | Anciennes régions à préserver | Haute |
 | Nouvelle-Aquitaine (`NAQ`) | `IMPORTED` flore vasculaire + groupes unifiés | `IMPORTED` araignées 2025 ; `PARTIAL` / flore 2026 en attente | EEE 2022 actuellement bloquée | **Très haute** |
 | Occitanie (`OCC`) | `IMPORTED` flore/bryo/chara 2023 + faune 2024-07 | `PARTIAL` / travaux 2026 en attente | Zones biogéographiques conservées | **Très haute** |
 | Pays de la Loire (`PDL`) | `IMPORTED` faune/flore 2018 | `RESEARCH_REQUIRED` pour consolidation | Rareté/indigénat à qualifier | Moyenne |
@@ -164,11 +164,16 @@ Surveiller les révisions OEB (CSV data.gouv) ; ne pas réimporter les listes d'
 - Flore vasculaire + bryophytes + 12 groupes faune ; habitats et fonge hors import.
 - Conditions de déterminance ≤ 80 caractères conservées ; 8 libellés trop longs omis.
 
-#### Listes rouges — `READY`
+#### Listes rouges — `IMPORTED` (3 PDF récents) + BDC pour le reste
 
 - **Page officielle** : https://www.centre-val-de-loire.developpement-durable.gouv.fr/listes-rouges-en-region-centre-val-de-loire-a1451.html
 - **Page vérifiée** : publication/mise à jour en février 2026.
-- Le portail liste les LRR validées par groupe et leurs millésimes, avec des évaluations récentes pour plusieurs groupes faunistiques ; la flore vasculaire reste sur un millésime plus ancien.
+- **Importés** (extraction PDF déterministe via Poppler, SHA-256 fail-closed) :
+  - odonates 2022 — `arb-cvl-lrr-odonates-2022` (68, SHA `61122d57…`) ;
+  - papillons de jour / zygènes 2024 — `arb-cvl-lrr-papillons-2024` (147, SHA `5fb905e7…`) ;
+  - coléoptères aquatiques 2025 — `ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025` (47, SHA `c7bf0ad7…`).
+- Total : 262 statuts ; raccord TAXREF 100 %. Overrides limités aux `cdRefs` couverts.
+- Les autres groupes (flore 2013, oiseaux, herpéto, etc.) restent sur BDC v18 tant qu'aucune publication machine plus récente n'est validée.
 
 #### Rareté / indigénat — `RESEARCH_REQUIRED`
 
@@ -176,7 +181,7 @@ Surveiller les révisions OEB (CSV data.gouv) ; ne pas réimporter les listes d'
 
 #### Action suivante
 
-Surveiller les révisions du tableur ZNIEFF ; qualifier un jeu CBNBP récent pour rareté/indigénat.
+Surveiller les révisions du tableur ZNIEFF et des LRR annoncées (oiseaux, amphibiens, reptiles, poissons) ; qualifier un jeu CBNBP récent pour rareté/indigénat.
 
 ---
 
@@ -296,11 +301,14 @@ Surveiller les révisions GeoNat ; brancher les poissons dès disponibilité mac
 - **SHA-256** : `71ae71b770f7b3911349e501caaaa65ac7dba8172d12b96ef4b90d5056995c95`.
 - **Hors vague** : Basse-Normandie ; faune ; liste synthétique Normandie 2024 PDF/non exhaustive machine ; `[Oui]` Digitale (erreur/douteux/cultivé).
 
-#### Listes rouges — `READY` pour groupes unifiés, sinon `PARTIAL`
+#### Listes rouges — `IMPORTED` (7 groupes ANBDD unifiés)
 
 - **DREAL** : https://www.normandie.developpement-durable.gouv.fr/les-listes-rouges-dans-le-monde-et-en-normandie-a6663.html
-- Page vérifiée en octobre 2025.
-- Plusieurs groupes possèdent désormais une LRR Normandie unifiée, notamment amphibiens, reptiles, mammifères, odonates, orthoptères et apparentés, rhopalocères/zygènes, ainsi qu'une liste oiseaux nicheurs récente.
+- **Producteur opérationnel** : ANBDD / partenaires / CSRPN Normandie.
+- **Téléchargeur** : `download_lrr.sh` (SHA-256 fail-closed) + `build_anbdd_lrr.py`.
+- Groupes : oiseaux nicheurs 2024 (205), mammifères 2022 (95), amphibiens 2022 (19), reptiles 2022 (17), odonates 2022 (59), orthoptères 2022 (69), rhopalocères/zygènes 2022 (112).
+- Total : **576** statuts ; raccord TAXREF 100 % via `CD_NOM`.
+- Identifiants `anbdd-normandie-lrr-…` ; portée `regional` Normandie.
 
 #### Action suivante
 
