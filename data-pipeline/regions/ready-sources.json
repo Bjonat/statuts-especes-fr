@@ -179,11 +179,34 @@
         "red_list_regional"
       ],
       "realms": [
-        "flora",
         "fauna"
       ],
+      "state": "IMPORTED",
       "landingPage": "https://www.centre-val-de-loire.developpement-durable.gouv.fr/listes-rouges-en-region-centre-val-de-loire-a1451.html",
-      "resourceDiscovery": "group-specific official publications"
+      "notes": "3 paquets PDF récents (odonates 2022, papillons 2024, coléoptères aquatiques 2025). Autres groupes via BDC v18.",
+      "resources": [
+        {
+          "kind": "pdf",
+          "group": "odonates",
+          "version": "2022",
+          "url": "https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/2025-01/LRodonatesRCVL2022-VF2ok.pdf",
+          "sha256": "61122d57b365267140e6a2307de522e629fdf50b2f87bef5e2c6a792de142b37"
+        },
+        {
+          "kind": "pdf",
+          "group": "papillons",
+          "version": "2024",
+          "url": "https://www.biodiversite-centrevaldeloire.fr/sites/default/files/content/ressources/pdf/listes%20rouges/LRR-papillons_2024_vf-4.pdf",
+          "sha256": "5fb905e75f6a4765b6c7d2bc39fc7f44c051c521858ebf9070c26d27a9f1a333"
+        },
+        {
+          "kind": "pdf",
+          "group": "coleopteres-aquatiques",
+          "version": "2025",
+          "url": "https://www.laboratoireecoentomologie.com/wp-content/uploads/2026/02/Chapelin-Viscardi-et-al.-2025.-LRR-CVdL-Gyrins-dytiques-donacies.pdf",
+          "sha256": "c7bf0ad76a6c502fb99cf387db3768eda9511164aa5a7fb8aa06a1080d5b300a"
+        }
+      ]
     },
     {
       "id": "dreal-cvl-znieff-2026-04",
@@ -369,8 +392,60 @@
       "realms": [
         "fauna"
       ],
+      "state": "IMPORTED",
       "landingPage": "https://www.normandie.developpement-durable.gouv.fr/les-listes-rouges-dans-le-monde-et-en-normandie-a6663.html",
-      "resourceDiscovery": "ANBDD / DREAL group-specific unified LRR"
+      "notes": "7 paquets ANBDD unifiés Normandie (oiseaux 2024 + 6 groupes 2022).",
+      "resources": [
+        {
+          "kind": "xlsx",
+          "group": "oiseaux-nicheurs",
+          "version": "2024",
+          "url": "https://www.anbdd.fr/wp-content/uploads/2025/01/LR_Oiseaux_Nicheurs-_Normandie_2024_telechargement.xlsx",
+          "sha256": "ed7b70e2bb8b87a61779e5d8800f37ab0142b2af6adc60939bb3dcc3995cc319"
+        },
+        {
+          "kind": "xlsx",
+          "group": "mammiferes",
+          "version": "2022",
+          "url": "https://www.anbdd.fr/wp-content/uploads/2022/11/Tableau_Liste_Rouge_Mammiferes_Normandie_2022-VF.xlsx",
+          "sha256": "9771d796d403784f240faff836cd1e2308f4014b69f3d90145911aa6de5a04ef"
+        },
+        {
+          "kind": "xlsx",
+          "group": "amphibiens",
+          "version": "2022",
+          "url": "https://www.anbdd.fr/wp-content/uploads/2022/09/Tableau-LR-Amphibiens-Normandie-2022.xlsx",
+          "sha256": "5db2c37e826fdf2d44a9b67f75d0123d06b970ce9d23c1cb8b06a9f064f2bd1d"
+        },
+        {
+          "kind": "xlsx",
+          "group": "reptiles",
+          "version": "2022",
+          "url": "https://www.anbdd.fr/publication/liste-rouge-des-reptiles-de-normandie/tableau-lr-reptiles-normandie-2022/",
+          "sha256": "e9f718febb0366d32137c8e70956a28bb6d714c3891bfac1dd140b7d26008287"
+        },
+        {
+          "kind": "xlsx",
+          "group": "odonates",
+          "version": "2022",
+          "url": "https://www.anbdd.fr/wp-content/uploads/2022/09/LR_ODONATES_tableau-de-synthese_pour_ANBDD_VF.xlsx",
+          "sha256": "78563f972a4a385a36d527194224b545d756fd7da4ceba449ef9ec21d7e585fa"
+        },
+        {
+          "kind": "xlsx",
+          "group": "orthopteres",
+          "version": "2022",
+          "url": "https://www.anbdd.fr/wp-content/uploads/2023/05/Liste_Rouge_ORTHO_Normandie_ANBDD_2022.xlsx",
+          "sha256": "362e053c0d38a9fa7fd5278ca64824d97b6aac2d19a6137253e65011562eea06"
+        },
+        {
+          "kind": "xlsx",
+          "group": "rhopaloceres",
+          "version": "2022",
+          "url": "https://www.anbdd.fr/wp-content/uploads/2022/05/LR_RHOPALO_tableau-de-synthese_ANBDD.xlsx",
+          "sha256": "975e63b1057826be3d3edeb36c222d7ff0c26663322226ee010fe5c4dcae6bbe"
+        }
+      ]
     },
     {
       "id": "cbnhdf-digitale-znieff-hn-flora",

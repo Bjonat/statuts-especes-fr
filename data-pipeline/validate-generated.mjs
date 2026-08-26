@@ -637,6 +637,79 @@ if (manifest.sources.some((source) => source.id === cvlZnieffSourceId)) {
   )
 }
 
+const cvlLrrChecks = [
+  {
+    id: 'arb-cvl-lrr-odonates-2022',
+    cdRef: 65139,
+    value: 'CR',
+    message: 'Coenagrion ornatum: LRR odonates Centre-Val de Loire CR',
+  },
+  {
+    id: 'arb-cvl-lrr-papillons-2024',
+    cdRef: 53229,
+    value: 'RE',
+    message: 'Pyrgus alveus: LRR papillons Centre-Val de Loire RE',
+  },
+  {
+    id: 'ecoentomologie-cvl-lrr-coleopteres-aquatiques-2025',
+    cdRef: 9562,
+    value: 'CR',
+    message: 'Graphoderus bilineatus: LRR coléoptères aquatiques Centre-Val de Loire CR',
+  },
+]
+for (const check of cvlLrrChecks) {
+  if (!manifest.sources.some((source) => source.id === check.id)) continue
+  assert.ok(
+    findStatus(
+      cvlFauna,
+      check.cdRef,
+      (status) =>
+        status.category === 'red_list_regional' &&
+        status.sourceId === check.id &&
+        status.value === check.value &&
+        status.scope === 'regional',
+    ),
+    check.message,
+  )
+}
+
+const norFauna = await loadStatuses('fauna', 'NOR')
+const norLrrChecks = [
+  {
+    id: 'anbdd-normandie-lrr-oiseaux-nicheurs-2024',
+    cdRef: 3379,
+    value: 'RE',
+    message: 'Uria aalge: LRR oiseaux nicheurs Normandie RE',
+  },
+  {
+    id: 'anbdd-normandie-lrr-rhopaloceres-2022',
+    cdRef: 53425,
+    value: 'RE',
+    message: 'Chazara briseis: LRR rhopalocères Normandie RE',
+  },
+  {
+    id: 'anbdd-normandie-lrr-amphibiens-2022',
+    cdRef: 240,
+    value: 'RE',
+    message: 'Pelobates fuscus: LRR amphibiens Normandie RE',
+  },
+]
+for (const check of norLrrChecks) {
+  if (!manifest.sources.some((source) => source.id === check.id)) continue
+  assert.ok(
+    findStatus(
+      norFauna,
+      check.cdRef,
+      (status) =>
+        status.category === 'red_list_regional' &&
+        status.sourceId === check.id &&
+        status.value === check.value &&
+        status.scope === 'regional',
+    ),
+    check.message,
+  )
+}
+
 const hdfFlora = await loadStatuses('flora', 'HDF')
 const hdfFauna = await loadStatuses('fauna', 'HDF')
 const hdfZnieffSourceId = 'cbnhdf-digitale-znieff-hdf-flora-2026-03-31'

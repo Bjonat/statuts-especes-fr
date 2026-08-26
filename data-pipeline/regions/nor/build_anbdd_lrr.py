@@ -16,6 +16,11 @@ from openpyxl import load_workbook
 REALM_BY_KINGDOM = {"animalia": "fauna", "plantae": "flora"}
 VALID_LRR_CATEGORY = re.compile(r"^(?:EX|EW|RE|CR\*?|EN|VU|NT|LC|DD|NE|NA[A-Z]?)$")
 
+LANDING_URL = (
+    "https://www.normandie.developpement-durable.gouv.fr/"
+    "les-listes-rouges-dans-le-monde-et-en-normandie-a6663.html"
+)
+
 SOURCES = [
     {
         "key": "oiseaux",
@@ -25,6 +30,8 @@ SOURCES = [
         "version": "2024",
         "year": 2024,
         "category_headers": ["Catégorie 2024"],
+        "landingPage": LANDING_URL,
+        "sourceUrl": "https://www.anbdd.fr/wp-content/uploads/2025/01/LR_Oiseaux_Nicheurs-_Normandie_2024_telechargement.xlsx",
     },
     {
         "key": "mammiferes",
@@ -34,6 +41,8 @@ SOURCES = [
         "version": "2022",
         "year": 2022,
         "category_headers": ["Catégorie Liste rouge Normandie"],
+        "landingPage": LANDING_URL,
+        "sourceUrl": "https://www.anbdd.fr/wp-content/uploads/2022/11/Tableau_Liste_Rouge_Mammiferes_Normandie_2022-VF.xlsx",
     },
     {
         "key": "amphibiens",
@@ -43,6 +52,8 @@ SOURCES = [
         "version": "2022",
         "year": 2022,
         "category_headers": ["Catégorie Liste rouge Normandie (2022)"],
+        "landingPage": LANDING_URL,
+        "sourceUrl": "https://www.anbdd.fr/wp-content/uploads/2022/09/Tableau-LR-Amphibiens-Normandie-2022.xlsx",
     },
     {
         "key": "reptiles",
@@ -52,6 +63,8 @@ SOURCES = [
         "version": "2022",
         "year": 2022,
         "category_headers": ["Catégorie Liste rouge Normandie (2022)"],
+        "landingPage": LANDING_URL,
+        "sourceUrl": "https://www.anbdd.fr/publication/liste-rouge-des-reptiles-de-normandie/tableau-lr-reptiles-normandie-2022/",
     },
     {
         "key": "odonates",
@@ -61,6 +74,8 @@ SOURCES = [
         "version": "2022",
         "year": 2022,
         "category_headers": ["LISTE ROUGE NORMANDE"],
+        "landingPage": LANDING_URL,
+        "sourceUrl": "https://www.anbdd.fr/wp-content/uploads/2022/09/LR_ODONATES_tableau-de-synthese_pour_ANBDD_VF.xlsx",
     },
     {
         "key": "orthopteres",
@@ -70,6 +85,8 @@ SOURCES = [
         "version": "2022",
         "year": 2022,
         "category_headers": ["LISTE ROUGE NORMANDE"],
+        "landingPage": LANDING_URL,
+        "sourceUrl": "https://www.anbdd.fr/wp-content/uploads/2023/05/Liste_Rouge_ORTHO_Normandie_ANBDD_2022.xlsx",
     },
     {
         "key": "rhopaloceres",
@@ -79,6 +96,8 @@ SOURCES = [
         "version": "2022",
         "year": 2022,
         "category_headers": ["LISTE ROUGE NORMANDE"],
+        "landingPage": LANDING_URL,
+        "sourceUrl": "https://www.anbdd.fr/wp-content/uploads/2022/05/LR_RHOPALO_tableau-de-synthese_ANBDD.xlsx",
     },
 ]
 
@@ -282,6 +301,8 @@ def build_package(source, rows, input_dir: Path, by_cd_nom, by_name, checked_at:
             "publicationYear": source["year"],
             "official": True,
             "checkedAt": checked_at,
+            "landingPage": source["landingPage"],
+            "sourceUrl": source["sourceUrl"],
             "sha256": sha256(file_path),
         },
         "replaces": [

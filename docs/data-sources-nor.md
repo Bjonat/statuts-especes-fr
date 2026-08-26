@@ -41,10 +41,30 @@ Le téléchargeur `download_digitale_znieff.sh` exige ce hash exact.
 - ZNIEFF faune Normandie ;
 - liste synthétique Normandie 2024 non démontrée comme jeu machine exhaustif.
 
-## LRR unifiées
+## LRR unifiées ANBDD — importées
 
-Les LRR ANBDD (oiseaux, mammifères, amphibiens, reptiles, odonates, orthoptères, rhopalocères) restent branchées séparément via `build_anbdd_lrr.py`.
+- Producteur : ANBDD / partenaires naturalistes / CSRPN Normandie.
+- Page DREAL : `https://www.normandie.developpement-durable.gouv.fr/les-listes-rouges-dans-le-monde-et-en-normandie-a6663.html`.
+- Téléchargeur : `download_lrr.sh` (SHA-256 fail-closed) ; builder : `build_anbdd_lrr.py`.
+
+| Groupe | Millésime | Statuts | SHA-256 (préfixe) | Identifiant |
+|---|---|---:|---|---|
+| Oiseaux nicheurs | 2024 | 205 | `ed7b70e2…` | `anbdd-normandie-lrr-oiseaux-nicheurs-2024` |
+| Mammifères | 2022 | 95 | `9771d796…` | `anbdd-normandie-lrr-mammiferes-2022` |
+| Amphibiens | 2022 | 19 | `5db2c37e…` | `anbdd-normandie-lrr-amphibiens-2022` |
+| Reptiles | 2022 | 17 | `e9f718fe…` | `anbdd-normandie-lrr-reptiles-2022` |
+| Odonates | 2022 | 59 | `78563f97…` | `anbdd-normandie-lrr-odonates-2022` |
+| Orthoptères / mantes / phasmes | 2022 | 69 | `362e053c…` | `anbdd-normandie-lrr-orthopteres-2022` |
+| Rhopalocères / zygènes | 2022 | 112 | `975e63b1…` | `anbdd-normandie-lrr-rhopaloceres-2022` |
+
+Total : **576** statuts ; raccord TAXREF 100 % via `CD_NOM`. Portée `regional`.
+
+### Sentinelles LRR
+
+- `Uria aalge` (`CD_REF 3379`) : oiseaux nicheurs `RE` ;
+- `Chazara briseis` (`CD_REF 53425`) : rhopalocères `RE` ;
+- `Pelobates fuscus` (`CD_REF 240`) : amphibiens `RE`.
 
 ## État pipeline
 
-ZNIEFF HN branchée dans `.github/workflows/nor-znieff-smoke.yml`, `data-smoke.yml` et `build-production.yml`.
+ZNIEFF HN + LRR ANBDD branchées dans `nor-znieff-smoke.yml`, `normandie-lrr-smoke.yml`, `data-smoke.yml` et `build-production.yml`.
