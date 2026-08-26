@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Télécharge le catalogue Digitale CBNHDF (flore + bryophytes) — SHA-256 fail-closed.
+# Télécharge les sources ZNIEFF Hauts-de-France utilisées en production — SHA-256 fail-closed.
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -39,4 +39,8 @@ download 'digitale-bryophytes.xlsx' \
   'https://www.cbnhdf.fr/system/files/2026-05/DIGITALE_BS-BIF-FVF_MH_4.0_20260331.xlsx' \
   '810cc4cc9458721710a826d009884698fcf9b06d059af41153197c12470cb3bc'
 
-echo "CBNHDF Digitale (flore + bryophytes) téléchargé dans $target_dir"
+# La faune n'est pas encore unifiée à l'échelle HDF : deux listes historiques
+# officielles sont donc téléchargées séparément dans le même dossier de build.
+bash "$(dirname "$0")/download_znieff_fauna.sh" "$target_dir"
+
+echo "Sources ZNIEFF HDF (flore, bryophytes, faune historique) téléchargées dans $target_dir"
