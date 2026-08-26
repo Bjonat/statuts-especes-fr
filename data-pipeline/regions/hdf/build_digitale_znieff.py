@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ZNIEFF flore vasculaire et bryophytes Hauts-de-France via catalogue Digitale CBNHDF."""
+"""ZNIEFF Hauts-de-France : flore/bryophytes Digitale + faune historique DREAL."""
 from __future__ import annotations
 
 import argparse
@@ -7,6 +7,8 @@ import csv
 import hashlib
 import json
 import re
+import subprocess
+import sys
 import unicodedata
 from collections import Counter
 from datetime import date
@@ -247,6 +249,29 @@ def build_package(source: dict, entry: dict, by_cd_ref: dict[int, str | None], c
     }
 
 
+def build_historical_fauna_if_available(args, input_dir: Path, out_dir: Path) -> None:
+    fauna_files = [input_dir / "picardie.ods", input_dir / "npdc.ods"]
+    if not all(path.is_file() for path in fauna_files):
+        print("ZNIEFF faune historique HDF non présente dans ce dossier : étape ignorée.")
+        return
+
+    command = [
+        sys.executable,
+        str(Path(__file__).with_name("build_znieff_fauna.py")),
+        "--taxref",
+        str(args.taxref),
+        "--input-dir",
+        str(input_dir),
+        "--out-dir",
+        str(out_dir),
+        "--checked-at",
+        str(args.checked_at),
+        "--min-match-rate",
+        str(args.min_match_rate),
+    ]
+    subprocess.run(command, check=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--taxref", required=True)
@@ -288,6 +313,7 @@ def main():
         print(f"Paquet écrit: {output} - {len(package['statuses'])} statuts")
 
     print(f"Hauts-de-France ZNIEFF Digitale: {len(SOURCES)} paquets, {total_statuses} statuts")
+    build_historical_fauna_if_available(args, input_dir, out_dir)
 
 
 if __name__ == "__main__":
