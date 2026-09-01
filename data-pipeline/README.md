@@ -1,19 +1,30 @@
 # Pipeline de données
 
-Le navigateur ne lit jamais directement les fichiers TAXREF ou BDC Statuts. Ce dossier transforme les référentiels officiels en jeux JSON immuables, fractionnés pour limiter mémoire, CPU et batterie sur téléphone.
+Le navigateur ne lit jamais directement TAXREF ou BDC Statuts. Ce dossier transforme les référentiels officiels en jeux JSON immuables, fractionnés pour le téléphone.
+
+Le pipeline v3 couvre les **13 régions métropolitaines** et combine le socle TAXREF / BDC avec les enrichissements régionaux déclarés dans le registre. Les volumes dépendent du jeu de sources effectivement inclus dans le build.
+
+Ce n’est **pas** un avis juridique, ni une couverture exhaustive de tous les référentiels régionaux existants.
 
 ## Sources nationales
 
-Référentiels vérifiés le 21/08/2026 :
+Référentiels du socle (vérifiés le 21/08/2026) :
 
-- **TAXREF v18** — PatriNat / INPN : `https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip`
-- **BDC Statuts v18** — PatriNat / SINP : `https://assets.patrinat.fr/files/referentiel/BDC.zip`
+- **TAXREF v18** — PatriNat / INPN
+- **BDC Statuts v18** — PatriNat / SINP
 
-Le workflow `Data source smoke test` sait télécharger ces archives, détecter automatiquement le CSV principal BDC, exécuter les tests, générer les jeux et publier temporairement un artifact de contrôle.
+Les archives brutes ne sont pas versionnées dans Git.
 
-## Matrice de couverture
+## Registre, manifeste, couverture
 
-La couverture des référentiels (ce que le système **déclare** couvrir) se distingue du manifeste v3 (ce qu’un **build** a réellement inclus) et de `resolveStatuses()` (ce qui s’applique à un taxon).
+| Artefact | Rôle |
+| --- | --- |
+| [`regions/ready-sources.json`](regions/ready-sources.json) | Registre machine : ce que le pipeline *déclare* |
+| `public/data/manifest.json` | Manifeste : ce qu’un *build* a *inclus* |
+| [`docs/generated/source-coverage.md`](../docs/generated/source-coverage.md) | Matrice humaine générée |
+| [`generated/coverage.json`](generated/coverage.json) | Même vue, JSON |
+
+La couverture (ce que le système déclare ou prouve couvrir) n’est pas l’affichage PWA (ce qui est montré pour un taxon une fois les référentiels intégrés filtrés). `resolveStatuses()` n’existe pas encore.
 
 ```bash
 npm run coverage:build
@@ -21,17 +32,16 @@ npm run coverage:build
 node data-pipeline/generate-coverage.mjs --manifest public/data/manifest.json
 ```
 
-Fichiers produits (hors contrat runtime PWA) :
-
-- `data-pipeline/generated/coverage.json`
-- `docs/generated/source-coverage.md`
-
 Une preuve `présent` n’est posée que si un identifiant candidat figure tel quel dans le manifeste :
 
 - `source.id` : preuve **source-wide** (tous les tuples de cette source) ;
 - `resource.pipelineId` : preuve **limitée aux tuples** produits par cette ressource.
 
 Les identifiants « parapluie » sans correspondance exacte restent `inconnu`. Ne jamais déduire `absent` / `false`.
+
+`coverage:build` relit registre + manifeste. Il ne relance pas l’ingestion.
+
+Détail humain : [`REGIONAL_SOURCES.md`](REGIONAL_SOURCES.md). Audits : `docs/data-sources-*.md`. Ne pas maintenir ici une seconde liste manuelle complète des sources.
 
 ## Construction
 
@@ -42,69 +52,112 @@ npm run data:build -- \
   --out public/data
 ```
 
+Paquets régionaux déjà construits :
+
+```bash
+npm run data:build -- \
+  --taxref /chemin/TAXREFv18.txt \
+  --bdc /chemin/bdc_18_01.csv \
+  --regional-dir /chemin/paquets \
+  --out public/data
+```
+
 Le manifeste v3 référence :
 
-- deux catalogues taxonomiques (Faune / Flore) ;
-- un dictionnaire global de définitions de statuts ;
+- deux catalogues taxonomiques (faune / flore) ;
+- un dictionnaire global de définitions ;
 - un jeu de liens compacts par règne et par région.
 
-Les métadonnées répétitives (`label`, valeur, citation, URL documentaire, source) ne sont plus dupliquées dans chaque relation taxon × région. Un lien régional contient uniquement le `CD_REF`, l'identifiant de définition, un code de portée et, uniquement pour une portée partielle, son libellé territorial.
+Un build qui télécharge **toutes** les sources `ready` peut échouer si une URL distante est indisponible. L’acquisition n’est pas robuste pour toutes les sources (chantier P0.5). Un échec réseau n’est pas une source absente du registre.
 
-Sur les sources officielles v18 et les trois régions pilotes, **229 813 relations sont décrites par 686 définitions uniques**. Le volume JSON brut complet tombe à environ **31 Mio**, dont ~26 Mio de taxonomie ; les données de statuts elles-mêmes n'occupent plus qu'environ 5 Mio.
+## Contrat du bundle compact
 
-## Validation métier des jeux générés
+Chaque relation pointe vers une définition :
 
-Les tests unitaires vérifient le parseur, les filtres taxonomiques, la compaction/hydratation et les règles territoriales. Après génération d'un jeu officiel, un second niveau contrôle des **cas sentinelles de terrain** :
+```text
+StatusDefinition = { category, label, value, sourceId }
+```
+
+Un lien régional contient le `CD_REF`, l’identifiant de définition, un code de portée et, pour une portée partielle, son libellé territorial.
+
+La provenance est conservée via **`sourceId`** et le **manifeste** (identifiant, millésime, producteur, `checkedAt`). Les définitions n’embarquent **pas** `citation` ni `documentUrl` : ces champs sont volontairement exclus du bundle mobile.
+
+Les citations longues et URL documentaires, lorsqu’elles existent, restent du côté pipeline / audits / registre. La PWA affiche la source et le millésime, pas une citation bibliographique complète.
+
+## Volumes du socle national
+
+Sur le **socle TAXREF v18 + BDC v18** métropole (hors enrichissements régionaux) :
+
+- 106 357 taxons (26 405 flore, 79 952 faune)
+- 877 930 relations
+- 1 411 définitions
+- ~43 Mio de JSON brut
+- ~6,3 Mo compressés (artifact CI)
+
+Les enrichissements régionaux augmentent relations et définitions selon les sources du build. Ne pas utiliser d’anciens totaux « trois régions pilotes » (229 813 / 686) comme métrique courante.
+
+## Validation métier
 
 ```bash
 node data-pipeline/validate-generated.mjs --dir public/data
 ```
 
-Les sentinelles actuelles sont :
+Les sentinelles incluent notamment :
 
-- `Lotus angustissimus` (`CD_REF 106634`) : présence dans le catalogue, LRR Centre-Val de Loire = LC et protection de l'ancienne Aquitaine conservée comme portée partielle en Nouvelle-Aquitaine ;
-- `Aconitum napellus` s. l. (`CD_REF 80037`) : protection régionale Centre ;
-- `Alcedo atthis` (`CD_REF 3571`) : présence côté faune et protection nationale.
+| Taxon | Ce que le test garantit |
+| --- | --- |
+| *Lotus angustissimus* (`106634`) | Catalogue flore ; LRR Centre-Val de Loire = LC ; protection de l’ancienne Aquitaine conservée en portée partielle NAQ |
+| *Aconitum napellus* s.l. (`80037`) | Protection régionale Centre |
+| *Alcedo atthis* (`3571`) | Catalogue faune ; protection nationale |
+| *Hyles euphorbiae* (`54843`) | Catalogue faune ; **0 statut projeté en Centre-Val de Loire** ; au moins un statut en Hauts-de-France, tous ZNIEFF à portée partielle ; au moins un statut en Normandie, tous ZNIEFF à portée partielle |
 
-`data-smoke.yml` exécute cette validation directement sur les archives officielles téléchargées au moment du run. Une évolution de TAXREF ou de la BDC ne peut donc pas être considérée compatible uniquement parce que le JSON se construit : les cas métier doivent continuer à produire les résultats attendus.
+Ces sentinelles caractérisent des cas représentatifs. Elles ne prétendent pas qu’un taxon n’a de statuts « que » dans certaines régions au-delà de ce que le test assert.
+
+`npm test` exécute les tests unitaires du parseur, de la compaction et des règles territoriales. La validation des jeux officiels (`validate-generated.mjs`) s’applique lorsqu’un dataset est présent dans `public/data`.
 
 ## Filtre taxonomique
 
-Le besoin métier est la recherche d'une espèce observée. Le pipeline conserve donc les rangs espèce/infraspécifiques utiles (`ES`, `SSES`, `VAR`, `SVAR`, `FO`, `CAR`, `RACE`, `AGES`) et retire genres, familles, ordres et autres rangs supraspécifiques du catalogue de recherche.
+Le catalogue conserve les rangs espèce / infraspécifiques utiles (`ES`, `SSES`, `VAR`, `SVAR`, `FO`, `CAR`, `RACE`, `AGES`) et retire les rangs supraspécifiques.
 
-Pour le périmètre métropolitain actuel, un taxon est conservé si son statut biogéographique TAXREF `FR` est renseigné et différent de `A` (absent) et `Q` (mention erronée). Garde-fou : un taxon possédant un statut BDC applicable à une région supportée reste conservé même si ce filtre l'aurait retiré.
+Pour le périmètre métropolitain, un taxon est conservé si son statut biogéographique TAXREF `FR` est renseigné et différent de `A` (absent) et `Q` (mention erronée). Garde-fou : un taxon possédant un statut BDC applicable à une région supportée reste conservé même si ce filtre l’aurait retiré.
 
-Les synonymes TAXREF restent rattachés au `CD_REF` accepté afin que les anciens noms restent recherchables.
+Les synonymes restent rattachés au `CD_REF` accepté.
 
 ## Résolution territoriale
 
-Une région administrative actuelle n'est pas toujours équivalente à la zone d'application d'un ancien texte.
+Une région administrative actuelle n’est pas toujours équivalente à la zone d’application d’un ancien texte. Exemples :
 
-- `INSEER72` — ancienne Aquitaine : **portée partielle** dans Nouvelle-Aquitaine ;
-- `INSEER54` — Poitou-Charentes : portée partielle dans Nouvelle-Aquitaine ;
-- `INSEER74` — Limousin : portée partielle dans Nouvelle-Aquitaine ;
-- `INSEER73` — Midi-Pyrénées : portée partielle dans Occitanie ;
-- `INSEER91` — Languedoc-Roussillon : portée partielle dans Occitanie ;
-- `INSEER24` — ancienne région Centre : même périmètre départemental que Centre-Val de Loire, donc portée régionale complète.
+- ancienne Aquitaine, Poitou-Charentes, Limousin → portées **partielles** en Nouvelle-Aquitaine
+- Midi-Pyrénées, Languedoc-Roussillon → portées **partielles** en Occitanie
+- ancienne région Centre → même périmètre que Centre-Val de Loire → portée régionale complète
 
-Les statuts départementaux sont conservés comme portées partielles tant que l'interface ne dispose que du choix régional.
+Les statuts départementaux sont conservés comme portées partielles tant que l’interface ne dispose que du choix régional.
 
-## Données effectivement exploitées
+## Indicateurs régionaux
 
-La BDC fournit notamment : listes rouges nationales/régionales, protections, déterminance ZNIEFF, PNA et autres réglementations. Chaque relation restituée par l'application conserve sa catégorie, sa valeur, sa zone d'application, sa citation et son URL documentaire lorsqu'elles sont fournies ; la compaction ne change que leur représentation sur disque.
+Les indicateurs régionaux non homogènes (responsabilité, enjeux, listes complémentaires, etc.) sont intégrés **source par source** lorsqu’un référentiel institutionnel actuel, traçable et suffisamment structuré est disponible. Voir la [matrice de couverture](../docs/generated/source-coverage.md) pour ce qui est effectivement présent. Aucune catégorie n’est promise a priori.
 
-Les indicateurs régionaux non homogènes — par exemple certaines classes de rareté ou de responsabilité — seront intégrés par des adaptateurs séparés uniquement lorsqu'une source institutionnelle actuelle et traçable est disponible.
+## Bourgogne-Franche-Comté
 
-## Audit des sources régionales
+| Source | État | Publication |
+| --- | --- | --- |
+| `dreal-bfc-statuts-2026-03-03` | `IMPORTED` — tableur DREAL 2026 | source publiée / intégrée |
+| `arb-bfc-statuts-2023-12-19` | `WITNESS` | **non publiable** (schéma interne) |
 
-Le premier territoire complémentaire étudié est **Centre-Val de Loire**.
+L’URL DREAL du tableur 2026 peut être temporairement indisponible ou en maintenance lors des builds. Ce n’est pas la même chose qu’une source non intégrée. La robustesse d’acquisition / fallback de BFC 2026 (et ARA LRR) reste un chantier P0.5.
 
-Voir [`../docs/data-sources-cvl.md`](../docs/data-sources-cvl.md) pour l'audit détaillé :
+Le témoin 2023 sert à documenter un schéma ; il n’entre pas dans un dataset publiable (`UNPUBLISHABLE_SOURCE_IDS`).
 
-- liste DREAL des espèces/habitats déterminants ZNIEFF actualisée le 02/04/2026 ;
-- millésimes réels des listes rouges par groupe ;
-- catalogue de rareté CBNBP de 2016 identifié comme trop ancien pour être présenté comme une donnée « à jour » sans avertissement explicite.
+## Auvergne-Rhône-Alpes
 
-La prochaine ingestion régionale prioritaire est la liste ZNIEFF DREAL 2026.
+ZNIEFF OEB / DREAL (`dreal-ara-znieff`) est intégrée, avec **fallback archive** si le portail courant échoue.
 
-Le tableur maître Bourgogne-Franche-Comté 2026 reste inaccessible. Un adaptateur est toutefois déjà écrit sur le témoin de schéma ARB 2023-12-19 : voir [`../docs/data-sources-bfc.md`](../docs/data-sources-bfc.md). Ce millésime ne doit pas être publié.
+La LRR vertébrés 2024 (`dreal-ara-lrr-vertebres-2024`) est intégrée dans le registre. L’URL DREAL associée peut échouer. Pas de fallback archive équivalent à celui de la ZNIEFF. Chantier P0.5.
+
+Fail-closed SHA-256 : déjà en place. Ce n’est pas une acquisition robuste pour toutes les sources.
+
+## Qualité
+
+- Dedup à l’import régional
+- SHA-256 des dumps ; fail-closed si un SHA connu ne correspond plus
+- Fallback archive **pour certaines sources** (ex. ARA ZNIEFF), pas pour toutes

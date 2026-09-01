@@ -1,7 +1,7 @@
 # Roadmap technique — moteur de statuts d’espèces FR
 
 Document de référence pour les développements à venir.
-Dernière actualisation : 2026-09-01, après merge de la PR #26.
+Dernière actualisation : 2026-09-01. PR-A (matrice de couverture, #28) et PR-B (alignement documentaire) sont réalisées.
 
 **Ce document n’autorise aucun chantier.** Chaque phase se traite dans une PR dédiée, petite et vérifiable. Ne pas lancer une refonte générale du pipeline ni du front à partir de ce fichier.
 
@@ -77,7 +77,9 @@ Une définition embarquée = `{ category, label, value, sourceId }`. Citations e
 
 **Il n’existe pas encore de `resolveStatuses()`.** Cette logique est implicitement dans `main.ts` + `hydrateStatusLinks`.
 
-### 2.2 Couverture régionale (constat, pas une matrice générée)
+### 2.2 Couverture régionale (constat d’audit)
+
+La matrice générée existe depuis **PR-A** : [`docs/generated/source-coverage.md`](generated/source-coverage.md) et [`data-pipeline/generated/coverage.json`](../data-pipeline/generated/coverage.json). Le constat ci-dessous reste celui de l’audit initial.
 
 Les 13 régions métropolitaines sont dans le manifeste. Le socle BDC est national. Des référentiels régionaux sont **importés** pour la plupart des régions (ZNIEFF et/ou LRR), avec des trous documentés :
 
@@ -88,7 +90,7 @@ Les 13 régions métropolitaines sont dans le manifeste. Le socle BDC est nation
 - **OCC / NAQ LRR** : travaux 2026 en attente de publication machine ;
 - **papillons de nuit / Sphingidae** : souvent aucun statut dans les sources intégrées (cas *Hyles euphorbiae* CD_REF 54843 : ZNIEFF partielle HDF/NOR seulement). C’est un **trou de couverture**, pas un bug de mapping.
 
-Il n’existe **pas** de `coverage.json` ni de vue générée `Région × catégorie × groupe × source × millésime`.
+Dette identifiée à l’audit initial ; corrigée par **PR-A** (matrice générée, non éditée à la main).
 
 ### 2.3 Documentation devenue fausse ou incomplète
 
@@ -96,13 +98,13 @@ Il n’existe **pas** de `coverage.json` ni de vue générée `Région × catég
 
 | Fichier | Problème |
 |---|---|
-| `data-pipeline/README.md` | Parle encore des « trois régions pilotes », volumes 229 813 / 686 définitions, « prochaine ingestion ZNIEFF DREAL 2026 », BFC « inaccessible ». Tout cela est dépassé (13 régions, ZNIEFF CVL et tableur BFC 2026 importés). |
-| `README.md` | Volumes légèrement datés ; liste de docs incomplète (BRE, HDF, IDF, NOR, OCC, PDL, PAC, déploiement, Sources, cette roadmap). Positionne encore le projet surtout comme « PWA MVP ». |
-| `docs/README.md` | N’indexe que 4 audits régionaux sur 13. |
+| `data-pipeline/README.md` | Dette identifiée à l’audit (« trois régions pilotes », volumes 229 813 / 686, « prochaine ingestion ZNIEFF DREAL 2026 », BFC « inaccessible ») ; **corrigée par PR-B**. |
+| `README.md` | Dette identifiée (positionnement « PWA MVP », index docs incomplet) ; **corrigée par PR-B**. Les volumes du socle TAXREF+BDC restent ceux de la baseline métropolitaine, avec périmètre explicite. |
+| `docs/README.md` | Dette identifiée (4 audits sur 13) ; index déjà complété avant PR-B, lien pipeline ajouté. |
 | GitHub About | Description, topics, licence et homepage **vides**. |
 | Licence | Aucun `LICENSE` ; `package.json` n’a pas de champ `license`. |
 
-Les audits `docs/data-sources-*.md` et `REGIONAL_SOURCES.md` sont globalement alignés avec le pipeline (états `IMPORTED`). C’est le README pipeline / l’index `docs/` qui racontent un état plus ancien.
+Les audits `docs/data-sources-*.md` et `REGIONAL_SOURCES.md` sont globalement alignés avec le pipeline (états `IMPORTED`). Le décalage README / index `docs/` constaté à l’audit est traité par **PR-B**.
 
 ### 2.4 CI et acquisition
 
@@ -115,7 +117,6 @@ Les audits `docs/data-sources-*.md` et `REGIONAL_SOURCES.md` sont globalement al
 ### 2.5 Ce qui n’existe pas encore
 
 - Licence du code.
-- Matrice de couverture générée.
 - Modèle d’état d’acquisition unifié (`READY` / `UNAVAILABLE` / `CHANGED_UNVERIFIED` / …) au runtime CI.
 - Interface `SourceAdapter` + runner générique.
 - Diagnostics standardisés persistés (taux de résolution, ambiguïtés, seuils par source).
@@ -171,9 +172,9 @@ PWA   Batch/CSV   QGIS / package / API
 3. **Double registre** — `REGIONAL_SOURCES.md` (humain) et `ready-sources.json` (machine) peuvent diverger. Pas de couverture générée depuis l’un ou l’autre.
 4. **Logique métier dans l’UI** — filtre, tri, empty state, choix des sources affichées vivent dans `main.ts`. Risque de duplication dès qu’un batch ou QGIS apparaîtra.
 5. **Diagnostics inégaux** — `mergeRegionalPackages` compte `imported` / `unknownRefs`. Les scripts Python ont chacun leurs prints. Pas de contrat unique, pas de seuils déclarés par source, pas d’artifact stable.
-6. **Documentation décalée** — un nouvel agent qui lit `data-pipeline/README.md` croit encore à trois régions pilotes.
+6. **Documentation décalée** — dette identifiée à l’audit initial ; corrigée par **PR-B**.
 7. **Licence absente** — repository public sans contrat de réutilisation du **code**. Les données sources ont de toute façon leurs propres conditions.
-8. **Couverture invisible** — le retour terrain « rien ne ressort » (papillons) est un trou de référentiels, aujourd’hui indémontrable autrement que par inspection manuelle.
+8. **Couverture invisible** — le retour terrain « rien ne ressort » (papillons) est un trou de référentiels. La matrice générée (**PR-A**) le rend inspectable ; elle ne comble pas les trous.
 
 ---
 
@@ -955,8 +956,8 @@ Ordre proposé. Chaque ligne = **une** PR.
 
 | ID | Objectif | Dépend | Fichiers (approx.) | Acceptation | Risque | Rollback |
 |---|---|---|---|---|---|---|
-| **PR-A** | Générer la matrice de couverture depuis `ready-sources.json` (+ manifeste si présent) | — | `data-pipeline/coverage.mjs` (nom libre), `docs/generated/source-coverage.md`, éventuellement `public/data/coverage.json` | 13 régions ; sources `IMPORTED` listées ; fichier non édité à la main | Incomplet vs jeu de prod | Supprimer le générateur |
-| **PR-B** | Aligner README / `data-pipeline/README.md` / `docs/README.md` sur l’état réel ; pointer cette roadmap | PR-A utile mais pas bloquante | markdown uniquement | Plus de « 3 régions pilotes » ; index docs complet | — | Revert markdown |
+| **PR-A** | ~~Générer la matrice de couverture depuis `ready-sources.json` (+ manifeste si présent)~~ **Réalisée** (#28) | — | `data-pipeline/coverage.mjs`, `docs/generated/source-coverage.md`, `data-pipeline/generated/coverage.json` | 13 régions ; sources `IMPORTED` listées ; fichier non édité à la main | Incomplet vs jeu de prod | Supprimer le générateur |
+| **PR-B** | ~~Aligner README / `data-pipeline/README.md` / `docs/README.md` sur l’état réel ; pointer cette roadmap~~ **Réalisée** (cette PR) | PR-A utile mais pas bloquante | markdown uniquement | Plus de « 3 régions pilotes » ; index docs complet | — | Revert markdown |
 | **PR-C** | Modèle d’états d’acquisition + tests sur fixtures (HTML, SHA faux) | — | `data-pipeline/acquire.*`, tests | 4 états distingués ; fail-closed SHA | Trop d’états | Revert module |
 | **PR-D** | Fallback déclaré **ou** état clair sur **une** source fragile (ARA LRR ods **ou** BFC 2026) | PR-C | 1 `download_*.sh` + entrée registre | CI : message d’état lisible ; SHA archive = SHA connu | Archive absente | Revert le script |
 | **PR-E** | Introduire `resolveStatuses` **sans** changer l’UX | — | `src/resolve-statuses.ts` + tests | Sentinelles *Alcedo* / *Hyles* CVL / Lotus ; `main.ts` intact | Mauvaise copie du filtre | Supprimer le module |
