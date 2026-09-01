@@ -155,13 +155,49 @@ function resourceRealms(resource, sourceRealms) {
   return sourceRealms
 }
 
-function candidateDatasetIds(source) {
-  const ids = new Set([source.id])
-  for (const resource of source.resources ?? []) {
-    const pipelineId = asNonEmptyString(resource.pipelineId)
-    if (pipelineId) ids.add(pipelineId)
+function regionalTuples(source) {
+  const resources = source.resources?.length ? source.resources : [{}]
+  const collected = new Map()
+
+  for (const category of source.categories) {
+    for (const resource of resources) {
+      const realms = resourceRealms(resource, source.realms)
+      const groups = resourceGroups(resource)
+      const version = asNonEmptyString(resource.version)
+      const pipelineId = asNonEmptyString(resource.pipelineId)
+      const groupKeys = groups.length ? groups : [null]
+      for (const realm of realms) {
+        for (const group of groupKeys) {
+          const key = `${realm}|${category}|${group ?? ''}`
+          if (!collected.has(key)) {
+            collected.set(key, {
+              realm,
+              category,
+              group,
+              versions: new Set(),
+              // source.id = preuve source-wide si cet id est dans le manifeste.
+              candidateDatasetIds: new Set([source.id]),
+            })
+          }
+          const item = collected.get(key)
+          item.versions.add(version)
+          // pipelineId = preuve limitée aux tuples issus de CETTE ressource.
+          if (pipelineId) item.candidateDatasetIds.add(pipelineId)
+        }
+      }
+    }
   }
-  return [...ids]
+
+  return [...collected.values()].map((item) => {
+    const versions = [...item.versions]
+    return {
+      realm: item.realm,
+      category: item.category,
+      group: item.group,
+      version: versions.length === 1 ? versions[0] : null,
+      candidateDatasetIds: [...item.candidateDatasetIds].sort(),
+    }
+  })
 }
 
 function datasetEvidenceFor(candidateIds, manifestSourceIds) {
@@ -224,40 +260,11 @@ function nationalEntries(manifestSourceIds) {
   return entries
 }
 
-function regionalTuples(source) {
-  const resources = source.resources?.length ? source.resources : [{}]
-  const collected = new Map()
-
-  for (const category of source.categories) {
-    for (const resource of resources) {
-      const realms = resourceRealms(resource, source.realms)
-      const groups = resourceGroups(resource)
-      const version = asNonEmptyString(resource.version)
-      const groupKeys = groups.length ? groups : [null]
-      for (const realm of realms) {
-        for (const group of groupKeys) {
-          const key = `${realm}|${category}|${group ?? ''}`
-          if (!collected.has(key)) {
-            collected.set(key, { realm, category, group, versions: new Set() })
-          }
-          collected.get(key).versions.add(version)
-        }
-      }
-    }
-  }
-
-  return [...collected.values()].map((item) => {
-    const versions = [...item.versions]
-    const version = versions.length === 1 ? versions[0] : null
-    return { realm: item.realm, category: item.category, group: item.group, version }
-  })
-}
-
 function regionalEntries(sources, manifestSourceIds) {
   const entries = []
   for (const source of sources) {
-    const evidence = datasetEvidenceFor(candidateDatasetIds(source), manifestSourceIds)
     for (const tuple of regionalTuples(source)) {
+      const evidence = datasetEvidenceFor(tuple.candidateDatasetIds, manifestSourceIds)
       entries.push({
         layer: 'regional',
         role: 'regional_enrichment',
@@ -369,7 +376,7 @@ export function renderCoverageMarkdown(coverage) {
       ? `- Preuves dataset : manifeste ${coverage.dataset.datasetVersion ?? '—'} (TAXREF ${coverage.dataset.taxrefVersion ?? '—'} / BDC ${coverage.dataset.bdcVersion ?? '—'})`
       : '- Preuves dataset : absentes (génération registre seul ; `datasetEvidence` = inconnu sauf correspondance exacte si un manifeste est fourni)',
     '',
-    'Les identifiants du registre sont souvent des identifiants « parapluie ». Une preuve `présent` n’est posée que si l’`id` (ou un `pipelineId` de ressource) figure tel quel dans le manifeste.',
+    'Les identifiants du registre sont souvent des identifiants « parapluie ». Une preuve `présent` n’est posée que si un identifiant candidat figure tel quel dans le manifeste : `source.id` vaut pour tous les tuples de la source ; un `pipelineId` de ressource ne vaut que pour les tuples issus de cette ressource.',
     '',
   ]
 

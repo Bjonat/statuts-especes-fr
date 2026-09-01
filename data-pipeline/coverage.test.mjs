@@ -177,7 +177,7 @@ test('une preuve manifeste exacte est présente ; une absence d’id n’est pas
   assert.notEqual(ara.datasetEvidence, false)
 })
 
-test('pipelineId de ressource peut prouver la présence sans inventer un id', () => {
+test('pipelineId de ressource ne prouve que les tuples de cette ressource', () => {
   const coverage = buildCoverage(
     registryFixture([
       sourceFixture({
@@ -195,8 +195,60 @@ test('pipelineId de ressource peut prouver la présence sans inventer un id', ()
     },
   )
   const fauna = coverage.entries.find((entry) => entry.sourceId === 'dreal-pdl-znieff-2018' && entry.realm === 'fauna')
+  const flora = coverage.entries.find((entry) => entry.sourceId === 'dreal-pdl-znieff-2018' && entry.realm === 'flora')
   assert.equal(fauna.datasetEvidence, 'present')
   assert.deepEqual(fauna.matchedDatasetSourceIds, ['dreal-pdl-znieff-faune-2018'])
+  assert.equal(flora.datasetEvidence, 'unknown')
+  assert.deepEqual(flora.matchedDatasetSourceIds, [])
+})
+
+test('pipelineId par groupe ne prouve pas les autres groupes', () => {
+  const coverage = buildCoverage(
+    registryFixture([
+      sourceFixture({
+        id: 'irpn-hdf-lrr-unifiees',
+        region: 'HDF',
+        categories: ['red_list_regional'],
+        realms: ['fauna'],
+        resources: [
+          { group: 'papillons-jour', pipelineId: 'irpn-hdf-lrr-papillons-jour-2024' },
+          { group: 'odonates', pipelineId: 'irpn-hdf-lrr-odonates-2023' },
+        ],
+      }),
+    ]),
+    {
+      schemaVersion: 3,
+      sources: [{ id: 'irpn-hdf-lrr-papillons-jour-2024' }],
+    },
+  )
+  const papillons = coverage.entries.find((entry) => entry.group === 'papillons-jour')
+  const odonates = coverage.entries.find((entry) => entry.group === 'odonates')
+  assert.equal(papillons.datasetEvidence, 'present')
+  assert.equal(odonates.datasetEvidence, 'unknown')
+  assert.deepEqual(odonates.matchedDatasetSourceIds, [])
+})
+
+test('source.id dans le manifeste prouve tous les tuples de la source', () => {
+  const coverage = buildCoverage(
+    registryFixture([
+      sourceFixture({
+        id: 'dreal-pdl-znieff-2018',
+        region: 'PDL',
+        resources: [
+          { realm: 'fauna', pipelineId: 'dreal-pdl-znieff-faune-2018' },
+          { realm: 'flora', pipelineId: 'dreal-pdl-znieff-flore-2018' },
+        ],
+      }),
+    ]),
+    {
+      schemaVersion: 3,
+      sources: [{ id: 'dreal-pdl-znieff-2018' }],
+    },
+  )
+  const regional = coverage.entries.filter((entry) => entry.sourceId === 'dreal-pdl-znieff-2018')
+  assert.equal(regional.length, 2)
+  assert.ok(regional.every((entry) => entry.datasetEvidence === 'present'))
+  assert.ok(regional.every((entry) => entry.matchedDatasetSourceIds.includes('dreal-pdl-znieff-2018')))
 })
 
 test('sentinelles du registre réel ARA / BRE / BFC / COR / HDF', async () => {

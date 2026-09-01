@@ -26,7 +26,12 @@ Fichiers produits (hors contrat runtime PWA) :
 - `data-pipeline/generated/coverage.json`
 - `docs/generated/source-coverage.md`
 
-Une preuve `présent` n’est posée que si l’identifiant du registre (ou un `pipelineId` de ressource) figure tel quel dans le manifeste. Les identifiants « parapluie » restent `inconnu`.
+Une preuve `présent` n’est posée que si un identifiant candidat figure tel quel dans le manifeste :
+
+- `source.id` : preuve **source-wide** (tous les tuples de cette source) ;
+- `resource.pipelineId` : preuve **limitée aux tuples** produits par cette ressource.
+
+Les identifiants « parapluie » sans correspondance exacte restent `inconnu`. Ne jamais déduire `absent` / `false`.
 
 ## Construction
 

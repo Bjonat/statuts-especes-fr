@@ -8,7 +8,7 @@ Fichier généré. Ne pas éditer à la main. Source : `data-pipeline/regions/re
 - Sources régionales déclarées : 26
 - Preuves dataset : absentes (génération registre seul ; `datasetEvidence` = inconnu sauf correspondance exacte si un manifeste est fourni)
 
-Les identifiants du registre sont souvent des identifiants « parapluie ». Une preuve `présent` n’est posée que si l’`id` (ou un `pipelineId` de ressource) figure tel quel dans le manifeste.
+Les identifiants du registre sont souvent des identifiants « parapluie ». Une preuve `présent` n’est posée que si un identifiant candidat figure tel quel dans le manifeste : `source.id` vaut pour tous les tuples de la source ; un `pipelineId` de ressource ne vaut que pour les tuples issus de cette ressource.
 
 ## Auvergne-Rhône-Alpes (`ARA`)
 
