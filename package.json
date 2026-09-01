@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run src && node --test data-pipeline/*.test.mjs",
-    "data:build": "node data-pipeline/build.mjs"
+    "data:build": "node data-pipeline/build.mjs",
+    "coverage:build": "node data-pipeline/generate-coverage.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.2",

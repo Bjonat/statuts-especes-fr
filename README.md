@@ -100,6 +100,7 @@ Une attention particulière est portée aux anciennes régions : un statut appli
 ## Documentation métier
 
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — vision (moteur de résolution), audit, phases et découpe des prochaines PR ;
+- [`docs/generated/source-coverage.md`](docs/generated/source-coverage.md) — matrice de couverture des sources (générée) ;
 - [`docs/README.md`](docs/README.md) — index des audits régionaux et du déploiement ;
 - [`data-pipeline/README.md`](data-pipeline/README.md) — règles de transformation et validation des référentiels ;
 - [`data-pipeline/REGIONAL_SOURCES.md`](data-pipeline/REGIONAL_SOURCES.md) — registre humain des sources régionales.
