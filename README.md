@@ -99,11 +99,7 @@ Une attention particulière est portée aux anciennes régions : un statut appli
 
 ## Documentation métier
 
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — vision (moteur de résolution), audit, phases et découpe des prochaines PR ;
+- [`docs/README.md`](docs/README.md) — index des audits régionaux et du déploiement ;
 - [`data-pipeline/README.md`](data-pipeline/README.md) — règles de transformation et validation des référentiels ;
-- [`docs/data-sources-cvl.md`](docs/data-sources-cvl.md) — audit de fraîcheur et priorisation des sources Centre-Val de Loire ;
-- [`docs/data-sources-ara.md`](docs/data-sources-ara.md) — intégration ZNIEFF Auvergne-Rhône-Alpes ;
-- [`docs/data-sources-bfc.md`](docs/data-sources-bfc.md) — intégration du tableur maître BFC 03/03/2026 ;
-- [`docs/data-sources-ges.md`](docs/data-sources-ges.md) — intégration ZNIEFF faune/flore Grand Est ;
-- [`docs/data-sources-naq.md`](docs/data-sources-naq.md) — intégration ZNIEFF Nouvelle-Aquitaine (flore + groupes unifiés) ;
-- [`docs/data-sources-pac.md`](docs/data-sources-pac.md) — intégration ZNIEFF + LRR Provence-Alpes-Côte d'Azur ;
-- [`docs/data-sources-pdl.md`](docs/data-sources-pdl.md) — intégration ZNIEFF Pays de la Loire 2018.
+- [`data-pipeline/REGIONAL_SOURCES.md`](data-pipeline/REGIONAL_SOURCES.md) — registre humain des sources régionales.
