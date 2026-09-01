@@ -11,6 +11,23 @@ Référentiels vérifiés le 21/08/2026 :
 
 Le workflow `Data source smoke test` sait télécharger ces archives, détecter automatiquement le CSV principal BDC, exécuter les tests, générer les jeux et publier temporairement un artifact de contrôle.
 
+## Matrice de couverture
+
+La couverture des référentiels (ce que le système **déclare** couvrir) se distingue du manifeste v3 (ce qu’un **build** a réellement inclus) et de `resolveStatuses()` (ce qui s’applique à un taxon).
+
+```bash
+npm run coverage:build
+# optionnel, si un manifeste v3 est disponible :
+node data-pipeline/generate-coverage.mjs --manifest public/data/manifest.json
+```
+
+Fichiers produits (hors contrat runtime PWA) :
+
+- `data-pipeline/generated/coverage.json`
+- `docs/generated/source-coverage.md`
+
+Une preuve `présent` n’est posée que si l’identifiant du registre (ou un `pipelineId` de ressource) figure tel quel dans le manifeste. Les identifiants « parapluie » restent `inconnu`.
+
 ## Construction
 
 ```bash
