@@ -30,7 +30,7 @@ describe('formatStatusValueForDisplay', () => {
 })
 
 describe('buildStatusHelp', () => {
-  it('fournit une aide lisible pour un code de protection nationale', () => {
+  it('fournit une aide prudente pour un code de protection, sans déduire un article', () => {
     const help = buildStatusHelp({
       category: 'protection_national',
       label: 'Protection nationale',
@@ -41,8 +41,47 @@ describe('buildStatusHelp', () => {
     expect(help.familyLabel).toBe('Protection')
     expect(help.title).toBe('Protection nationale')
     expect(help.code).toBe('NI2')
-    expect(help.explanation).toMatch(/article 2/i)
+    expect(help.explanation).toMatch(/arrêté applicable/i)
+    expect(help.explanation).not.toMatch(/article/i)
     expect(help.explanationSource).toBe('glossary')
+  })
+
+  it('n’extrapole pas un numéro d’article depuis un autre code de protection', () => {
+    const help = buildStatusHelp({
+      category: 'protection_national',
+      label: 'Protection nationale',
+      value: 'FRAR3',
+    })
+
+    expect(help.code).toBe('FRAR3')
+    expect(help.explanation).not.toMatch(/article 3/i)
+    expect(help.explanation).toMatch(/consulter le texte réglementaire/i)
+  })
+
+  it('privilégie le libellé officiel porté par la valeur lorsqu’il existe', () => {
+    const help = buildStatusHelp({
+      category: 'protection_national',
+      label: 'Protection nationale',
+      value: 'NI2 - Protégée',
+    })
+
+    expect(help.code).toBe('NI2')
+    expect(help.explanation).toBe('Protégée')
+    expect(help.explanationSource).toBe('official_label')
+    expect(help.explanation).not.toMatch(/article/i)
+  })
+
+  it('reste générique pour une protection régionale, sans numéro d’article', () => {
+    const help = buildStatusHelp({
+      category: 'protection_regional',
+      label: 'Protection régionale',
+      value: 'RV2',
+    })
+
+    expect(help.family).toBe('protection')
+    expect(help.code).toBe('RV2')
+    expect(help.explanation).toMatch(/protection régionale/i)
+    expect(help.explanation).not.toMatch(/article/i)
   })
 
   it('explique une directive à partir du code tout en gardant le libellé officiel', () => {

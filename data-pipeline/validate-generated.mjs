@@ -714,7 +714,8 @@ const hdfFlora = await loadStatuses('flora', 'HDF')
 const hdfFauna = await loadStatuses('fauna', 'HDF')
 
 // Sentinelle lépidoptères (retour terrain Sphinx de l'euphorbe) :
-// présence TAXREF, ZNIEFF partielle HDF/NOR uniquement, pas de protection/LRR nationale intégrée.
+// taxon présent ; aucun statut en CVL (donc pas de statut national projeté) ;
+// au moins un statut en HDF et en NOR, tous ZNIEFF à portée partielle.
 const hylesEuphorbiae = fauna.find((taxon) => taxon.cdRef === 54843)
 assert.equal(hylesEuphorbiae?.scientificName, 'Hyles euphorbiae', 'Hyles euphorbiae présent dans le catalogue faune')
 assert.equal(
@@ -723,15 +724,16 @@ assert.equal(
   'Hyles euphorbiae: aucun statut en Centre-Val de Loire dans les référentiels intégrés',
 )
 const hylesHdf = hdfFauna.filter((status) => status.cdRef === 54843)
-assert.ok(hylesHdf.length >= 1, 'Hyles euphorbiae: au moins un statut ZNIEFF partiel en Hauts-de-France')
+assert.ok(hylesHdf.length >= 1, 'Hyles euphorbiae: au moins un statut en Hauts-de-France')
 assert.ok(
   hylesHdf.every((status) => status.category === 'znieff' && status.scope === 'partial'),
-  'Hyles euphorbiae HDF: uniquement ZNIEFF déterminante à portée partielle',
+  'Hyles euphorbiae HDF: uniquement ZNIEFF à portée partielle',
 )
 const hylesNor = norFauna.filter((status) => status.cdRef === 54843)
+assert.ok(hylesNor.length >= 1, 'Hyles euphorbiae: au moins un statut en Normandie')
 assert.ok(
   hylesNor.every((status) => status.category === 'znieff' && status.scope === 'partial'),
-  'Hyles euphorbiae NOR: uniquement ZNIEFF déterminante à portée partielle',
+  'Hyles euphorbiae NOR: uniquement ZNIEFF à portée partielle',
 )
 
 const hdfZnieffSourceId = 'cbnhdf-digitale-znieff-hdf-flora-2026-03-31'

@@ -72,8 +72,11 @@ const CODE_GLOSSARY: Record<string, string> = {
   IBO2: 'Convention de Bonn — espèces migratrices à protéger par accords (appendice II).',
 }
 
-/** Codes BDC de protection nationale du type N…2 / FRAR3 : le chiffre renvoie à l’article. */
-const NATIONAL_PROTECTION_CODE = /^(?:NI|NO|NV|NP|NM|NMO|NMAMmar|NEC|NMam|FRAR|FMFR|OC|PN|PNTM)(\d+)$/i
+const GENERIC_NATIONAL_PROTECTION =
+  'Code de protection nationale. Le détail des interdictions dépend de l’arrêté applicable ; consulter le texte réglementaire.'
+
+const GENERIC_REGIONAL_PROTECTION =
+  'Code de protection régionale ou départementale. Le détail des interdictions dépend de l’arrêté applicable ; consulter le texte réglementaire.'
 
 function familyFromStatus(status: Pick<TaxonStatus, 'category' | 'label'>): StatusHelpFamily {
   const label = status.label.toLocaleLowerCase('fr')
@@ -104,30 +107,7 @@ export function extractStatusCode(value: string): string | undefined {
 }
 
 function glossaryExplanation(code: string): string | undefined {
-  const direct = CODE_GLOSSARY[code] ?? CODE_GLOSSARY[code.toUpperCase()]
-  if (direct) return direct
-
-  const nationalProtection = code.match(NATIONAL_PROTECTION_CODE)
-  if (nationalProtection) {
-    return (
-      `Code BDC de protection nationale, article ${nationalProtection[1]}. ` +
-      `Le détail des interdictions figure dans l’arrêté de protection du groupe concerné ; ` +
-      `cette aide ne remplace pas le texte réglementaire.`
-    )
-  }
-
-  if (/^(?:RV|RI|DV|PV)\d+/i.test(code)) {
-    return (
-      `Code BDC de protection régionale ou départementale. ` +
-      `Il renvoie à une liste officielle locale ; consulter l’arrêté pour le détail.`
-    )
-  }
-
-  if (/^IBO[A-Z0-9]+$/i.test(code)) {
-    return 'Code BDC lié à la convention de Bonn (espèces migratrices).'
-  }
-
-  return undefined
+  return CODE_GLOSSARY[code] ?? CODE_GLOSSARY[code.toUpperCase()]
 }
 
 /**
@@ -151,6 +131,12 @@ export function buildStatusHelp(status: Pick<TaxonStatus, 'category' | 'label' |
   if (!explanation && valueDetail && valueDetail.toLocaleLowerCase('fr') !== title.toLocaleLowerCase('fr')) {
     explanation = valueDetail
     explanationSource = 'official_label'
+  }
+
+  if (!explanation && family === 'protection') {
+    explanation =
+      status.category === 'protection_regional' ? GENERIC_REGIONAL_PROTECTION : GENERIC_NATIONAL_PROTECTION
+    explanationSource = 'glossary'
   }
 
   if (!explanation && family === 'znieff') {

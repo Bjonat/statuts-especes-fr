@@ -683,7 +683,12 @@ function renderDetail(): void {
 
   root.querySelectorAll<HTMLButtonElement>('[data-help-close]').forEach((button) => {
     button.addEventListener('click', () => {
+      const index = button.dataset.helpClose
       closeAllStatusHelp()
+      const toggle = index
+        ? root.querySelector<HTMLButtonElement>(`[data-help-toggle="${index}"]`)
+        : null
+      toggle?.focus()
     })
   })
 }
