@@ -34,4 +34,12 @@ describe('searchTaxa', () => {
     expect(searchTaxa(taxa, 'fauna', 'chene')).toHaveLength(0)
     expect(searchTaxa(taxa, 'fauna', 'martin')[0]?.scientificName).toBe('Alcedo atthis')
   })
+
+  it('retrouve le Sphinx de l’euphorbe (sentinelle lépidoptères)', () => {
+    const byScientific = searchTaxa(taxa, 'fauna', 'Hyles euphorbiae')
+    expect(byScientific.some((taxon) => taxon.cdRef === 54843)).toBe(true)
+
+    const byVernacular = searchTaxa(taxa, 'fauna', 'euphorbe')
+    expect(byVernacular.some((taxon) => taxon.scientificName === 'Hyles euphorbiae')).toBe(true)
+  })
 })

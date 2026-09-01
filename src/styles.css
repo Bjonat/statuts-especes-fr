@@ -352,17 +352,20 @@ h2 {
   margin: 0;
 }
 
+.status-item {
+  border-bottom: 1px solid #ecece7;
+}
+
+.status-item:first-child {
+  border-top: 1px solid #ecece7;
+}
+
 .status-row {
   display: grid;
   grid-template-columns: minmax(150px, 0.9fr) minmax(0, 1.1fr);
   gap: 8px 22px;
   align-items: start;
-  padding: 13px 0;
-  border-bottom: 1px solid #ecece7;
-}
-
-.status-row:first-child {
-  border-top: 1px solid #ecece7;
+  padding: 13px 0 11px;
 }
 
 .status-row dt {
@@ -390,6 +393,104 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.status-value-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.status-help-btn {
+  flex: none;
+  width: 1.55rem;
+  height: 1.55rem;
+  padding: 0;
+  border: 1px solid #c9cec4;
+  border-radius: 999px;
+  background: #f4f5f1;
+  color: #4f5649;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.status-help-btn[aria-expanded='true'] {
+  border-color: #8a927f;
+  background: #e8ebe3;
+}
+
+.status-help {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f3f4ef;
+  border: 1px solid #e0e3da;
+}
+
+.status-help-family {
+  margin: 0 0 2px;
+  color: #6a7166;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.status-help-title {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+  font-weight: 750;
+  line-height: 1.35;
+  color: #2f342c;
+}
+
+.status-help-text {
+  margin: 0 0 10px;
+  color: #4d5448;
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.status-help-text--muted {
+  color: #6b7167;
+}
+
+.status-help-close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #3f6b4d;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.empty-status {
+  margin: 8px 0 4px;
+}
+
+.empty-status .empty-state {
+  margin-bottom: 8px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .source-summary {
   margin: 18px 0 0;
   padding-top: 14px;
@@ -407,6 +508,12 @@ h2 {
 
   .status-row dd {
     font-size: 1rem;
+  }
+
+  .status-help-btn {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.9rem;
   }
 }
 

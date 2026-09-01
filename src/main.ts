@@ -1,6 +1,11 @@
 import './styles.css'
 import { loadDataStore } from './catalog'
 import { searchTaxa } from './search'
+import {
+  NO_IDENTIFIED_STATUS_MESSAGE,
+  buildStatusHelp,
+  formatStatusValueForDisplay,
+} from './status-help'
 import type { Realm, RegionCode, SourceDataset, StatusCategory, Taxon, TaxonStatus } from './types'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -219,11 +224,26 @@ function shortStatusLabel(status: TaxonStatus): string {
 }
 
 function shortStatusValue(status: TaxonStatus): string {
-  const value = cleanDisplayText(status.value)
-  if (value.length <= 72) return value
+  return formatStatusValueForDisplay(cleanDisplayText(status.value))
+}
 
-  const codeMatch = value.match(/^([A-Z0-9._/-]{1,16})\s+-\s+/)
-  return codeMatch?.[1] ?? 'Oui'
+function renderStatusHelpPanel(status: TaxonStatus, index: number): string {
+  const help = buildStatusHelp(status)
+  const titleParts = [help.title]
+  if (help.code) titleParts.push(help.code)
+
+  return `
+    <div class="status-help" id="status-help-${index}" hidden>
+      <p class="status-help-family">${escapeHtml(help.familyLabel)}</p>
+      <p class="status-help-title">${escapeHtml(titleParts.join(' — '))}</p>
+      ${
+        help.explanation
+          ? `<p class="status-help-text">${escapeHtml(help.explanation)}</p>`
+          : '<p class="status-help-text status-help-text--muted">Libellé issu du référentiel ; aucune explication complémentaire n’est disponible hors ligne pour ce code.</p>'
+      }
+      <button type="button" class="status-help-close" data-help-close="${index}">Fermer</button>
+    </div>
+  `
 }
 
 function usefulStatus(status: TaxonStatus): boolean {
@@ -589,19 +609,37 @@ function renderDetail(): void {
             ? `<dl class="status-list">
                 ${taxonStatuses
                   .map(
-                    (status) => `
-                      <div class="status-row">
-                        <dt>
-                          ${escapeHtml(shortStatusLabel(status))}
-                          ${status.scope === 'partial' && status.scopeLabel ? `<small>Portée : ${escapeHtml(cleanDisplayText(status.scopeLabel))}</small>` : ''}
-                        </dt>
-                        <dd>${escapeHtml(shortStatusValue(status))}</dd>
+                    (status, index) => `
+                      <div class="status-item">
+                        <div class="status-row">
+                          <dt>
+                            ${escapeHtml(shortStatusLabel(status))}
+                            ${status.scope === 'partial' && status.scopeLabel ? `<small>Portée : ${escapeHtml(cleanDisplayText(status.scopeLabel))}</small>` : ''}
+                          </dt>
+                          <dd>
+                            <span class="status-value-line">
+                              <span class="status-value">${escapeHtml(shortStatusValue(status))}</span>
+                              <button
+                                type="button"
+                                class="status-help-btn"
+                                data-help-toggle="${index}"
+                                aria-expanded="false"
+                                aria-controls="status-help-${index}"
+                                title="Explication du statut"
+                              >ⓘ<span class="visually-hidden">Aide sur ce statut</span></button>
+                            </span>
+                          </dd>
+                        </div>
+                        ${renderStatusHelpPanel(status, index)}
                       </div>
                     `,
                   )
                   .join('')}
               </dl>`
-            : '<p class="empty-state">Aucun statut disponible pour ce taxon et cette région dans les référentiels chargés.</p>'
+            : `<div class="empty-status">
+                <p class="empty-state">${escapeHtml(NO_IDENTIFIED_STATUS_MESSAGE)}</p>
+                <button class="link-button" id="open-sources-from-detail" type="button">Voir les sources couvertes</button>
+              </div>`
         }
 
         <p class="source-summary">${escapeHtml(sourceSummary(taxonStatuses))}</p>
@@ -614,6 +652,39 @@ function renderDetail(): void {
   document.querySelector<HTMLButtonElement>('#back-to-search')?.addEventListener('click', () => {
     state.selectedTaxon = null
     render()
+  })
+
+  document.querySelector<HTMLButtonElement>('#open-sources-from-detail')?.addEventListener('click', () => {
+    void openSources()
+  })
+
+  const closeAllStatusHelp = (): void => {
+    root.querySelectorAll<HTMLElement>('.status-help').forEach((panel) => {
+      panel.hidden = true
+    })
+    root.querySelectorAll<HTMLButtonElement>('[data-help-toggle]').forEach((button) => {
+      button.setAttribute('aria-expanded', 'false')
+    })
+  }
+
+  root.querySelectorAll<HTMLButtonElement>('[data-help-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const index = button.dataset.helpToggle
+      const panel = root.querySelector<HTMLElement>(`#status-help-${index}`)
+      if (!panel) return
+      const willOpen = panel.hidden
+      closeAllStatusHelp()
+      if (willOpen) {
+        panel.hidden = false
+        button.setAttribute('aria-expanded', 'true')
+      }
+    })
+  })
+
+  root.querySelectorAll<HTMLButtonElement>('[data-help-close]').forEach((button) => {
+    button.addEventListener('click', () => {
+      closeAllStatusHelp()
+    })
   })
 }
 

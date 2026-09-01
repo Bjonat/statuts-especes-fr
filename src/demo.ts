@@ -73,6 +73,16 @@ export const taxa: Taxon[] = [
     synonyms: [],
     family: 'Ranidae',
   },
+  {
+    // Sentinelle terrain : espèce présente dans TAXREF, sans statut en démo
+    // (miroir du comportement « aucun statut » observé hors HDF/NOR en production).
+    cdRef: 54843,
+    realm: 'fauna',
+    scientificName: 'Hyles euphorbiae',
+    vernacularNames: ["Sphinx de l'Euphorbe"],
+    synonyms: ['Celerio euphorbiae', 'Deilephila euphorbiae', 'Sphinx euphorbiae'],
+    family: 'Sphingidae',
+  },
 ]
 
 export const sources: SourceDataset[] = [
@@ -87,13 +97,14 @@ export const sources: SourceDataset[] = [
 ]
 
 export const statuses: TaxonStatus[] = [
-  { cdRef: 106634, region: 'CVL', category: 'red_list_national', label: 'Liste rouge nationale', value: 'LC (fixture)', sourceId: 'fixture-dev' },
-  { cdRef: 106634, region: 'CVL', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'LC (fixture)', sourceId: 'fixture-dev' },
-  { cdRef: 106634, region: 'CVL', category: 'rarity', label: 'Rareté régionale', value: 'RR (fixture)', sourceId: 'fixture-dev' },
-  { cdRef: 116703, region: 'CVL', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'DÉMO', sourceId: 'fixture-dev' },
-  { cdRef: 116703, region: 'NAQ', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'DÉMO', sourceId: 'fixture-dev' },
-  { cdRef: 116703, region: 'OCC', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'DÉMO', sourceId: 'fixture-dev' },
-  { cdRef: 3571, region: 'CVL', category: 'protection_national', label: 'Protection nationale', value: 'DÉMO', sourceId: 'fixture-dev' },
-  { cdRef: 3571, region: 'CVL', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'DÉMO', sourceId: 'fixture-dev' },
-  { cdRef: 310, region: 'CVL', category: 'protection_national', label: 'Protection nationale', value: 'DÉMO', sourceId: 'fixture-dev' },
+  { cdRef: 106634, region: 'CVL', category: 'red_list_national', label: 'Liste rouge nationale', value: 'LC - Préoccupation mineure', sourceId: 'fixture-dev' },
+  { cdRef: 106634, region: 'CVL', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'LC - Préoccupation mineure', sourceId: 'fixture-dev' },
+  { cdRef: 106634, region: 'CVL', category: 'rarity', label: 'Rareté régionale', value: 'RR', sourceId: 'fixture-dev' },
+  { cdRef: 116703, region: 'CVL', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'LC', sourceId: 'fixture-dev' },
+  { cdRef: 116703, region: 'NAQ', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'LC', sourceId: 'fixture-dev' },
+  { cdRef: 116703, region: 'OCC', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'LC', sourceId: 'fixture-dev' },
+  { cdRef: 3571, region: 'CVL', category: 'protection_national', label: 'Protection nationale', value: 'NI2', sourceId: 'fixture-dev' },
+  { cdRef: 3571, region: 'CVL', category: 'other', label: 'Directive Habitat', value: 'CDH4', sourceId: 'fixture-dev' },
+  { cdRef: 3571, region: 'CVL', category: 'red_list_regional', label: 'Liste rouge régionale', value: 'LC - Préoccupation mineure', sourceId: 'fixture-dev' },
+  { cdRef: 310, region: 'CVL', category: 'protection_national', label: 'Protection nationale', value: 'NV2', sourceId: 'fixture-dev' },
 ]
