@@ -35,9 +35,7 @@ download() {
 
 inspect_received_ods() {
   local file="$1"
-  local head
-  head="$(head -c 512 "$file" || true)"
-  if printf '%s' "$head" | grep -qiE '<!doctype html|<html'; then
+  if grep -aqiE '<!doctype html|<html' < <(head -c 512 "$file"); then
     type_ok=false
     detected_kind=html
     if grep -aqi 'maintenance en cours' "$file"; then
