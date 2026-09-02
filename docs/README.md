@@ -2,6 +2,7 @@
 
 - [Roadmap technique](ROADMAP.md) — vision moteur, audit, phases, futures PR
 - [Couverture des sources (générée)](generated/source-coverage.md) — matrice registre × territoire, pas l’applicabilité juridique
+- [Pipeline de données](../data-pipeline/README.md) — construction, contrat compact, sentinelles
 - [Déploiement FTP](deployment-ftp.md)
 
 ## Audits de sources par région

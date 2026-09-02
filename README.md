@@ -1,63 +1,67 @@
-# statuts-especes-fr
+# Statuts des espèces — France
 
-Application PWA mobile et offline-first de consultation des statuts réglementaires et patrimoniaux des espèces de France.
+Ce repository fournit aujourd’hui une **PWA mobile offline-first** et son **pipeline de données** pour consulter les statuts réglementaires et patrimoniaux des espèces de France. La trajectoire architecturale est d’extraire progressivement un moteur de résolution indépendant de l’interface — ce moteur (`resolveStatuses`) n’est **pas** encore livré.
 
-## Objectif
+**Aujourd’hui :** PWA terrain + pipeline v3 + dataset embarqué + [matrice de couverture](docs/generated/source-coverage.md).
 
-Parcours cible :
+**Cible roadmap :** moteur indépendant, puis batch / QGIS / API / package — voir [`docs/ROADMAP.md`](docs/ROADMAP.md). Ces usages ne sont pas disponibles.
+
+## Produit terrain
+
+Parcours actuel :
 
 1. choisir **Faune** ou **Flore** ;
-2. choisir une région ;
-3. saisir quelques lettres d'un nom scientifique ou vernaculaire ;
-4. sélectionner le taxon ;
-5. consulter immédiatement ses statuts locaux, leur source et leur millésime.
+2. choisir une **région** ;
+3. rechercher un taxon par nom scientifique, nom vernaculaire ou synonyme ;
+4. consulter les statuts ;
+5. voir les **sources** et **millésimes**.
 
-Le cœur métier fonctionne sans connexion. Le réseau sert principalement à vérifier puis télécharger une nouvelle version des référentiels.
+La PWA est le produit effectivement utilisable. Elle fonctionne sans réseau une fois le dataset chargé. Deux catalogues (faune / flore) partagent le même pipeline de données et le même écran de statuts.
 
-## Périmètre MVP
+Elle ne dit pas si un projet est autorisé. Elle ne remplace pas un diagnostic écologique.
 
-- PWA installable et utilisable hors ligne ;
-- moteur commun faune/flore ;
-- recherche tolérante : accents, noms partiels, noms vernaculaires/scientifiques, synonymes et petites fautes ;
-- **13 régions métropolitaines** ;
-- affichage compact des statuts ;
-- traçabilité des sources et versions ;
-- aucune carte, aucun compte, aucune saisie d'observation dans le MVP.
+## Données
 
-## Développement
+Les **13 régions métropolitaines** sont supportées par le moteur de données, avec une couverture régionale variable selon les référentiels intégrés. Le socle national est **TAXREF v18** et **BDC Statuts v18**. Plusieurs référentiels régionaux (listes rouges, ZNIEFF, parfois responsabilité régionale ou listes complémentaires) sont intégrés.
 
-```bash
-npm install
-npm run dev
-```
+L’absence de statut pour une espèce n’est pas nécessairement un bug : le référentiel correspondant peut ne pas être intégré, ou le taxon peut être hors liste.
 
-Vérifications :
+Vue synthétique (générée, ne pas recopier à la main) :
 
-```bash
-npm test
-npm run build
-```
+- [`docs/generated/source-coverage.md`](docs/generated/source-coverage.md)
+- [`data-pipeline/generated/coverage.json`](data-pipeline/generated/coverage.json)
 
-Tant qu'aucun jeu officiel n'est généré dans `public/data`, l'application utilise des fixtures clairement marquées comme données de démonstration non utilisables pour une décision terrain.
+Registres et audits :
 
-## Données officielles
+- [`data-pipeline/regions/ready-sources.json`](data-pipeline/regions/ready-sources.json) — registre machine
+- [`data-pipeline/REGIONAL_SOURCES.md`](data-pipeline/REGIONAL_SOURCES.md) — registre humain
+- [`docs/data-sources-*.md`](docs/) — audits régionaux
 
-Le pipeline utilise actuellement :
+## Couverture : registre, manifeste, matrice
 
-- **TAXREF v18** — PatriNat / INPN ;
-- **Base de connaissance Statuts v18** — PatriNat / SINP.
+Trois couches distinctes :
 
-Après téléchargement et extraction des archives officielles :
+| Couche | Rôle |
+| --- | --- |
+| **Registre** | Ce que le pipeline *déclare* pouvoir couvrir (`ready-sources.json`) |
+| **Manifeste** | Ce qu’un *build* a effectivement inclus (`public/data/manifest.json`) |
+| **Couverture générée** | Vue normalisée registre + manifeste, pour humains et machines |
 
-```bash
-npm run data:build -- \
-  --taxref /chemin/TAXREFv18.txt \
-  --bdc /chemin/bdc_18_01.csv
-```
+La couverture n’est **pas** une applicabilité juridique. Un trou dans la matrice n’implique pas l’absence de statut dans la nature ; un statut affiché n’est pas un avis réglementaire.
 
-Les fichiers sources bruts ne sont pas versionnés dans Git.
+## Dataset v3 (socle national)
 
-Le pipeline v3 produit un **manifeste léger**, deux catalogues taxonomiques, un dictionnaire global des définitions de statuts et des liens régionaux compacts :
+Sur le **socle TAXREF v18 + BDC Statuts v18** utilisé pour la métropole (hors enrichissements régionaux, dont le volume dépend du jeu de sources du build) :
+
+- **106 357 taxons** après filtrage : 26 405 flore et 79 952 faune
+- **877 930 relations** taxon × territoire × statut
+- **1 411 définitions** uniques après déduplication
+- environ **43 Mio** de JSON brut pour le jeu métropolitain offline
+- environ **6,3 Mo** pour l’artifact compressé généré par la CI
+
+Les enrichissements régionaux s’ajoutent à ce socle. Pour un build donné : manifeste + [matrice générée](docs/generated/source-coverage.md).
+
+Le pipeline produit un manifeste léger, deux catalogues, un dictionnaire de définitions et des liens régionaux compacts :
 
 ```text
 public/data/
@@ -65,42 +69,53 @@ public/data/
 ├── taxa-flora-<hash>.json
 ├── taxa-fauna-<hash>.json
 ├── status-definitions-<hash>.json
-└── status-links-<realm>-<region>-<hash>.json  # 2 règnes × 13 régions
+└── status-links-<realm>-<region>-<hash>.json
 ```
 
-Sur TAXREF v18 + BDC v18 réels pour toute la métropole :
+Une définition embarquée = `{ category, label, value, sourceId }`. Les citations longues et URL documentaires ne sont pas dans le bundle mobile. La PWA affiche le nom de source, le millésime et la date de vérification.
 
-- **106 357 taxons** conservés après filtrage sécurisé : 26 405 Flore et 79 952 Faune ;
-- **877 930 relations taxon × territoire × statut** ;
-- **1 411 définitions de statut uniques** après déduplication ;
-- environ **43 Mio de JSON brut** pour tout le jeu métropolitain offline, taxonomie comprise ;
-- environ **6,3 Mo** pour l'artifact compressé généré par la CI.
+## Lancer en local
 
-Chaque région possède des relations BDC réellement territoriales en plus des statuts nationaux. Les anciennes régions restent interprétées selon leur périmètre : une ancienne région composant une région fusionnée est signalée comme portée partielle ; une région dont le périmètre n'a pas changé reste une portée régionale complète.
-
-L'application ne charge en mémoire que le règne choisi, le dictionnaire et les liens de la région sélectionnée. Lorsqu'une nouvelle version est disponible, les jeux sont mis en cache pour le mode hors ligne sans interrompre la recherche en cours.
-
-Le workflow de données vérifie également des **cas sentinelles métier** sur les jeux officiels générés (notamment `Lotus angustissimus`, `Aconitum napellus` et `Alcedo atthis`).
-
-## Architecture
-
-```text
-TAXREF v18 ───────┐
-                  ├─ data-pipeline ─► manifeste + jeux compacts ─► PWA offline
-BDC Statuts v18 ──┤
-                  │
-Référentiels ─────┘
-régionaux
+```bash
+npm install
+npm run dev
 ```
 
-Le code applicatif et les données sont découplés. Pour le MVP métropolitain, le pipeline conserve les rangs espèce/infraspécifiques et élimine le bruit supraspécifique. Un taxon normalement exclu par son statut biogéographique est néanmoins conservé s'il possède un statut BDC applicable à l'une des régions supportées.
+Tant qu’aucun jeu officiel n’est généré dans `public/data`, l’application utilise des fixtures de démonstration, non utilisables pour une décision terrain.
 
-Une attention particulière est portée aux anciennes régions : un statut applicable à l'ancienne Aquitaine n'est jamais affiché comme applicable à toute la Nouvelle-Aquitaine. Tant que la localisation n'est connue qu'au niveau régional, ces cas sont signalés comme **portée partielle**.
+Socle national (dumps TAXREF / BDC déjà extraits, non versionnés) :
 
-## Documentation métier
+```bash
+npm run data:build -- \
+  --taxref /chemin/TAXREFv18.txt \
+  --bdc /chemin/bdc_18_01.csv
+```
 
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — vision (moteur de résolution), audit, phases et découpe des prochaines PR ;
-- [`docs/generated/source-coverage.md`](docs/generated/source-coverage.md) — matrice de couverture des sources (générée) ;
-- [`docs/README.md`](docs/README.md) — index des audits régionaux et du déploiement ;
-- [`data-pipeline/README.md`](data-pipeline/README.md) — règles de transformation et validation des référentiels ;
-- [`data-pipeline/REGIONAL_SOURCES.md`](data-pipeline/REGIONAL_SOURCES.md) — registre humain des sources régionales.
+Sources régionales : [`data-pipeline/README.md`](data-pipeline/README.md). Un build qui télécharge toutes les sources `ready` peut échouer si une URL distante est indisponible (chantier P0.5 — robustesse d’acquisition).
+
+## Vérifier
+
+```bash
+npm test
+npm run build
+npm run coverage:build
+```
+
+## Limites actuelles
+
+- **Métropole uniquement** (pas DROM, pas marin dédié, pas de sélecteur départemental)
+- Couverture régionale **variable** — [matrice](docs/generated/source-coverage.md)
+- Bundle compact : provenance via `sourceId` + manifeste ; pas de citations / URL documentaires embarquées
+- Acquisition de certaines sources (ARA LRR, BFC 2026) encore fragile
+- Pas de moteur `resolveStatuses` indépendant, pas d’usage batch / QGIS / API
+- Licence du **code** à arbitrer ; les données restent sous les licences de leurs producteurs (TAXREF, BDC, DREAL, OEB, CBN, etc.)
+
+## Documentation
+
+| Document | Rôle |
+| --- | --- |
+| [`docs/README.md`](docs/README.md) | Index |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Trajectoire et chantiers |
+| [`docs/generated/source-coverage.md`](docs/generated/source-coverage.md) | Couverture actuelle |
+| [`data-pipeline/README.md`](data-pipeline/README.md) | Pipeline et reproductions |
+| [`docs/deployment-ftp.md`](docs/deployment-ftp.md) | Déploiement |
