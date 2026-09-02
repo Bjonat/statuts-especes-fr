@@ -156,6 +156,22 @@ La LRR vertébrés 2024 (`dreal-ara-lrr-vertebres-2024`) est intégrée dans le 
 
 Fail-closed SHA-256 : déjà en place. Ce n’est pas une acquisition robuste pour toutes les sources.
 
+## États d’acquisition
+
+`sourceState` (`IMPORTED`, `WITNESS`, `READY`, …) décrit une décision éditoriale dans le registre. `acquisitionState` décrit **une tentative d’obtention** du fichier. Les deux sont indépendants : une source `IMPORTED` peut être `UNAVAILABLE` pendant une maintenance.
+
+États (`data-pipeline/acquisition.mjs`) :
+
+| État | Sens | Issue |
+| --- | --- | --- |
+| `FETCH_OK` | Canonique : type plausible + SHA piné validé | succès |
+| `ARCHIVED_FALLBACK` | Archive **déclarée**, type OK, SHA archive validé | succès (explicite) |
+| `UNAVAILABLE` | Réseau / HTTP : pas de contenu exploitable | échec |
+| `TYPE_MISMATCH` | Octets reçus, mauvais type (ex. HTML de maintenance à la place d’un ODS) | échec |
+| `CHANGED_UNVERIFIED` | Type OK, SHA ≠ pin | échec, **fail-closed** |
+
+`CHANGED_UNVERIFIED` ne déclenche **jamais** de fallback archive : une republication officielle ne doit pas être masquée. L’inspection des octets reste dans `probe_ready_sources.py`. Ce module ne classifie que des observations déjà faites. Branchement sur une source réelle : PR-D.
+
 ## Qualité
 
 - Dedup à l’import régional
