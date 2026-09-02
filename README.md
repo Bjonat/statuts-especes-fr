@@ -12,7 +12,7 @@ Parcours actuel :
 
 1. choisir **Faune** ou **Flore** ;
 2. choisir une **région** ;
-3. rechercher un taxon (nom scientifique, nom vernaculaire, CD_REF) ;
+3. rechercher un taxon par nom scientifique, nom vernaculaire ou synonyme ;
 4. consulter les statuts ;
 5. voir les **sources** et **millésimes**.
 

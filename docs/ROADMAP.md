@@ -88,7 +88,7 @@ Les 13 régions métropolitaines sont dans le manifeste. Le socle BDC est nation
 - **NOR ZNIEFF** : seulement Haute-Normandie flore ;
 - **PDL LRR** : `RESEARCH_REQUIRED` ;
 - **OCC / NAQ LRR** : travaux 2026 en attente de publication machine ;
-- **papillons de nuit / Sphingidae** : souvent aucun statut dans les sources intégrées (cas *Hyles euphorbiae* CD_REF 54843 : ZNIEFF partielle HDF/NOR seulement). C’est un **trou de couverture**, pas un bug de mapping.
+- **papillons de nuit / Sphingidae** : souvent aucun statut dans les sources intégrées. *Hyles euphorbiae* (CD_REF 54843) : aucun statut projeté en CVL ; des statuts ZNIEFF partiels sont confirmés en HDF et NOR. Ce cas illustre un trou de couverture possible, pas un bug de mapping. Les sentinelles ne vérifient pas les 13 régions.
 
 Dette identifiée à l’audit initial ; corrigée par **PR-A** (matrice générée, non éditée à la main).
 
@@ -169,7 +169,7 @@ PWA   Batch/CSV   QGIS / package / API
 
 1. **Fragilité d’acquisition** — un SHA instable ou une page HTML de maintenance bloque plusieurs workflows de données. Le fail-closed est juste ; l’absence de diagnostic d’état et de fallback déclaré ne l’est pas.
 2. **Explosion des workflows** — ~26 YAML spécifiques. Coût de maintenance croissant ; pas de runner générique.
-3. **Double registre** — `REGIONAL_SOURCES.md` (humain) et `ready-sources.json` (machine) peuvent diverger. Pas de couverture générée depuis l’un ou l’autre.
+3. **Double registre** — `REGIONAL_SOURCES.md` (humain) et `ready-sources.json` (machine) peuvent diverger. La matrice de couverture est désormais générée depuis le registre machine ; cela ne garantit pas l’alignement du registre humain.
 4. **Logique métier dans l’UI** — filtre, tri, empty state, choix des sources affichées vivent dans `main.ts`. Risque de duplication dès qu’un batch ou QGIS apparaîtra.
 5. **Diagnostics inégaux** — `mergeRegionalPackages` compte `imported` / `unknownRefs`. Les scripts Python ont chacun leurs prints. Pas de contrat unique, pas de seuils déclarés par source, pas d’artifact stable.
 6. **Documentation décalée** — dette identifiée à l’audit initial ; corrigée par **PR-B**.
