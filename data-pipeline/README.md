@@ -152,9 +152,9 @@ Le témoin 2023 sert à documenter un schéma ; il n’entre pas dans un dataset
 
 ZNIEFF OEB / DREAL (`dreal-ara-znieff`) est intégrée, avec **fallback archive** si le portail courant échoue.
 
-La LRR vertébrés 2024 (`dreal-ara-lrr-vertebres-2024`) est intégrée dans le registre. L’URL DREAL associée peut échouer. Pas de fallback archive équivalent à celui de la ZNIEFF. Chantier P0.5.
+La LRR vertébrés 2024 (`dreal-ara-lrr-vertebres-2024`) est intégrée dans le registre (`IMPORTED`). `oiseaux-mammiferes.ods` est le premier pilote branché sur le contrat d’acquisition unifié. Les indisponibilités, mauvais types et changements de SHA produisent désormais des états explicites. Aucun fallback archive n’est déclaré à ce stade. Le XLSX voisin conserve l’ancien téléchargement fail-closed.
 
-Fail-closed SHA-256 : déjà en place. Ce n’est pas une acquisition robuste pour toutes les sources.
+Ce n’est pas une acquisition robuste pour toutes les sources.
 
 ## États d’acquisition
 
@@ -164,13 +164,17 @@ Fail-closed SHA-256 : déjà en place. Ce n’est pas une acquisition robuste po
 
 | État | Sens | Issue |
 | --- | --- | --- |
-| `FETCH_OK` | Canonique : type plausible + SHA piné validé | succès |
+| `FETCH_OK` | Canonique : type valide + politique SHA satisfaite | succès |
 | `ARCHIVED_FALLBACK` | Archive **déclarée**, type OK, SHA archive validé | succès (explicite) |
 | `UNAVAILABLE` | Réseau / HTTP : pas de contenu exploitable | échec |
 | `TYPE_MISMATCH` | Octets reçus, mauvais type (ex. HTML de maintenance à la place d’un ODS) | échec |
 | `CHANGED_UNVERIFIED` | Type OK, SHA ≠ pin | échec, **fail-closed** |
 
-`CHANGED_UNVERIFIED` ne déclenche **jamais** de fallback archive : une republication officielle ne doit pas être masquée. L’inspection des octets reste dans `probe_ready_sources.py`. Ce module ne classifie que des observations déjà faites. Branchement sur une source réelle : PR-D.
+`CHANGED_UNVERIFIED` ne déclenche **jamais** de fallback archive : une republication officielle ne doit pas être masquée.
+
+Pour une ressource pinée, `FETCH_OK` exige un SHA conforme. Une ressource explicitement `shaPolicy:none` peut être `FETCH_OK` sans pin, avec un message qui l’indique. ARA LRR `oiseaux-mammiferes.ods` reste `shaPolicy: pinned`.
+
+L’inspection détaillée et générique des ressources reste dans `probe_ready_sources.py`. Le pilote ARA LRR applique seulement un garde minimal HTML / ZIP / mimetype avant de transmettre l’observation au contrat d’acquisition (`download_lrr.sh` → `acquisition-cli.mjs`). Ce n’est pas un parseur ODS.
 
 ## Qualité
 
