@@ -1,7 +1,11 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+
+// @ts-expect-error Node builtin resolved by Vitest; no @types/node in the app tsconfig.
+import { readFileSync } from 'node:fs'
+// @ts-expect-error Node builtin resolved by Vitest; no @types/node in the app tsconfig.
+import { dirname, join } from 'node:path'
+// @ts-expect-error Node builtin resolved by Vitest; no @types/node in the app tsconfig.
+import { fileURLToPath } from 'node:url'
 
 const mainSource = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'main.ts'), 'utf8')
 
