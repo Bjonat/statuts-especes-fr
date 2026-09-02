@@ -83,13 +83,14 @@ test('cas A — succès canonique : type OK et SHA attendu', () => {
     ok: true,
     origin: 'canonical',
     reasonCode: null,
+    shaPolicy: SHA_POLICIES.PINNED,
     expectedSha256: ODS_SHA,
     actualSha256: ODS_SHA,
     expectedKind: 'ods',
     detectedKind: 'office-zip',
   })
   assert.equal(isAcquisitionSuccess(result), true)
-  assert.equal(formatAcquisitionResult(result), 'FETCH_OK: source canonique validée')
+  assert.equal(formatAcquisitionResult(result), 'FETCH_OK: source canonique validée (SHA-256 conforme)')
 })
 
 test('cas B — réseau indisponible : UNAVAILABLE sans SHA observé', () => {
@@ -107,6 +108,7 @@ test('cas B — réseau indisponible : UNAVAILABLE sans SHA observé', () => {
   assert.equal(result.reasonCode, 'timeout')
   assert.equal(result.actualSha256, null)
   assert.equal(result.expectedSha256, ODS_SHA)
+  assert.equal(result.shaPolicy, SHA_POLICIES.PINNED)
   assert.equal(result.detectedKind, null)
   assert.equal(isAcquisitionSuccess(result), false)
   assert.equal(formatAcquisitionResult(result), 'UNAVAILABLE: téléchargement impossible')
@@ -129,6 +131,7 @@ test('cas C — HTML de maintenance à la place d’un ODS : TYPE_MISMATCH', () 
   assert.equal(result.reasonCode, 'maintenance_page')
   assert.equal(result.detectedKind, 'html')
   assert.equal(result.expectedKind, 'ods')
+  assert.equal(result.shaPolicy, SHA_POLICIES.PINNED)
   const message = formatAcquisitionResult(result)
   assert.equal(message, 'TYPE_MISMATCH: page de maintenance reçue à la place d’un ODS')
   assert.equal(/SHA inattendu/i.test(message), false)
@@ -158,6 +161,7 @@ test('cas D — type correct mais SHA changé : CHANGED_UNVERIFIED fail-closed',
   assert.equal(result.state, ACQUISITION_STATES.CHANGED_UNVERIFIED)
   assert.equal(result.ok, false)
   assert.equal(result.reasonCode, 'sha_mismatch')
+  assert.equal(result.shaPolicy, SHA_POLICIES.PINNED)
   assert.equal(result.actualSha256, OTHER_SHA)
   assert.equal(result.expectedSha256, ODS_SHA)
   assert.equal(isAcquisitionSuccess(result), false)
@@ -173,6 +177,7 @@ test('cas E — canonique indisponible + archive validée : ARCHIVED_FALLBACK', 
   assert.equal(result.state, ACQUISITION_STATES.ARCHIVED_FALLBACK)
   assert.equal(result.ok, true)
   assert.equal(result.origin, 'archive')
+  assert.equal(result.shaPolicy, SHA_POLICIES.PINNED)
   assert.equal(result.expectedSha256, ARCHIVE_SHA)
   assert.equal(result.actualSha256, ARCHIVE_SHA)
   assert.equal(isAcquisitionSuccess(result), true)
@@ -295,8 +300,45 @@ test('une ressource sans politique SHA peut réussir si le type est valide', () 
     shaPolicy: SHA_POLICIES.NONE,
   })
   assert.equal(result.state, ACQUISITION_STATES.FETCH_OK)
+  assert.equal(result.shaPolicy, SHA_POLICIES.NONE)
   assert.equal(result.expectedSha256, null)
   assert.equal(result.ok, true)
+})
+
+test('une archive shaPolicy none ne devient jamais ARCHIVED_FALLBACK', () => {
+  assert.throws(
+    () => resolveAcquisition({
+      canonical: { fetchOk: false, expectedKind: 'ods', expectedSha256: ODS_SHA },
+      archive: {
+        allowed: true,
+        fetchOk: true,
+        typeOk: true,
+        expectedKind: 'ods',
+        detectedKind: 'office-zip',
+        shaPolicy: SHA_POLICIES.NONE,
+      },
+    }),
+    /archive fallback requires pinned SHA-256/,
+  )
+})
+
+test('FETCH_OK pinned et none produisent des messages distincts', () => {
+  const pinned = classifyCandidate(canonicalOk())
+  const unpinned = classifyCandidate({
+    fetchOk: true,
+    typeOk: true,
+    expectedKind: 'csv',
+    detectedKind: 'csv',
+    shaPolicy: SHA_POLICIES.NONE,
+  })
+  const pinnedMessage = formatAcquisitionResult(pinned)
+  const unpinnedMessage = formatAcquisitionResult(unpinned)
+  assert.equal(pinned.shaPolicy, SHA_POLICIES.PINNED)
+  assert.equal(unpinned.shaPolicy, SHA_POLICIES.NONE)
+  assert.equal(pinnedMessage, 'FETCH_OK: source canonique validée (SHA-256 conforme)')
+  assert.equal(unpinnedMessage, 'FETCH_OK: source canonique obtenue, type validé (SHA non piné)')
+  assert.notEqual(pinnedMessage, unpinnedMessage)
+  assert.equal(/SHA-256 conforme/.test(unpinnedMessage), false)
 })
 
 test('sans shaPolicy ni SHA attendu, le contrat refuse l’ambiguïté', () => {

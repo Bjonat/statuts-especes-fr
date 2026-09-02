@@ -64,7 +64,7 @@ export function normalizeSha256(value, role = 'SHA-256') {
   return normalized
 }
 
-function resolveShaPolicy(observation) {
+function knownShaPolicy(observation) {
   const policy = observation.shaPolicy
   if (policy === SHA_POLICIES.NONE) return SHA_POLICIES.NONE
   if (policy === SHA_POLICIES.PINNED) return SHA_POLICIES.PINNED
@@ -72,7 +72,32 @@ function resolveShaPolicy(observation) {
     throw new Error(`shaPolicy inconnue: ${JSON.stringify(policy)} (pinned | none)`)
   }
   if (observation.expectedSha256) return SHA_POLICIES.PINNED
+  return null
+}
+
+function resolveShaPolicy(observation) {
+  const policy = knownShaPolicy(observation)
+  if (policy) return policy
   throw new Error('shaPolicy manquant: préciser pinned (avec SHA) ou none')
+}
+
+function requirePinnedArchiveFallback(archive) {
+  const policy = knownShaPolicy(archive)
+  const expectedSha256 = normalizeSha256(archive.expectedSha256, 'SHA-256 attendu')
+  if (policy === SHA_POLICIES.PINNED && expectedSha256) return expectedSha256
+  throw new Error('archive fallback requires pinned SHA-256')
+}
+
+function assertPinnedArchiveSuccess(result) {
+  if (
+    result.state !== ACQUISITION_STATES.FETCH_OK ||
+    result.shaPolicy !== SHA_POLICIES.PINNED ||
+    !result.expectedSha256 ||
+    !result.actualSha256 ||
+    result.expectedSha256 !== result.actualSha256
+  ) {
+    throw new Error('archive fallback requires pinned SHA-256')
+  }
 }
 
 function acquisitionResult(fields) {
@@ -81,6 +106,7 @@ function acquisitionResult(fields) {
     ok: fields.ok,
     origin: fields.origin,
     reasonCode: fields.reasonCode,
+    shaPolicy: fields.shaPolicy,
     expectedSha256: fields.expectedSha256,
     actualSha256: fields.actualSha256,
     expectedKind: fields.expectedKind,
@@ -110,6 +136,7 @@ export function classifyCandidate(observation) {
   const expectedSha256 = observation.expectedSha256
     ? normalizeSha256(observation.expectedSha256, 'SHA-256 attendu')
     : null
+  const knownPolicy = knownShaPolicy(observation)
 
   if (observation.fetchOk !== true) {
     return acquisitionResult({
@@ -117,6 +144,7 @@ export function classifyCandidate(observation) {
       ok: false,
       origin,
       reasonCode: observation.reasonCode ?? 'network_error',
+      shaPolicy: knownPolicy,
       expectedSha256,
       actualSha256: null,
       expectedKind,
@@ -134,6 +162,7 @@ export function classifyCandidate(observation) {
       ok: false,
       origin,
       reasonCode: observation.reasonCode ?? 'unexpected_type',
+      shaPolicy: knownPolicy,
       expectedSha256,
       actualSha256: normalizeSha256(observation.actualSha256, 'SHA-256 observé'),
       expectedKind,
@@ -158,6 +187,7 @@ export function classifyCandidate(observation) {
         ok: false,
         origin,
         reasonCode: 'sha_mismatch',
+        shaPolicy,
         expectedSha256,
         actualSha256,
         expectedKind,
@@ -169,6 +199,7 @@ export function classifyCandidate(observation) {
       ok: true,
       origin,
       reasonCode: null,
+      shaPolicy,
       expectedSha256,
       actualSha256,
       expectedKind,
@@ -181,6 +212,7 @@ export function classifyCandidate(observation) {
     ok: true,
     origin,
     reasonCode: null,
+    shaPolicy,
     expectedSha256: null,
     actualSha256: normalizeSha256(observation.actualSha256, 'SHA-256 observé'),
     expectedKind,
@@ -209,18 +241,22 @@ export function resolveAcquisition({ canonical, archive } = {}) {
     return canonicalResult
   }
 
+  requirePinnedArchiveFallback(archive)
+
   if (archive.fetchOk !== true && archive.fetchOk !== false) {
     return canonicalResult
   }
 
   const archiveResult = classifyCandidate({ ...archive, origin: ACQUISITION_ORIGINS.ARCHIVE })
   if (archiveResult.state === ACQUISITION_STATES.FETCH_OK) {
+    assertPinnedArchiveSuccess(archiveResult)
     return acquisitionResult({
       ...archiveResult,
       state: ACQUISITION_STATES.ARCHIVED_FALLBACK,
       ok: true,
       origin: ACQUISITION_ORIGINS.ARCHIVE,
       reasonCode: null,
+      shaPolicy: SHA_POLICIES.PINNED,
     })
   }
 
@@ -247,7 +283,10 @@ export function formatAcquisitionResult(result) {
 
   switch (result.state) {
     case ACQUISITION_STATES.FETCH_OK:
-      return 'FETCH_OK: source canonique validée'
+      if (result.shaPolicy === SHA_POLICIES.PINNED) {
+        return 'FETCH_OK: source canonique validée (SHA-256 conforme)'
+      }
+      return 'FETCH_OK: source canonique obtenue, type validé (SHA non piné)'
     case ACQUISITION_STATES.ARCHIVED_FALLBACK:
       return 'ARCHIVED_FALLBACK: archive validée utilisée'
     case ACQUISITION_STATES.UNAVAILABLE:
