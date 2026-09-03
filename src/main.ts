@@ -1,5 +1,6 @@
 import './styles.css'
 import { loadDataStore } from './catalog'
+import { REGIONS, assertDepartmentInRegion } from '../data-pipeline/regions.mjs'
 import { searchTaxa } from './search'
 import { resolveStatuses } from './resolve-statuses'
 import {
@@ -24,6 +25,17 @@ const { regions, sources } = dataStore
 const storedRegion = localStorage.getItem('region')
 const defaultRegion = regions.some((region) => region.code === storedRegion) ? (storedRegion as RegionCode) : 'CVL'
 
+function readStoredDepartment(region: RegionCode): string | null {
+  const stored = localStorage.getItem('department')
+  if (stored === null) return null
+  try {
+    return assertDepartmentInRegion(region, stored)
+  } catch {
+    localStorage.removeItem('department')
+    return null
+  }
+}
+
 let installPrompt: BeforeInstallPromptEvent | null = null
 let iosInstallHelpVisible = false
 
@@ -31,6 +43,7 @@ const state: {
   screen: 'home' | 'sources'
   realm: Realm | null
   region: RegionCode
+  department: string | null
   query: string
   selectedTaxon: Taxon | null
   taxa: Taxon[]
@@ -43,6 +56,7 @@ const state: {
   screen: 'home',
   realm: null,
   region: defaultRegion,
+  department: readStoredDepartment(defaultRegion),
   query: '',
   selectedTaxon: null,
   taxa: [],
@@ -169,6 +183,57 @@ function regionOptions(): string {
     .join('')
 }
 
+function departmentOptions(): string {
+  const region = REGIONS.find((item) => item.code === state.region)
+  const departments = region?.departments ?? []
+  return [
+    `<option value="" ${state.department === null ? 'selected' : ''}>Toute la région</option>`,
+    ...departments.map(
+      (code) =>
+        `<option value="${escapeHtml(code)}" ${state.department === code ? 'selected' : ''}>${escapeHtml(code)}</option>`,
+    ),
+  ].join('')
+}
+
+function departmentFieldMarkup(spaced = false): string {
+  const labelClass = spaced ? 'field-label field-label--spaced' : 'field-label'
+  return `
+    <div class="territory-filter">
+      <label class="${labelClass}" for="department-select">Département (facultatif)</label>
+      <select id="department-select" class="field-control">${departmentOptions()}</select>
+      <p class="field-hint">Affinez les statuts de portée départementale ou d’ancienne région.</p>
+    </div>
+  `
+}
+
+function changeDepartment(value: string): void {
+  if (value.trim() === '') {
+    state.department = null
+    localStorage.removeItem('department')
+    render()
+    return
+  }
+
+  try {
+    const normalized = assertDepartmentInRegion(state.region, value)
+    state.department = normalized
+    localStorage.setItem('department', normalized)
+  } catch {
+    state.department = null
+    localStorage.removeItem('department')
+  }
+  render()
+}
+
+function renderTerritoryNotices(warnings: string[]): string {
+  if (warnings.length === 0) return ''
+  const body =
+    warnings.length === 1
+      ? `<p>${escapeHtml(warnings[0])}</p>`
+      : `<ul>${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>`
+  return `<aside class="territory-notice" role="note">${body}</aside>`
+}
+
 function formatCheckedDate(value?: string): string {
   const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!match) return 'date inconnue'
@@ -268,9 +333,11 @@ async function chooseRealm(realm: Realm): Promise<void> {
 
 async function changeRegion(region: RegionCode): Promise<void> {
   state.region = region
+  state.department = null
   state.selectedTaxon = null
   state.statuses = []
   localStorage.setItem('region', region)
+  localStorage.removeItem('department')
   if (state.screen === 'sources') {
     await loadRegionSources(region)
     return
@@ -323,6 +390,13 @@ function bindRegionSelect(): void {
   const select = document.querySelector<HTMLSelectElement>('#region-select')
   select?.addEventListener('change', () => {
     void changeRegion(select.value as RegionCode)
+  })
+}
+
+function bindDepartmentSelect(): void {
+  const select = document.querySelector<HTMLSelectElement>('#department-select')
+  select?.addEventListener('change', () => {
+    changeDepartment(select.value)
   })
 }
 
@@ -487,6 +561,8 @@ function renderSearch(): void {
         <label class="field-label" for="region-select">Région</label>
         <select id="region-select" class="field-control">${regionOptions()}</select>
 
+        ${departmentFieldMarkup(true)}
+
         <label class="field-label field-label--spaced" for="taxon-search">Espèce</label>
         <input
           id="taxon-search"
@@ -526,6 +602,7 @@ function renderSearch(): void {
   `
 
   bindRegionSelect()
+  bindDepartmentSelect()
 
   document.querySelector<HTMLButtonElement>('#change-realm')?.addEventListener('click', () => {
     state.realm = null
@@ -558,11 +635,16 @@ function renderDetail(): void {
   if (!taxon || !state.realm) return
 
   const region = regions.find((item) => item.code === state.region)
-  const { statuses: taxonStatuses } = resolveStatuses({
+  const result = resolveStatuses({
     cdRef: taxon.cdRef,
     region: state.region,
+    department: state.department ?? undefined,
     statuses: state.statuses,
   })
+  const taxonStatuses = result.statuses
+  const territoryContext = state.department
+    ? `${state.realm === 'flora' ? 'Flore' : 'Faune'} - ${region?.name ?? state.region} - département ${state.department}`
+    : `${state.realm === 'flora' ? 'Flore' : 'Faune'} - ${region?.name ?? state.region}`
 
   root.innerHTML = `
     <main class="shell">
@@ -572,13 +654,17 @@ function renderDetail(): void {
       </header>
 
       <section class="panel taxon-card">
-        <p class="eyebrow">${state.realm === 'flora' ? 'Flore' : 'Faune'} - ${escapeHtml(region?.name ?? state.region)}</p>
+        <p class="eyebrow">${escapeHtml(territoryContext)}</p>
         <h1>${escapeHtml(taxon.vernacularNames[0] ?? taxon.scientificName)}</h1>
         <p class="scientific-name"><i>${escapeHtml(taxon.scientificName)}</i></p>
         <p class="taxon-meta">${taxon.family ? `${escapeHtml(taxon.family)} - ` : ''}CD_REF ${taxon.cdRef}</p>
 
         <div class="divider"></div>
 
+        ${departmentFieldMarkup()}
+
+        <div class="status-results" aria-live="polite">
+        ${renderTerritoryNotices(result.warnings)}
         <h2>Statuts</h2>
         ${
           taxonStatuses.length
@@ -619,11 +705,14 @@ function renderDetail(): void {
         }
 
         <p class="source-summary">${escapeHtml(sourceSummary(taxonStatuses))}</p>
+        </div>
       </section>
 
       ${renderDataNotice()}
     </main>
   `
+
+  bindDepartmentSelect()
 
   document.querySelector<HTMLButtonElement>('#back-to-search')?.addEventListener('click', () => {
     state.selectedTaxon = null
