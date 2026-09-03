@@ -8,6 +8,23 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { runAdapter } from './run-adapter.mjs'
 import { validateRegionalPackage } from './regional.mjs'
+import { validateSourceDiagnostic } from './diagnostics.mjs'
+
+const HISTORICAL_DIAGNOSTIC_KEYS = [
+  'rows',
+  'matched',
+  'cd_nom',
+  'name',
+  'excluded_realm',
+  'unmatched',
+  'ambiguous',
+  'flora',
+  'fauna',
+  'unresolvedSample',
+  'matchRate',
+  'years',
+  'groups',
+]
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const PIPELINE_ID = 'oeb-bretagne-znieff-csv-2026-01-29'
@@ -77,10 +94,11 @@ async function withWorkspace(run) {
   const taxrefPath = path.join(dir, 'TAXREFv18.txt')
   const inputPath = path.join(dir, 'bre-znieff.csv')
   const outputPath = path.join(dir, 'out', 'bre-znieff.json')
+  const diagnosticsPath = path.join(dir, 'diagnostics', 'oeb-bretagne-znieff.json')
   await writeFile(taxrefPath, TAXREF_TSV, 'utf8')
   await writeFile(inputPath, ZNIEFF_CSV, 'utf8')
   try {
-    return await run({ dir, taxrefPath, inputPath, outputPath })
+    return await run({ dir, taxrefPath, inputPath, outputPath, diagnosticsPath })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -91,13 +109,14 @@ function expectedSha(csv) {
 }
 
 test('le pilote IMPORTED produit un paquet ZNIEFF schemaVersion 1 validé', async () => {
-  await withWorkspace(async ({ taxrefPath, inputPath, outputPath }) => {
+  await withWorkspace(async ({ taxrefPath, inputPath, outputPath, diagnosticsPath }) => {
     const pkg = await runAdapter({
       registry: registryFixture([sourceFixture()]),
       sourceId: 'oeb-bretagne-znieff',
       taxrefPath,
       inputPath,
       outputPath,
+      diagnosticsPath,
       checkedAt: CHECKED_AT,
     })
 
@@ -169,11 +188,88 @@ test('le pilote IMPORTED produit un paquet ZNIEFF schemaVersion 1 validé', asyn
 
     const written = JSON.parse(await readFile(outputPath, 'utf8'))
     assert.deepEqual(written, pkg)
+    assert.deepEqual(Object.keys(pkg.diagnostics), HISTORICAL_DIAGNOSTIC_KEYS)
+    for (const key of ['schemaVersion', 'quality', 'checks', 'baseline']) {
+      assert.equal(key in pkg.diagnostics, false)
+    }
+
+    const sidecar = JSON.parse(await readFile(diagnosticsPath, 'utf8'))
+    assert.equal(validateSourceDiagnostic(sidecar).quality.status, 'not_configured')
+    assert.equal(sidecar.metrics.resolutionRate, pkg.diagnostics.matchRate)
+    assert.equal(sidecar.metrics.duplicatesDropped, 1)
+    assert.equal(sidecar.metrics.statusesProduced, 3)
+  })
+})
+
+test('une source sans quality produit le paquet et un sidecar not_configured', async () => {
+  await withWorkspace(async ({ taxrefPath, inputPath, outputPath, diagnosticsPath }) => {
+    await runAdapter({
+      registry: registryFixture([sourceFixture()]),
+      sourceId: 'oeb-bretagne-znieff',
+      taxrefPath,
+      inputPath,
+      outputPath,
+      diagnosticsPath,
+      checkedAt: CHECKED_AT,
+    })
+    await access(outputPath)
+    const sidecar = JSON.parse(await readFile(diagnosticsPath, 'utf8'))
+    assert.equal(sidecar.quality.status, 'not_configured')
+    assert.deepEqual(sidecar.quality.failures, [])
+  })
+})
+
+test('un échec qualité écrit le sidecar et bloque le paquet', async () => {
+  await withWorkspace(async ({ taxrefPath, inputPath, outputPath, diagnosticsPath }) => {
+    await assert.rejects(
+      () =>
+        runAdapter({
+          registry: registryFixture([sourceFixture({ quality: { minResolutionRate: 0.99 } })]),
+          sourceId: 'oeb-bretagne-znieff',
+          taxrefPath,
+          inputPath,
+          outputPath,
+          diagnosticsPath,
+          checkedAt: CHECKED_AT,
+        }),
+      /QUALITY FAIL oeb-bretagne-znieff/,
+    )
+    const sidecar = JSON.parse(await readFile(diagnosticsPath, 'utf8'))
+    assert.equal(sidecar.quality.status, 'fail')
+    assert.equal(sidecar.quality.failures.some((check) => check.id === 'minResolutionRate'), true)
+    await assert.rejects(() => access(outputPath), { code: 'ENOENT' })
+  })
+})
+
+test('une source avec quality satisfaite écrit paquet et sidecar pass', async () => {
+  await withWorkspace(async ({ taxrefPath, inputPath, outputPath, diagnosticsPath }) => {
+    const pkg = await runAdapter({
+      registry: registryFixture([
+        sourceFixture({
+          quality: {
+            minStatuses: 3,
+            minResolutionRate: 0.6,
+            requiredCategories: ['znieff'],
+            sentinels: [{ cdRef: 900001, category: 'znieff', value: 'Oui', scope: 'regional' }],
+          },
+        }),
+      ]),
+      sourceId: 'oeb-bretagne-znieff',
+      taxrefPath,
+      inputPath,
+      outputPath,
+      diagnosticsPath,
+      checkedAt: CHECKED_AT,
+    })
+    await access(outputPath)
+    const sidecar = JSON.parse(await readFile(diagnosticsPath, 'utf8'))
+    assert.equal(sidecar.quality.status, 'pass')
+    assert.equal(sidecar.metrics.resolutionRate, pkg.diagnostics.matchRate)
   })
 })
 
 test('une source WITNESS est refusée et n’écrit aucun fichier', async () => {
-  await withWorkspace(async ({ taxrefPath, inputPath, outputPath }) => {
+  await withWorkspace(async ({ taxrefPath, inputPath, outputPath, diagnosticsPath }) => {
     await assert.rejects(
       () =>
         runAdapter({
@@ -182,11 +278,13 @@ test('une source WITNESS est refusée et n’écrit aucun fichier', async () => 
           taxrefPath,
           inputPath,
           outputPath,
+          diagnosticsPath,
           checkedAt: CHECKED_AT,
         }),
       /WITNESS et ne peut pas être publiée/,
     )
     await assert.rejects(() => access(outputPath), { code: 'ENOENT' })
+    await assert.rejects(() => access(diagnosticsPath), { code: 'ENOENT' })
   })
 })
 
@@ -205,6 +303,25 @@ test('un adaptateur inconnu est refusé sans écrire le paquet', async () => {
       /Adaptateur inconnu: not-an-adapter/,
     )
     await assert.rejects(() => access(outputPath), { code: 'ENOENT' })
+  })
+})
+
+test('un adaptateur diagnostiqué sans diagnosticsPath est refusé avant écriture', async () => {
+  await withWorkspace(async ({ taxrefPath, inputPath, outputPath, diagnosticsPath }) => {
+    await assert.rejects(
+      () =>
+        runAdapter({
+          registry: registryFixture([sourceFixture()]),
+          sourceId: 'oeb-bretagne-znieff',
+          taxrefPath,
+          inputPath,
+          outputPath,
+          checkedAt: CHECKED_AT,
+        }),
+      /diagnosticsPath obligatoire pour l'adaptateur oeb-csv-znieff/,
+    )
+    await assert.rejects(() => access(outputPath), { code: 'ENOENT' })
+    await assert.rejects(() => access(diagnosticsPath), { code: 'ENOENT' })
   })
 })
 
@@ -233,13 +350,14 @@ test('parité Python historique sur les fixtures synthétiques', async (t) => {
     return
   }
 
-  await withWorkspace(async ({ taxrefPath, inputPath, outputPath }) => {
+  await withWorkspace(async ({ taxrefPath, inputPath, outputPath, diagnosticsPath }) => {
     const candidate = await runAdapter({
       registry: registryFixture([sourceFixture()]),
       sourceId: 'oeb-bretagne-znieff',
       taxrefPath,
       inputPath,
       outputPath,
+      diagnosticsPath,
       checkedAt: CHECKED_AT,
     })
 

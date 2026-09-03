@@ -1,11 +1,20 @@
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { buildOebCsvZnieff } from './adapters/oeb-csv-znieff.mjs'
+import { buildOebCsvZnieff, diagnosticsForOebCsvZnieff } from './adapters/oeb-csv-znieff.mjs'
+import {
+  buildSourceDiagnostic,
+  formatQualityLog,
+  validateQualityConfig,
+  validateSourceDiagnostic,
+} from './diagnostics.mjs'
 import { validateRegionalPackage } from './regional.mjs'
 
 const ADAPTERS = {
-  'oeb-csv-znieff': buildOebCsvZnieff,
+  'oeb-csv-znieff': {
+    build: buildOebCsvZnieff,
+    diagnostics: diagnosticsForOebCsvZnieff,
+  },
 }
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -50,6 +59,11 @@ async function requireFile(filePath, label) {
   }
 }
 
+async function writeJson(filePath, value) {
+  await mkdir(path.dirname(filePath), { recursive: true })
+  await writeFile(filePath, `${JSON.stringify(value)}\n`, 'utf8')
+}
+
 export async function runAdapter({
   registry,
   registryPath,
@@ -57,6 +71,7 @@ export async function runAdapter({
   taxrefPath,
   inputPath,
   outputPath,
+  diagnosticsPath,
   checkedAt,
 }) {
   if (!sourceId) throw new Error('sourceId obligatoire')
@@ -76,12 +91,15 @@ export async function runAdapter({
   if (!adapter) {
     throw new Error(`Adaptateur inconnu: ${source.adapter}`)
   }
+  if (adapter.diagnostics && !diagnosticsPath) {
+    throw new Error(`diagnosticsPath obligatoire pour l'adaptateur ${source.adapter}`)
+  }
 
   const resource = findCsvResource(source)
   await requireFile(taxrefPath, 'TAXREF')
   await requireFile(inputPath, 'Fichier d’entrée')
 
-  const pkg = await adapter({
+  const pkg = await adapter.build({
     source,
     resource,
     taxrefPath,
@@ -90,8 +108,23 @@ export async function runAdapter({
   })
   validateRegionalPackage(pkg, path.basename(outputPath))
 
-  await mkdir(path.dirname(outputPath), { recursive: true })
-  await writeFile(outputPath, `${JSON.stringify(pkg)}\n`, 'utf8')
+  if (adapter.diagnostics) {
+    validateQualityConfig(source.quality, source.id)
+    const diagnostic = buildSourceDiagnostic({
+      source,
+      resource,
+      package: pkg,
+      adapterMetrics: adapter.diagnostics(pkg),
+    })
+    validateSourceDiagnostic(diagnostic)
+    console.log(formatQualityLog(diagnostic))
+    if (diagnosticsPath) await writeJson(diagnosticsPath, diagnostic)
+    if (diagnostic.quality.status === 'fail') {
+      throw new Error(formatQualityLog(diagnostic))
+    }
+  }
+
+  await writeJson(outputPath, pkg)
   return pkg
 }
 
@@ -103,6 +136,7 @@ async function main() {
     taxrefPath: args.taxref,
     inputPath: args.input,
     outputPath: args.out,
+    diagnosticsPath: args['diagnostics-out'],
     checkedAt: args['checked-at'],
   })
 }

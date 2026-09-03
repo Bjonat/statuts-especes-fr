@@ -286,3 +286,25 @@ export async function buildOebCsvZnieff({ source, resource, taxrefPath, inputPat
     diagnostics: stats,
   }
 }
+
+export function diagnosticsForOebCsvZnieff(pkg) {
+  const historical = pkg.diagnostics
+  return {
+    rowsRead: historical.rows,
+    rowsResolved: historical.matched,
+    resolvedByCode: historical.cd_nom,
+    resolvedByName: historical.name,
+    unresolved: historical.unmatched,
+    ambiguous: historical.ambiguous,
+    explicitlyIgnored: historical.excluded_realm,
+    duplicatesDropped: historical.matched - pkg.statuses.length,
+    realms: {
+      flora: historical.flora,
+      fauna: historical.fauna,
+    },
+    years: historical.years,
+    groups: historical.groups,
+    unresolvedSample: historical.unresolvedSample,
+    matchRate: historical.matchRate,
+  }
+}
