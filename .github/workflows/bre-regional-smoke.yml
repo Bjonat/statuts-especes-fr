@@ -7,6 +7,10 @@ on:
     paths:
       - 'data-pipeline/regions/bre/**'
       - 'data-pipeline/regional.mjs'
+      - 'data-pipeline/run-adapter.mjs'
+      - 'data-pipeline/adapters/**'
+      - 'data-pipeline/adapter-runner.test.mjs'
+      - 'data-pipeline/regions/ready-sources.json'
       - '.github/workflows/bre-regional-smoke.yml'
 
 jobs:
@@ -59,14 +63,25 @@ jobs:
 
       - name: Build Bretagne regional packages
         run: |
-          mkdir -p "$RUNNER_TEMP/regional"
+          CHECKED_AT="$(date -u +%F)"
+          echo "CHECKED_AT=$CHECKED_AT" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/regional" "$RUNNER_TEMP/regional-candidate"
           python data-pipeline/regions/bre/build_oeb.py \
             --taxref "$TAXREF_FILE" \
             --znieff "$BRE_ZNIEFF_FILE" \
             --lrr "$BRE_LRR_FILE" \
             --responsabilite "$BRE_RESPONSABILITE_FILE" \
             --out-dir "$RUNNER_TEMP/regional" \
+            --checked-at "$CHECKED_AT" \
             --min-match-rate 0.97
+          node data-pipeline/run-adapter.mjs \
+            --source oeb-bretagne-znieff \
+            --taxref "$TAXREF_FILE" \
+            --input "$BRE_ZNIEFF_FILE" \
+            --out "$RUNNER_TEMP/regional-candidate/bre-znieff.json" \
+            --checked-at "$CHECKED_AT"
+          echo "BRE_LEGACY_ZNIEFF=$RUNNER_TEMP/regional/bre-znieff.json" >> "$GITHUB_ENV"
+          echo "BRE_CANDIDATE_ZNIEFF=$RUNNER_TEMP/regional-candidate/bre-znieff.json" >> "$GITHUB_ENV"
 
       - name: Validate regional package contract
         run: |
@@ -98,6 +113,22 @@ jobs:
             throw new Error('Sentinelle Alca torda migrateurs absente')
           }
           console.log(packages.map((pkg) => ({ id: pkg.source.id, statuses: pkg.statuses.length, diagnostics: pkg.diagnostics })))
+          NODE
+
+      - name: Compare ZNIEFF adapter parity
+        run: |
+          node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict'
+          import { readFile } from 'node:fs/promises'
+          const legacy = JSON.parse(await readFile(process.env.BRE_LEGACY_ZNIEFF, 'utf8'))
+          const candidate = JSON.parse(await readFile(process.env.BRE_CANDIDATE_ZNIEFF, 'utf8'))
+          assert.equal(candidate.schemaVersion, legacy.schemaVersion)
+          assert.deepStrictEqual(candidate.source, legacy.source)
+          assert.deepStrictEqual(candidate.replaces, legacy.replaces)
+          assert.deepStrictEqual(candidate.statuses, legacy.statuses)
+          assert.deepStrictEqual(candidate.diagnostics, legacy.diagnostics)
+          assert.deepStrictEqual(candidate, legacy)
+          console.log(`Parité ZNIEFF : ${candidate.statuses.length} statuts, matchRate=${candidate.diagnostics.matchRate}`)
           NODE
 
       - name: Upload normalized packages
