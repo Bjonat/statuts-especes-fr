@@ -1,7 +1,9 @@
 # Roadmap technique — moteur de statuts d’espèces FR
 
 Document de référence pour les développements à venir.
-Dernière actualisation : 2026-09-01. PR-A (matrice de couverture, #28) et PR-B (alignement documentaire) sont réalisées.
+Dernière actualisation : 2026-09-03. PR-A à PR-J sont réalisées. PR-K (cette PR) ajoute le département au resolver.
+
+**Décision mainteneur du 3 septembre 2026 :** priorité absolue à la PWA terrain offline. Après PR-K et PR-L, gel des nouvelles surfaces fonctionnelles et phase de hardening terrain. CLI/CSV, QGIS et distribution sont différés jusqu’à décision explicite ultérieure.
 
 **Ce document n’autorise aucun chantier.** Chaque phase se traite dans une PR dédiée, petite et vérifiable. Ne pas lancer une refonte générale du pipeline ni du front à partir de ce fichier.
 
@@ -15,12 +17,9 @@ Cible à moyen terme :
 
 > Un moteur français de résolution des statuts réglementaires et patrimoniaux d’un taxon selon son territoire, avec données traçables et fonctionnement offline.
 
-La PWA actuelle devient **un consommateur** de ce moteur parmi d’autres. Le même cœur doit pouvoir, à terme, alimenter :
+**Priorité produit actuelle :** faire de la PWA un outil terrain offline extrêmement fiable avant toute extension vers CLI/CSV, QGIS, package ou API.
 
-- la PWA terrain ;
-- un traitement CSV / XLSX ;
-- un plugin QGIS ;
-- éventuellement une API et un package réutilisable.
+La PWA actuelle est le consommateur prioritaire du moteur. CLI, QGIS, package et API restent des cibles documentées, **hors roadmap active**.
 
 Principe directeur :
 
@@ -186,21 +185,20 @@ Ordre retenu (voir justification en §5.0) :
 P0     Gouvernance / docs / matrice de couverture
   ↓
 P0.5   Robustesse de l’acquisition          ┐
-  ↓                                         ├ peuvent chevaucher après P0
+  ↓                                         ├ déjà engagés / réalisés
 P1-C   resolveStatuses()                    ┘
   ↓
-P1-A   SourceAdapter + registre (pilote)
+P1-A / P1-B   Runner + diagnostics (PR-G à PR-J)
   ↓
-P1-B   Diagnostics et seuils
+P2-A / PR-K   Département dans le resolver
   ↓
-P2-A   Territorialisation départementale
+PR-L          Sélecteur département PWA
   ↓
-P2-B   Listes / CSV
-  ↓
-P2-C   Plugin QGIS
-  ↓
-P3     Dataset / package / API
+PWA TERRAIN HARDENING
+  offline réel · fiabilité · UX mobile · performance · tests terrain
 ```
+
+CLI/CSV (PR-M), QGIS (PR-N) et distribution (PR-O) sont **DIFFÉRÉS / BACKLOG** : hors roadmap active.
 
 ### 5.0 Pourquoi P1-C avant P1-A / P1-B
 
@@ -213,7 +211,7 @@ L’ordre initial proposait d’industrialiser les adapters avant d’extraire l
 
 P0.5 reste **prioritaire pour la santé CI des données** (incidents ARA/BFC). P1-C peut démarrer en parallèle dès que P0 a figé le vocabulaire (couverture, absence de statut, états de source).
 
-Ne **pas** inverser P2-A avant P1-C : le département n’a de sens que dans le resolver, pas dans `main.ts`.
+Ne **pas** inverser PR-L avant PR-K : le département n’a de sens dans l’UI que lorsque le resolver le comprend.
 
 ---
 
@@ -599,7 +597,7 @@ Dataset inchangé. Rollback UI = revenir à `sortedStatuses` local (à supprimer
 
 ---
 
-### PHASE P2-A — Territorialisation départementale
+### PHASE P2-A / PR-K — Territorialisation départementale (resolver)
 
 #### Objectif
 
@@ -666,6 +664,8 @@ Liens générés inchangés. Filtrage runtime uniquement.
 
 ### PHASE P2-B — Résolution d’une liste de taxons
 
+**DIFFÉRÉ / BACKLOG — hors roadmap active.** Ne pas lancer sans décision explicite du mainteneur.
+
 #### Objectif
 
 Usage professionnel : une liste de noms ou de `CD_REF` → table de statuts + export CSV.
@@ -721,6 +721,8 @@ Nouvel outil. La PWA inchangée.
 
 ### PHASE P2-C — Plugin QGIS
 
+**DIFFÉRÉ / BACKLOG — hors roadmap active.** Ne pas lancer sans décision explicite du mainteneur.
+
 #### Objectif
 
 Enrichir une table attributaire à partir d’une colonne `CD_REF` (ou d’une sélection) sans réimplémenter les règles.
@@ -774,6 +776,8 @@ Nouvel artefact. Ne touche pas à la PWA.
 ---
 
 ### PHASE P3 — Dataset et distribution du moteur
+
+**DIFFÉRÉ / BACKLOG — hors roadmap active.** Ne pas lancer sans décision explicite du mainteneur.
 
 #### Objectif
 
@@ -856,18 +860,69 @@ adaptateurs historiques          │
                                 ▼
                         P1-C resolveStatuses
                                 │
-                 ┌──────────────┼──────────────┐
-                 ▼              ▼              ▼
-               PWA           P2-B batch      P2-A département
-                 │              │              │
-                 │              └──────┬───────┘
-                 │                     ▼
-                 │                   P2-C QGIS
-                 │                     │
-                 └──────────► P3 package / API / dataset
+                                ▼
+                              PWA
+                                │
+                                ▼
+                         PR-K département resolver
+                                │
+                                ▼
+                         PR-L sélecteur département
+                                │
+                                ▼
+                      PWA TERRAIN HARDENING
 ```
 
-La PWA existe déjà : elle se **rebranche** sur le resolver (PR-G), elle n’attend pas P3.
+CLI / QGIS / package / API (PR-M / N / O) restent documentés plus bas, **hors de ce graphe actif**.
+
+---
+
+## 6.1 Phase prioritaire après PR-L — Hardening PWA terrain/offline
+
+Cette section **documente** la phase. Elle ne l’implémente pas. Pas de PR-P / PR-Q / PR-R inventées maintenant : un audit terrain après PR-L découpera les petites PR nécessaires.
+
+Objectif :
+
+> Pouvoir partir une journée sur le terrain sans réseau et faire confiance à l’application.
+
+### Offline réel
+
+- démarrage après mise en cache sans réseau ;
+- changement règne/région déjà primé hors connexion ;
+- comportement cache incomplet ;
+- nouvelle version du dataset ;
+- reprise après erreur.
+
+### Fiabilité
+
+- aucun écran vide ambigu ;
+- aucun échec silencieux ;
+- erreurs compréhensibles ;
+- absence de statut distinguée d’un problème de données/cache.
+
+### UX terrain
+
+- téléphone ;
+- manipulation à une main ;
+- recherche rapide ;
+- lisibilité ;
+- navigation retour ;
+- sélecteur département simple.
+
+### Performance
+
+- démarrage ;
+- recherche ;
+- mémoire ;
+- changement région/règne ;
+- téléphone moyen/bas de gamme.
+
+### Validation métier
+
+- sentinelles flora/fauna ;
+- plusieurs régions ;
+- plusieurs départements ;
+- retours écologues terrain.
 
 ---
 
@@ -966,11 +1021,13 @@ Ordre proposé. Chaque ligne = **une** PR.
 | **PR-H** | ~~Diagnostics standardisés sur le pilote~~ **Réalisée** (cette PR) : sidecar diagnostic v1 + quality gate registre sur BRE ZNIEFF ; `pkg.diagnostics` historique inchangé | PR-G | JSON diagnostic + seuils dans le registre | Artifact + échec si sentinelle absente | Seuil mal calé | Seuil optionnel |
 | **PR-I** | ~~Migrer une **deuxième** source simple (BRE LRR CSV) pour valider l’abstraction~~ **Réalisée** (cette PR) : deuxième adaptateur BRE LRR ; common OEB minimal ; parité stricte ZNIEFF + LRR ; quality sidecars sur les deux sources ; production historique conservée | PR-G, PR-H | adaptateur + registre | Deux sources passent par le runner | Spécificités LRR | Script historique |
 | **PR-J** | ~~Workflow CI générique (matrice) **uniquement** pour les sources migrées~~ **Réalisée** (cette PR) : matrice CI registry-driven sur les sources IMPORTED avec adapter ; ZNIEFF + LRR actuellement ; quality sidecars par job ; smoke Bretagne historique conservé | PR-I | 1 YAML matrice | Équivalence smoke BRE | Casser le dispatch | YAML historique conservé |
-| **PR-K** | Département dans le resolver (sans UI) | PR-E, table `regions.mjs` | resolver + tests OCC/NAQ | Sans département = inchangé | Mal parser les `scopeLabel` libres | Flag off |
-| **PR-L** | Sélecteur département PWA (opt-in) | PR-K, PR-F | `main.ts`, CSS | Terrain : OCC 31 vs 34 | UX | Cacher le sélecteur |
-| **PR-M** | CLI liste / CSV | PR-F | CLI + tests | `ambiguous` / `not_found` / *Hyles* | — | Supprimer le CLI |
-| **PR-N** | Note d’architecture QGIS (choix 1/2/3) puis plugin minimal | PR-M | `docs/` + plugin | Pas de règles dans le plugin | Portée | Ne pas merger le plugin |
-| **PR-O** | ADR distribution (JSON / SQLite / package / API) | moteur stable §8 | `docs/` | Décision écrite, **rien publié** | — | — |
+| **PR-K** | ~~Département dans le resolver (sans UI)~~ **Réalisée** (cette PR) : `department?` dans `resolveStatuses` ; filtrage data-driven des portées département / anciennes régions ; sans département = comportement inchangé ; aucune UI | PR-E, table `regions.mjs` | resolver + tests OCC/NAQ | Sans département = inchangé | Mal parser les `scopeLabel` libres | Flag off |
+| **PR-L** | Sélecteur département PWA (opt-in) — **dernière feature active actuellement planifiée** | PR-K, PR-F | `main.ts`, CSS | Terrain : OCC 31 vs 34 | UX | Cacher le sélecteur |
+| **PR-M** | CLI liste / CSV — **DIFFÉRÉ / BACKLOG — hors roadmap active** | PR-F | CLI + tests | `ambiguous` / `not_found` / *Hyles* | — | Supprimer le CLI |
+| **PR-N** | Note d’architecture QGIS (choix 1/2/3) puis plugin minimal — **DIFFÉRÉ / BACKLOG — hors roadmap active** | PR-M | `docs/` + plugin | Pas de règles dans le plugin | Portée | Ne pas merger le plugin |
+| **PR-O** | ADR distribution (JSON / SQLite / package / API) — **DIFFÉRÉ / BACKLOG — hors roadmap active** | moteur stable §8 | `docs/` | Décision écrite, **rien publié** | — | — |
+
+Après PR-L, aucune nouvelle fonctionnalité de type CLI/QGIS/API n’est lancée automatiquement. La prochaine étape est un audit de la PWA terrain puis un découpage en petites PR de hardening selon les problèmes réellement observés.
 
 **Pilote d’abstraction :** Bretagne ZNIEFF OEB (CSV data.gouv). Ne pas piloter avec BFC (tableur maître) ni OCC (zones biogéographiques).
 
@@ -985,4 +1042,4 @@ Ordre proposé. Chaque ligne = **une** PR.
 3. Respecter « Hors périmètre » de la phase.
 4. Ne pas inventer de statuts, de SHA, ni de licence.
 5. `npm test` et `npm run build` verts. Ne pas « réparer » les workflows de téléchargement amont dans une PR qui n’est pas PR-C/D.
-6. Ne pas enchaîner automatiquement la PR suivante.
+6. Ne pas enchaîner automatiquement la PR suivante. Après PR-L, ne pas lancer PR-M / N / O.
