@@ -76,7 +76,9 @@ Les seuils viennent du registre (`source.quality`), source par source. Absence d
 
 Ne pas placer le sidecar dans le dossier chargé par `loadRegionalPackages()`.
 
-`data-pipeline/regions/bre/build_oeb.py` reste le chemin historique (ZNIEFF + LRR + responsabilité). La production continue de l’utiliser jusqu’à la matrice générique. Le runner construit ZNIEFF et LRR en double, pour la parité uniquement. La responsabilité reste historique.
+`run-adapter.mjs` exécute **une** source déjà téléchargée. `migrated-source-matrix.mjs` découvre les sources `IMPORTED` qui déclarent un `adapter`. Le workflow `.github/workflows/regional-adapters-matrix.yml` lance une case CI par source découverte (paquet + sidecar + quality). `.github/workflows/bre-regional-smoke.yml` reste l’oracle de parité Node/Python pour les deux pilotes Bretagne.
+
+`data-pipeline/regions/bre/build_oeb.py` reste le chemin historique (ZNIEFF + LRR + responsabilité). La production continue de l’utiliser. Le runner n’est pas encore le chemin de publication.
 
 ## Construction
 
