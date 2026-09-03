@@ -6,7 +6,8 @@
 
 - ZNIEFF : `oeb-bretagne-znieff-csv-2026-01-29` (CSV data.gouv `4ada0b2b-…`)
 - LRR : `oeb-bretagne-lrr-csv-2026-01-29` (CSV data.gouv `937614a8-…`)
-- Adaptateur commun : `data-pipeline/regions/bre/build_oeb.py`
+- `build_oeb.py` reste le chemin historique pour ZNIEFF/LRR/responsabilité.
+- ZNIEFF dispose aussi du pilote registry-driven `oeb-csv-znieff`, en double construction de parité.
 
 ## Responsabilité biologique régionale — importée
 

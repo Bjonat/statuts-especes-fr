@@ -124,11 +124,18 @@
         "fauna"
       ],
       "state": "IMPORTED",
+      "adapter": "oeb-csv-znieff",
+      "name": "Espèces déterminantes ZNIEFF Bretagne",
+      "producer": "Observatoire de l'environnement en Bretagne / CSRPN Bretagne",
+      "official": true,
       "landingPage": "https://data.bretagne-environnement.fr/datasets/especes-determinantes-pour-les-znieff-en-bretagne",
       "resources": [
         {
           "kind": "csv",
-          "url": "https://www.data.gouv.fr/api/1/datasets/r/4ada0b2b-d56e-44a9-8532-9ca2335c625b"
+          "url": "https://www.data.gouv.fr/api/1/datasets/r/4ada0b2b-d56e-44a9-8532-9ca2335c625b",
+          "pipelineId": "oeb-bretagne-znieff-csv-2026-01-29",
+          "version": "CSV 29/01/2026 - évaluations 2004-2020",
+          "publicationYear": 2026
         }
       ]
     },

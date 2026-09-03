@@ -74,10 +74,10 @@ Les identifiants du registre sont souvent des identifiants « parapluie ». Une 
 |---|---|---|---|---|---|---|
 | fauna | Liste rouge régionale | — | `oeb-bretagne-lrr` | — | IMPORTED | inconnu |
 | fauna | Responsabilité régionale | — | `oeb-bretagne-responsabilite` | mise à jour OEB 2025 / data.gouv 2026-07-29 | IMPORTED | inconnu |
-| fauna | ZNIEFF | — | `oeb-bretagne-znieff` | — | IMPORTED | inconnu |
+| fauna | ZNIEFF | — | `oeb-bretagne-znieff` | CSV 29/01/2026 - évaluations 2004-2020 | IMPORTED | inconnu |
 | flora | Liste rouge régionale | — | `oeb-bretagne-lrr` | — | IMPORTED | inconnu |
 | flora | Responsabilité régionale | — | `oeb-bretagne-responsabilite` | mise à jour OEB 2025 / data.gouv 2026-07-29 | IMPORTED | inconnu |
-| flora | ZNIEFF | — | `oeb-bretagne-znieff` | — | IMPORTED | inconnu |
+| flora | ZNIEFF | — | `oeb-bretagne-znieff` | CSV 29/01/2026 - évaluations 2004-2020 | IMPORTED | inconnu |
 
 ## Centre-Val de Loire (`CVL`)
 

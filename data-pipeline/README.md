@@ -43,6 +43,23 @@ Les identifiants « parapluie » sans correspondance exacte restent `inconnu`. N
 
 Détail humain : [`REGIONAL_SOURCES.md`](REGIONAL_SOURCES.md). Audits : `docs/data-sources-*.md`. Ne pas maintenir ici une seconde liste manuelle complète des sources.
 
+## Runner d’adaptateur (pilote)
+
+Pilote **BRE ZNIEFF** uniquement (`oeb-bretagne-znieff` → adaptateur `oeb-csv-znieff`) :
+
+```bash
+node data-pipeline/run-adapter.mjs \
+  --source oeb-bretagne-znieff \
+  --taxref /chemin/TAXREFv18.txt \
+  --input /chemin/bre-znieff.csv \
+  --out /chemin/bre-znieff.json \
+  --checked-at 2026-09-03
+```
+
+Le runner lit `ready-sources.json`, refuse une source `WITNESS`, valide le paquet via `validateRegionalPackage()`, puis écrit le JSON. Il consomme un fichier local : pas d’acquisition réseau.
+
+`data-pipeline/regions/bre/build_oeb.py` reste le chemin historique (ZNIEFF + LRR + responsabilité). La production continue de l’utiliser. Le nouveau runner ne remplace que la branche ZNIEFF, en double construction de parité.
+
 ## Construction
 
 ```bash
