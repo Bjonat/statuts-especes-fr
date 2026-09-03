@@ -12,6 +12,7 @@ on:
       - 'data-pipeline/diagnostics.test.mjs'
       - 'data-pipeline/adapters/**'
       - 'data-pipeline/adapter-runner.test.mjs'
+      - 'data-pipeline/oeb-lrr-adapter.test.mjs'
       - 'data-pipeline/regions/ready-sources.json'
       - '.github/workflows/bre-regional-smoke.yml'
 
@@ -83,9 +84,19 @@ jobs:
             --out "$RUNNER_TEMP/regional-candidate/bre-znieff.json" \
             --diagnostics-out "$RUNNER_TEMP/diagnostics/oeb-bretagne-znieff.json" \
             --checked-at "$CHECKED_AT"
+          node data-pipeline/run-adapter.mjs \
+            --source oeb-bretagne-lrr \
+            --taxref "$TAXREF_FILE" \
+            --input "$BRE_LRR_FILE" \
+            --out "$RUNNER_TEMP/regional-candidate/bre-lrr.json" \
+            --diagnostics-out "$RUNNER_TEMP/diagnostics/oeb-bretagne-lrr.json" \
+            --checked-at "$CHECKED_AT"
           echo "BRE_LEGACY_ZNIEFF=$RUNNER_TEMP/regional/bre-znieff.json" >> "$GITHUB_ENV"
           echo "BRE_CANDIDATE_ZNIEFF=$RUNNER_TEMP/regional-candidate/bre-znieff.json" >> "$GITHUB_ENV"
           echo "BRE_ZNIEFF_DIAGNOSTICS=$RUNNER_TEMP/diagnostics/oeb-bretagne-znieff.json" >> "$GITHUB_ENV"
+          echo "BRE_LEGACY_LRR=$RUNNER_TEMP/regional/bre-lrr.json" >> "$GITHUB_ENV"
+          echo "BRE_CANDIDATE_LRR=$RUNNER_TEMP/regional-candidate/bre-lrr.json" >> "$GITHUB_ENV"
+          echo "BRE_LRR_DIAGNOSTICS=$RUNNER_TEMP/diagnostics/oeb-bretagne-lrr.json" >> "$GITHUB_ENV"
 
       - name: Validate regional package contract
         run: |
@@ -148,6 +159,41 @@ jobs:
           console.log({ statusesProduced, resolutionRate, duplicatesDropped, unresolved, ambiguous })
           NODE
 
+      - name: Compare LRR adapter parity
+        run: |
+          node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict'
+          import { readFile } from 'node:fs/promises'
+          const legacy = JSON.parse(await readFile(process.env.BRE_LEGACY_LRR, 'utf8'))
+          const candidate = JSON.parse(await readFile(process.env.BRE_CANDIDATE_LRR, 'utf8'))
+          assert.equal(candidate.schemaVersion, legacy.schemaVersion)
+          assert.deepStrictEqual(candidate.source, legacy.source)
+          assert.deepStrictEqual(candidate.replaces, legacy.replaces)
+          assert.deepStrictEqual(candidate.statuses, legacy.statuses)
+          assert.deepStrictEqual(candidate.diagnostics, legacy.diagnostics)
+          assert.deepStrictEqual(candidate, legacy)
+          console.log(`Parité LRR : ${candidate.statuses.length} statuts, matchRate=${candidate.diagnostics.matchRate}`)
+          NODE
+
+      - name: Validate LRR diagnostic sidecar
+        run: |
+          node --input-type=module - <<'NODE'
+          import { readFile } from 'node:fs/promises'
+          const diagnostic = JSON.parse(await readFile(process.env.BRE_LRR_DIAGNOSTICS, 'utf8'))
+          if (diagnostic.schemaVersion !== 1) throw new Error('schemaVersion diagnostic invalide')
+          if (diagnostic.sourceId !== 'oeb-bretagne-lrr') throw new Error('sourceId diagnostic inattendu')
+          if (diagnostic.packageSourceId !== 'oeb-bretagne-lrr-csv-2026-01-29') throw new Error('packageSourceId inattendu')
+          if (diagnostic.quality.status !== 'pass') throw new Error(`quality.status=${diagnostic.quality.status}`)
+          const { statusesProduced, resolutionRate, duplicatesDropped, categories } = diagnostic.metrics
+          if (statusesProduced !== 2187) throw new Error(`statusesProduced=${statusesProduced}`)
+          if (resolutionRate !== 1) throw new Error(`resolutionRate=${resolutionRate}`)
+          if (duplicatesDropped !== 25) throw new Error(`duplicatesDropped=${duplicatesDropped}`)
+          if (categories.red_list_regional !== 2187) throw new Error(`categories.red_list_regional=${categories.red_list_regional}`)
+          const sentinel = diagnostic.quality.checks.find((check) => check.id === 'sentinel:97152')
+          if (!sentinel?.passed) throw new Error('sentinelle 97152 absente ou échouée')
+          console.log({ statusesProduced, resolutionRate, duplicatesDropped, categories, sentinel })
+          NODE
+
       - name: Upload normalized packages
         uses: actions/upload-artifact@v4
         with:
@@ -162,5 +208,14 @@ jobs:
         with:
           name: bre-znieff-diagnostics
           path: ${{ runner.temp }}/diagnostics/oeb-bretagne-znieff.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload LRR diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bre-lrr-diagnostics
+          path: ${{ runner.temp }}/diagnostics/oeb-bretagne-lrr.json
           if-no-files-found: warn
           retention-days: 7

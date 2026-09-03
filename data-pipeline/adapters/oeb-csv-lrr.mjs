@@ -9,10 +9,9 @@ import {
   wantedFromRows,
 } from './oeb-csv-common.mjs'
 
-const CODE_FIELDS = ['CD_NOM']
-const NAME_FIELDS = ['NOM_SCIEN_VALIDE', 'NOM_SCIENTIFIQUE_TAXREF']
-const ZNIEFF_LABEL = 'Déterminante ZNIEFF'
-const ZNIEFF_VALUE = 'Oui'
+const CODE_FIELDS = ['CODE_NOM_TAXREF', 'CD_NOM']
+const NAME_FIELDS = ['NOM_SCIENTIFIQUE_TAXREF', 'NOM_SCIEN_VALIDE']
+const LRR_LABEL = 'Liste rouge régionale'
 
 function requiredMeta(source, resource) {
   const pipelineId = resource.pipelineId
@@ -25,13 +24,17 @@ function requiredMeta(source, resource) {
   if (!Number.isInteger(publicationYear)) throw new Error(`Source ${source.id} : publicationYear manquant`)
   if (source.official !== true) throw new Error(`Source ${source.id} : official doit être true`)
   if (!source.region) throw new Error(`Source ${source.id} : region manquante`)
-  if (source.categories?.[0] !== 'znieff') {
-    throw new Error(`Adaptateur oeb-csv-znieff : catégorie znieff attendue pour ${source.id}`)
+  if (source.categories?.[0] !== 'red_list_regional') {
+    throw new Error(`Adaptateur oeb-csv-lrr : catégorie red_list_regional attendue pour ${source.id}`)
   }
   return { pipelineId, name, producer, version, publicationYear, region: source.region }
 }
 
-export async function buildOebCsvZnieff({ source, resource, taxrefPath, inputPath, checkedAt }) {
+function sortedCountMap(counts) {
+  return Object.fromEntries(Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)))
+}
+
+export async function buildOebCsvLrr({ source, resource, taxrefPath, inputPath, checkedAt }) {
   const meta = requiredMeta(source, resource)
   const buffer = await readFile(inputPath)
   const rows = readCsvRows(buffer)
@@ -52,10 +55,13 @@ export async function buildOebCsvZnieff({ source, resource, taxrefPath, inputPat
   }
   const statuses = []
   const seen = new Set()
-  const years = new Set()
-  const groups = new Set()
+  const years = {}
+  const groups = {}
+  const values = {}
 
   for (const row of rows) {
+    const result = rowValue(row, 'RESULTAT_EVALUATION').toUpperCase()
+    if (!result) continue
     stats.rows += 1
     const { cdRef, realm, mode } = resolveRow(row, byCdNom, acceptedNames, CODE_FIELDS, NAME_FIELDS)
     if (mode === 'excluded_realm') {
@@ -66,8 +72,8 @@ export async function buildOebCsvZnieff({ source, resource, taxrefPath, inputPat
       stats[mode] += 1
       if (stats.unresolvedSample.length < 50) {
         stats.unresolvedSample.push({
-          taxon: rowValue(row, 'NOM_SCIEN_VALIDE', 'NOM_FRANCAIS'),
-          code: rowValue(row, 'CD_NOM'),
+          taxon: rowValue(row, 'NOM_SCIENTIFIQUE_TAXREF', 'NOM_VERNACULAIRE'),
+          code: rowValue(row, 'CODE_NOM_TAXREF'),
           reason: mode,
         })
       }
@@ -76,19 +82,20 @@ export async function buildOebCsvZnieff({ source, resource, taxrefPath, inputPat
     stats.matched += 1
     stats[mode] += 1
     stats[realm] += 1
-    const year = rowValue(row, 'ANNEE_EVALUATION')
-    if (year) years.add(year)
-    const group = rowValue(row, 'GROUP1_INPN', 'GROUP2_INPN', 'LISTE_ZNIEFF')
-    if (group) groups.add(group)
-    const key = `${cdRef}|${realm}`
+    const year = rowValue(row, 'ANNEE_EVALUATION') || 'inconnu'
+    const group = rowValue(row, 'GROUPE_ESPECE') || 'inconnu'
+    years[year] = (years[year] ?? 0) + 1
+    groups[group] = (groups[group] ?? 0) + 1
+    values[result] = (values[result] ?? 0) + 1
+    const key = `${cdRef}|${realm}|${result}`
     if (seen.has(key)) continue
     seen.add(key)
     statuses.push({
       cdRef,
       region: meta.region,
-      category: 'znieff',
-      label: ZNIEFF_LABEL,
-      value: ZNIEFF_VALUE,
+      category: 'red_list_regional',
+      label: LRR_LABEL,
+      value: result,
       sourceId: meta.pipelineId,
       scope: 'regional',
       _realm: realm,
@@ -97,12 +104,13 @@ export async function buildOebCsvZnieff({ source, resource, taxrefPath, inputPat
 
   const candidates = stats.matched + stats.unmatched + stats.ambiguous
   stats.matchRate = candidates ? Number((stats.matched / candidates).toFixed(6)) : 1
-  stats.years = [...years].sort((left, right) => left.localeCompare(right))
-  stats.groups = [...groups].sort((left, right) => left.localeCompare(right))
+  stats.years = sortedCountMap(years)
+  stats.groups = sortedCountMap(groups)
+  stats.values = sortedCountMap(values)
 
   const publicStatuses = statuses
     .map(({ _realm, ...status }) => status)
-    .sort((left, right) => left.cdRef - right.cdRef || left.category.localeCompare(right.category))
+    .sort((left, right) => left.cdRef - right.cdRef || left.value.localeCompare(right.value))
 
   return {
     schemaVersion: 1,
@@ -116,13 +124,13 @@ export async function buildOebCsvZnieff({ source, resource, taxrefPath, inputPat
       checkedAt,
       sha256: sha256Buffer(buffer),
     },
-    replaces: targetedReplacements(statuses, meta.region, 'znieff'),
+    replaces: targetedReplacements(statuses, meta.region, 'red_list_regional'),
     statuses: publicStatuses,
     diagnostics: stats,
   }
 }
 
-export function diagnosticsForOebCsvZnieff(pkg) {
+export function diagnosticsForOebCsvLrr(pkg) {
   const historical = pkg.diagnostics
   return {
     rowsRead: historical.rows,

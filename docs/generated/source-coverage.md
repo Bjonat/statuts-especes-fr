@@ -72,10 +72,10 @@ Les identifiants du registre sont souvent des identifiants « parapluie ». Une 
 
 | Règne | Catégorie | Groupe | Source | Version | État | Dataset |
 |---|---|---|---|---|---|---|
-| fauna | Liste rouge régionale | — | `oeb-bretagne-lrr` | — | IMPORTED | inconnu |
+| fauna | Liste rouge régionale | — | `oeb-bretagne-lrr` | CSV 29/01/2026 - données mises à jour OEB 2025 | IMPORTED | inconnu |
 | fauna | Responsabilité régionale | — | `oeb-bretagne-responsabilite` | mise à jour OEB 2025 / data.gouv 2026-07-29 | IMPORTED | inconnu |
 | fauna | ZNIEFF | — | `oeb-bretagne-znieff` | CSV 29/01/2026 - évaluations 2004-2020 | IMPORTED | inconnu |
-| flora | Liste rouge régionale | — | `oeb-bretagne-lrr` | — | IMPORTED | inconnu |
+| flora | Liste rouge régionale | — | `oeb-bretagne-lrr` | CSV 29/01/2026 - données mises à jour OEB 2025 | IMPORTED | inconnu |
 | flora | Responsabilité régionale | — | `oeb-bretagne-responsabilite` | mise à jour OEB 2025 / data.gouv 2026-07-29 | IMPORTED | inconnu |
 | flora | ZNIEFF | — | `oeb-bretagne-znieff` | CSV 29/01/2026 - évaluations 2004-2020 | IMPORTED | inconnu |
 

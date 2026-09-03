@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { buildOebCsvLrr, diagnosticsForOebCsvLrr } from './adapters/oeb-csv-lrr.mjs'
 import { buildOebCsvZnieff, diagnosticsForOebCsvZnieff } from './adapters/oeb-csv-znieff.mjs'
 import {
   buildSourceDiagnostic,
@@ -14,6 +15,10 @@ const ADAPTERS = {
   'oeb-csv-znieff': {
     build: buildOebCsvZnieff,
     diagnostics: diagnosticsForOebCsvZnieff,
+  },
+  'oeb-csv-lrr': {
+    build: buildOebCsvLrr,
+    diagnostics: diagnosticsForOebCsvLrr,
   },
 }
 

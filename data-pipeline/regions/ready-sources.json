@@ -168,11 +168,36 @@
         "fauna"
       ],
       "state": "IMPORTED",
+      "adapter": "oeb-csv-lrr",
+      "name": "Listes rouges régionales Bretagne",
+      "producer": "Observatoire de l'environnement en Bretagne / observatoires régionaux faune-flore",
+      "official": true,
+      "quality": {
+        "expectedStatuses": 2187,
+        "expectedResolutionRate": 1.0,
+        "minStatuses": 2050,
+        "minResolutionRate": 0.995,
+        "requiredCategories": [
+          "red_list_regional"
+        ],
+        "sentinels": [
+          {
+            "cdRef": 97152,
+            "category": "red_list_regional",
+            "value": "CR",
+            "scope": "regional",
+            "note": "Eryngium viviparum — LRR Bretagne CR, raccord CD_NOM, baseline avant PR-I"
+          }
+        ]
+      },
       "landingPage": "https://data.bretagne-environnement.fr/datasets/especes-en-listes-rouges-regionales-pour-la-bretagne",
       "resources": [
         {
           "kind": "csv",
-          "url": "https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96"
+          "url": "https://www.data.gouv.fr/api/1/datasets/r/937614a8-3a9a-449c-9a12-0c2e2fa5ae96",
+          "pipelineId": "oeb-bretagne-lrr-csv-2026-01-29",
+          "version": "CSV 29/01/2026 - données mises à jour OEB 2025",
+          "publicationYear": 2026
         }
       ]
     },
