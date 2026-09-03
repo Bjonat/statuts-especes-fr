@@ -43,9 +43,12 @@ Les identifiants « parapluie » sans correspondance exacte restent `inconnu`. N
 
 Détail humain : [`REGIONAL_SOURCES.md`](REGIONAL_SOURCES.md). Audits : `docs/data-sources-*.md`. Ne pas maintenir ici une seconde liste manuelle complète des sources.
 
-## Runner d’adaptateur (pilote)
+## Runner d’adaptateur (registry-driven)
 
-Pilote **BRE ZNIEFF** uniquement (`oeb-bretagne-znieff` → adaptateur `oeb-csv-znieff`) :
+Adaptateurs registry-driven :
+
+- `oeb-csv-znieff` (`oeb-bretagne-znieff`)
+- `oeb-csv-lrr` (`oeb-bretagne-lrr`)
 
 ```bash
 node data-pipeline/run-adapter.mjs \
@@ -55,17 +58,25 @@ node data-pipeline/run-adapter.mjs \
   --out /chemin/bre-znieff.json \
   --diagnostics-out /chemin/diagnostics/oeb-bretagne-znieff.json \
   --checked-at 2026-09-03
+
+node data-pipeline/run-adapter.mjs \
+  --source oeb-bretagne-lrr \
+  --taxref /chemin/TAXREFv18.txt \
+  --input /chemin/bre-lrr.csv \
+  --out /chemin/bre-lrr.json \
+  --diagnostics-out /chemin/diagnostics/oeb-bretagne-lrr.json \
+  --checked-at 2026-09-03
 ```
 
 Le runner lit `ready-sources.json`, refuse une source `WITNESS`, valide le paquet via `validateRegionalPackage()`, écrit un sidecar diagnostic v1, puis le JSON régional. Il consomme un fichier local : pas d’acquisition réseau.
 
-Le sidecar (`diagnostics.mjs`) est un contrat générique distinct des `pkg.diagnostics` historiques, conservés pour la parité avec `build_znieff()`. On n’introduit pas `rowsValid` : le dénominateur utile est `rowsConsidered` = résolus + unmatched + ambiguous, identique au `matchRate` historique.
+Le sidecar (`diagnostics.mjs`) est un contrat générique distinct des `pkg.diagnostics` historiques, conservés pour la parité avec `build_znieff()` / `build_lrr()`. On n’introduit pas `rowsValid` : le dénominateur utile est `rowsConsidered` = résolus + unmatched + ambiguous, identique au `matchRate` historique.
 
 Les seuils viennent du registre (`source.quality`), source par source. Absence de bloc `quality` → `not_configured`, paquet publié, pas d’échec fantôme. Un échec qualité persiste le sidecar puis bloque l’écriture du paquet.
 
 Ne pas placer le sidecar dans le dossier chargé par `loadRegionalPackages()`.
 
-`data-pipeline/regions/bre/build_oeb.py` reste le chemin historique (ZNIEFF + LRR + responsabilité). La production continue de l’utiliser. Le nouveau runner ne remplace que la branche ZNIEFF, en double construction de parité.
+`data-pipeline/regions/bre/build_oeb.py` reste le chemin historique (ZNIEFF + LRR + responsabilité). La production continue de l’utiliser jusqu’à la matrice générique. Le runner construit ZNIEFF et LRR en double, pour la parité uniquement. La responsabilité reste historique.
 
 ## Construction
 
