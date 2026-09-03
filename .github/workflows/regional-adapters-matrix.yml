@@ -1,0 +1,162 @@
+name: Migrated regional adapters
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'data-pipeline/regions/ready-sources.json'
+      - 'data-pipeline/run-adapter.mjs'
+      - 'data-pipeline/diagnostics.mjs'
+      - 'data-pipeline/regional.mjs'
+      - 'data-pipeline/adapters/**'
+      - 'data-pipeline/migrated-source-matrix.mjs'
+      - 'data-pipeline/migrated-source-matrix.test.mjs'
+      - '.github/workflows/regional-adapters-matrix.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Discover migrated sources
+        id: matrix
+        run: |
+          set -euo pipefail
+          MATRIX="$(node data-pipeline/migrated-source-matrix.mjs)"
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
+  run-source:
+    name: ${{ matrix.region }} / ${{ matrix.sourceId }}
+    needs: discover
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Download TAXREF v18
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/taxref"
+          curl --fail --location --retry 3 https://assets.patrinat.fr/files/referentiel/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip" \
+            || curl --fail --location --retry 3 https://geonature.fr/data/inpn/taxonomie/TAXREF_v18_2025.zip -o "$RUNNER_TEMP/taxref.zip"
+          unzip -q "$RUNNER_TEMP/taxref.zip" -d "$RUNNER_TEMP/taxref"
+          TAXREF_FILE="$(find "$RUNNER_TEMP/taxref" -type f -iname 'TAXREFv18.txt' | head -n 1)"
+          test -n "$TAXREF_FILE"
+          echo "TAXREF_FILE=$TAXREF_FILE" >> "$GITHUB_ENV"
+
+      - name: Download source input
+        env:
+          SOURCE_ID: ${{ matrix.sourceId }}
+          SOURCE_URL: ${{ matrix.inputUrl }}
+          INPUT_KIND: ${{ matrix.inputKind }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 "$SOURCE_URL" \
+            -o "$RUNNER_TEMP/input.$INPUT_KIND"
+          echo "INPUT_FILE=$RUNNER_TEMP/input.$INPUT_KIND" >> "$GITHUB_ENV"
+          echo "SOURCE_ID=$SOURCE_ID" >> "$GITHUB_ENV"
+
+      - name: Run adapter
+        env:
+          SOURCE_ID: ${{ matrix.sourceId }}
+        run: |
+          set -euo pipefail
+          CHECKED_AT="$(date -u +%F)"
+          mkdir -p "$RUNNER_TEMP/package" "$RUNNER_TEMP/diagnostics"
+          PACKAGE_PATH="$RUNNER_TEMP/package/${SOURCE_ID}.json"
+          DIAGNOSTICS_PATH="$RUNNER_TEMP/diagnostics/${SOURCE_ID}.json"
+          echo "CHECKED_AT=$CHECKED_AT" >> "$GITHUB_ENV"
+          echo "PACKAGE_PATH=$PACKAGE_PATH" >> "$GITHUB_ENV"
+          echo "DIAGNOSTICS_PATH=$DIAGNOSTICS_PATH" >> "$GITHUB_ENV"
+          node data-pipeline/run-adapter.mjs \
+            --source "$SOURCE_ID" \
+            --taxref "$TAXREF_FILE" \
+            --input "$INPUT_FILE" \
+            --out "$PACKAGE_PATH" \
+            --diagnostics-out "$DIAGNOSTICS_PATH" \
+            --checked-at "$CHECKED_AT"
+
+      - name: Validate package and diagnostic
+        env:
+          SOURCE_ID: ${{ matrix.sourceId }}
+          ADAPTER: ${{ matrix.adapter }}
+          PIPELINE_ID: ${{ matrix.pipelineId }}
+        run: |
+          node --input-type=module - <<'NODE'
+          import { readFile } from 'node:fs/promises'
+          import { validateRegionalPackage } from './data-pipeline/regional.mjs'
+          import { validateSourceDiagnostic } from './data-pipeline/diagnostics.mjs'
+
+          const pkg = JSON.parse(await readFile(process.env.PACKAGE_PATH, 'utf8'))
+          const diagnostic = JSON.parse(await readFile(process.env.DIAGNOSTICS_PATH, 'utf8'))
+          validateRegionalPackage(pkg)
+          validateSourceDiagnostic(diagnostic)
+          if (diagnostic.sourceId !== process.env.SOURCE_ID) {
+            throw new Error(`sourceId sidecar=${diagnostic.sourceId}`)
+          }
+          if (diagnostic.adapter !== process.env.ADAPTER) {
+            throw new Error(`adapter sidecar=${diagnostic.adapter}`)
+          }
+          if (diagnostic.packageSourceId !== process.env.PIPELINE_ID) {
+            throw new Error(`packageSourceId sidecar=${diagnostic.packageSourceId}`)
+          }
+          if (pkg.source.id !== process.env.PIPELINE_ID) {
+            throw new Error(`package source.id=${pkg.source.id}`)
+          }
+          if (diagnostic.input.sha256 !== pkg.source.sha256) {
+            throw new Error('SHA package/sidecar incohérents')
+          }
+          if (diagnostic.quality.status === 'fail') {
+            throw new Error(`quality.status=${diagnostic.quality.status}`)
+          }
+          console.log({
+            sourceId: diagnostic.sourceId,
+            adapter: diagnostic.adapter,
+            packageSourceId: diagnostic.packageSourceId,
+            statusesProduced: diagnostic.metrics.statusesProduced,
+            resolutionRate: diagnostic.metrics.resolutionRate,
+            duplicatesDropped: diagnostic.metrics.duplicatesDropped,
+            quality: diagnostic.quality.status,
+          })
+          NODE
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regional-diagnostics-${{ matrix.sourceId }}
+          path: ${{ runner.temp }}/diagnostics/${{ matrix.sourceId }}.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: regional-package-${{ matrix.sourceId }}
+          path: ${{ runner.temp }}/package/${{ matrix.sourceId }}.json
+          if-no-files-found: error
+          retention-days: 7

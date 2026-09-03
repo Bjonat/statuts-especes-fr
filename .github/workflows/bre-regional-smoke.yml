@@ -13,8 +13,11 @@ on:
       - 'data-pipeline/adapters/**'
       - 'data-pipeline/adapter-runner.test.mjs'
       - 'data-pipeline/oeb-lrr-adapter.test.mjs'
+      - 'data-pipeline/migrated-source-matrix.mjs'
+      - 'data-pipeline/migrated-source-matrix.test.mjs'
       - 'data-pipeline/regions/ready-sources.json'
       - '.github/workflows/bre-regional-smoke.yml'
+      - '.github/workflows/regional-adapters-matrix.yml'
 
 jobs:
   build-bretagne-packages:
