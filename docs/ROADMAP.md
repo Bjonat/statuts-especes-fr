@@ -33,28 +33,35 @@ Question unique à laquelle le projet doit rester excellent :
 
 ## 2. État actuel du repository
 
-Audit au 2026-09-01 (`origin/main` = `ba45762`, PR #26 mergée).
+État au **2026-09-03** (PR-A à PR-J mergées ; PR-K = cette PR). Ce paragraphe est ce que les agents doivent lire en premier.
 
-### 2.1 Ce qui existe déjà
+- PWA offline-first fonctionnelle (Vite + `vite-plugin-pwa`).
+- `resolveStatuses()` est extrait et **utilisé** par `main.ts` (PR-E / PR-F).
+- Le resolver accepte `department?` (PR-K). Sans département, le comportement reste identique. **Aucun sélecteur département dans la PWA** : c’est PR-L.
+- Matrice de couverture générée depuis `ready-sources.json` (PR-A).
+- Contrat d’acquisition à états explicites (`FETCH_OK`, `ARCHIVED_FALLBACK`, `UNAVAILABLE`, `TYPE_MISMATCH`, `CHANGED_UNVERIFIED`) (PR-C / PR-D).
+- Runner générique `run-adapter.mjs` (PR-G).
+- Adaptateurs migrés aujourd’hui : **BRE ZNIEFF** (`oeb-csv-znieff`) et **BRE LRR** (`oeb-csv-lrr`).
+- Diagnostics sidecar v1 + quality gates sur ces sources migrées (PR-H / PR-I).
+- CI matricielle registry-driven pour les sources migrées (PR-J).
+- Scripts et workflows historiques encore conservés pour les sources non migrées et la parité Node/Python (smoke Bretagne).
+- CLI / QGIS / distribution : **différés** (PR-M / N / O).
+
+### 2.1 Couches et runtime PWA
 
 | Couche | État | Fichiers clés |
 |---|---|---|
-| PWA offline-first | Fonctionnelle (Vite + `vite-plugin-pwa`) | `src/main.ts`, `src/catalog.ts`, `index.html`, `vite.config.ts` |
-| Recherche taxon | Extraite, testée | `src/search.ts` |
-| Hydratation des liens | Extraite, testée | `src/status-data.ts` |
-| Aide de lecture des codes | Extraite, testée ; glossaire **applicatif** séparé des données officielles | `src/status-help.ts` |
-| Page Sources | Présente, filtrable par région | `src/main.ts` (`renderSources`) |
+| PWA offline-first | Fonctionnelle | `src/main.ts`, `src/catalog.ts`, `index.html`, `vite.config.ts` |
+| Resolver métier | Extraite, testée, `department?` (PR-K) | `src/resolve-statuses.ts`, `data-pipeline/regions.mjs` |
+| Recherche / hydratation / aide | Extraites, testées | `src/search.ts`, `src/status-data.ts`, `src/status-help.ts` |
 | Pipeline national | TAXREF v18 + BDC v18 → manifeste v3 | `data-pipeline/pipeline.mjs`, `build.mjs`, `compact.mjs` |
-| Modèle territorial BDC | Régions actuelles, anciennes régions, départements | `data-pipeline/regions.mjs` (`resolveScope`) |
-| Enrichissement régional | Paquets JSON + merge ciblé (région × règne × catégorie, éventuellement `cdRefs`) | `data-pipeline/regional.mjs` |
-| Registre humain | Matrice + protocoles d’import | `data-pipeline/REGIONAL_SOURCES.md` |
+| Runner + diagnostics | Registry-driven sur les sources migrées | `run-adapter.mjs`, `diagnostics.mjs`, `adapters/` |
+| Matrice CI migrée | `IMPORTED` + `adapter` | `.github/workflows/regional-adapters-matrix.yml` |
+| Ingestion historique | Encore majoritaire | `data-pipeline/regions/{ara,bfc,bre,…}/`, smokes dédiés |
 | Registre machine | 26 sources, états `IMPORTED` / `WITNESS` | `data-pipeline/regions/ready-sources.json` |
-| Adaptateurs régionaux | Scripts bash + Python **par source** | `data-pipeline/regions/{ara,bfc,bre,…}/` |
-| Validation métier | Sentinelles sur jeux générés | `data-pipeline/validate-generated.mjs` |
-| Audits régionaux | 13 fichiers `docs/data-sources-*.md` | `docs/` |
-| Déploiement | Artifact CI → FTP statique | `docs/deployment-ftp.md`, `.github/workflows/build-production.yml` |
+| Couverture | Générée, non éditée à la main | `docs/generated/source-coverage.md` |
 
-Le contrat de dataset consommé par la PWA est déjà stable :
+Le contrat de dataset consommé par la PWA reste le manifeste v3 :
 
 ```text
 public/data/
@@ -64,21 +71,17 @@ public/data/
 └── status-links-{realm}-{region}-<hash>.json
 ```
 
-Une définition embarquée = `{ category, label, value, sourceId }`. Citations et URL documentaires sont volontairement absentes du bundle (contrainte offline / taille). Les liens sont `[cdRef, definitionId, scopeCode, scopeLabel?]`.
-
 À l’exécution, la PWA :
 
-1. charge le règne + les liens de **une** région ;
-2. filtre `status.cdRef === taxon.cdRef` ;
-3. retire les « sans objet » (`usefulStatus` dans `src/main.ts`) ;
-4. trie selon un ordre de catégories ;
-5. affiche ou le message d’absence relative aux référentiels intégrés.
+1. `main.ts` hydrate le règne + les liens d’**une** région (`catalog` / `status-data`) ;
+2. appelle `resolveStatuses({ cdRef, region, statuses })` — aujourd’hui **sans** `department` ;
+3. rend le résultat (`statuses`, `outcome`, `warnings`).
 
-**Il n’existe pas encore de `resolveStatuses()`.** Cette logique est implicitement dans `main.ts` + `hydrateStatusLinks`.
+Le filtre utile, le tri et l’`outcome` appartiennent au **resolver**, pas à `main.ts`.
 
-### 2.2 Couverture régionale (constat d’audit)
+### 2.2 Couverture régionale (constat encore valable)
 
-La matrice générée existe depuis **PR-A** : [`docs/generated/source-coverage.md`](generated/source-coverage.md) et [`data-pipeline/generated/coverage.json`](../data-pipeline/generated/coverage.json). Le constat ci-dessous reste celui de l’audit initial.
+La matrice générée : [`docs/generated/source-coverage.md`](generated/source-coverage.md) et [`data-pipeline/generated/coverage.json`](../data-pipeline/generated/coverage.json).
 
 Les 13 régions métropolitaines sont dans le manifeste. Le socle BDC est national. Des référentiels régionaux sont **importés** pour la plupart des régions (ZNIEFF et/ou LRR), avec des trous documentés :
 
@@ -87,42 +90,29 @@ Les 13 régions métropolitaines sont dans le manifeste. Le socle BDC est nation
 - **NOR ZNIEFF** : seulement Haute-Normandie flore ;
 - **PDL LRR** : `RESEARCH_REQUIRED` ;
 - **OCC / NAQ LRR** : travaux 2026 en attente de publication machine ;
-- **papillons de nuit / Sphingidae** : souvent aucun statut dans les sources intégrées. *Hyles euphorbiae* (CD_REF 54843) : aucun statut projeté en CVL ; des statuts ZNIEFF partiels sont confirmés en HDF et NOR. Ce cas illustre un trou de couverture possible, pas un bug de mapping. Les sentinelles ne vérifient pas les 13 régions.
+- **papillons de nuit / Sphingidae** : souvent aucun statut dans les sources intégrées. *Hyles euphorbiae* (CD_REF 54843) : aucun statut projeté en CVL ; des statuts ZNIEFF partiels sont confirmés en HDF et NOR.
 
-Dette identifiée à l’audit initial ; corrigée par **PR-A** (matrice générée, non éditée à la main).
+### 2.3 CI et acquisition
 
-### 2.3 Documentation devenue fausse ou incomplète
+- **CI applicative** (`.github/workflows/ci.yml`) : `npm test` + `npm run build`.
+- **Matrice des sources migrées** (PR-J) : discovery depuis le registre, une case par source, Node uniquement.
+- **Workflows historiques** encore nombreux (smokes / probes par région, `data-smoke.yml`, `build-production.yml`).
+- Fail-closed SHA-256 dans les scripts `download_*.sh`. Fallback archive pour ARA ZNIEFF. **Pas de fallback** pour ARA LRR `oiseaux-mammiferes.ods` ni BFC 2026 : une page de maintenance casse encore `data-smoke` et `build-production`.
 
-À corriger dans la phase P0 — **ne pas les « réparer » au fil de l’eau dans une PR fonctionnelle**.
+### 2.4 Ce qui n’existe pas encore (ou est différé)
 
-| Fichier | Problème |
-|---|---|
-| `data-pipeline/README.md` | Dette identifiée à l’audit (« trois régions pilotes », volumes 229 813 / 686, « prochaine ingestion ZNIEFF DREAL 2026 », BFC « inaccessible ») ; **corrigée par PR-B**. |
-| `README.md` | Dette identifiée (positionnement « PWA MVP », index docs incomplet) ; **corrigée par PR-B**. Les volumes du socle TAXREF+BDC restent ceux de la baseline métropolitaine, avec périmètre explicite. |
-| `docs/README.md` | Dette identifiée (4 audits sur 13) ; index déjà complété avant PR-B, lien pipeline ajouté. |
-| GitHub About | Description, topics, licence et homepage **vides**. |
-| Licence | Aucun `LICENSE` ; `package.json` n’a pas de champ `license`. |
+- Licence du code ; métadonnées GitHub About encore vides.
+- Sélecteur département PWA — **PR-L**, pas encore branchée.
+- Hardening terrain / offline — à auditer et découper **après PR-L**.
+- CLI / CSV — **DIFFÉRÉ** (PR-M).
+- QGIS — **DIFFÉRÉ** (PR-N).
+- Distribution / package / API — **DIFFÉRÉE** (PR-O).
 
-Les audits `docs/data-sources-*.md` et `REGIONAL_SOURCES.md` sont globalement alignés avec le pipeline (états `IMPORTED`). Le décalage README / index `docs/` constaté à l’audit est traité par **PR-B**.
+### Audit initial du 2026-09-01 — historique
 
-### 2.4 CI et acquisition
+Snapshot avant PR-E à PR-J (`origin/main` = `ba45762`, PR #26 mergée). **Ne plus le traiter comme l’état actuel.**
 
-- **CI applicative** (`.github/workflows/ci.yml`) : `npm test` + `npm run build`. Saine.
-- **~26 workflows** régionaux / smoke / probe, plus `data-smoke.yml` et `build-production.yml`. Chaque référentiel a essentiellement son propre YAML.
-- Fail-closed SHA-256 dans les scripts `download_*.sh`.
-- Fallback archive **déjà présent** pour ARA ZNIEFF (`download_dreal_znieff.sh` → Internet Archive si maintenance).
-- **Pas de fallback** pour ARA LRR `oiseaux-mammiferes.ods` ni pour BFC 2026 : une republication byte-différente ou une page de maintenance **casse** `data-smoke` et `build-production`. Incident observé (2026-09-01) : checksum ARA instable ; DREAL BFC en maintenance.
-
-### 2.5 Ce qui n’existe pas encore
-
-- Licence du code.
-- Modèle d’état d’acquisition unifié (`READY` / `UNAVAILABLE` / `CHANGED_UNVERIFIED` / …) au runtime CI.
-- Interface `SourceAdapter` + runner générique.
-- Diagnostics standardisés persistés (taux de résolution, ambiguïtés, seuils par source).
-- `resolveStatuses()` indépendant de l’UI.
-- Choix départemental dans la PWA (le modèle `departments` existe côté pipeline uniquement).
-- Traitement de listes / CSV.
-- Plugin QGIS, package, API.
+À cette date : pas de `resolveStatuses()`, filtrage/tri dans `main.ts`, pas de runner générique, pas de diagnostics standardisés, pas de contrat d’acquisition unifié. README / index docs décalés (corrigés par PR-B). La matrice de couverture n’existait pas encore (PR-A).
 
 ---
 
@@ -166,14 +156,14 @@ PWA   Batch/CSV   QGIS / package / API
 
 ## 4. Dette / risques actuels
 
-1. **Fragilité d’acquisition** — un SHA instable ou une page HTML de maintenance bloque plusieurs workflows de données. Le fail-closed est juste ; l’absence de diagnostic d’état et de fallback déclaré ne l’est pas.
-2. **Explosion des workflows** — ~26 YAML spécifiques. Coût de maintenance croissant ; pas de runner générique.
-3. **Double registre** — `REGIONAL_SOURCES.md` (humain) et `ready-sources.json` (machine) peuvent diverger. La matrice de couverture est désormais générée depuis le registre machine ; cela ne garantit pas l’alignement du registre humain.
-4. **Logique métier dans l’UI** — filtre, tri, empty state, choix des sources affichées vivent dans `main.ts`. Risque de duplication dès qu’un batch ou QGIS apparaîtra.
-5. **Diagnostics inégaux** — `mergeRegionalPackages` compte `imported` / `unknownRefs`. Les scripts Python ont chacun leurs prints. Pas de contrat unique, pas de seuils déclarés par source, pas d’artifact stable.
-6. **Documentation décalée** — dette identifiée à l’audit initial ; corrigée par **PR-B**.
+1. **Acquisition amont fragile** — dette encore réelle. Un SHA instable ou une page HTML de maintenance bloque `data-smoke` / `build-production` (ARA LRR `TYPE_MISMATCH` observé). Le contrat d’états existe (PR-C/D) ; le fallback déclaré n’est pas universel.
+2. **Workflows historiques nombreux** — dette encore partielle. La matrice PR-J couvre les sources migrées ; la majorité des référentiels a encore son YAML dédié.
+3. **Double registre** — `REGIONAL_SOURCES.md` (humain) et `ready-sources.json` (machine) peuvent diverger. La matrice de couverture est générée depuis le registre machine ; cela ne garantit pas l’alignement du registre humain.
+4. **Resolver métier sorti de l’UI** — **dette corrigée** (PR-E / PR-F / PR-K). `main.ts` hydrate et rend ; `resolveStatuses()` filtre, trie et calcule l’`outcome`.
+5. **Diagnostics standardisés** — présents sur les sources migrées (sidecar v1 + `source.quality`), **pas encore universels**. Les scripts historiques gardent leurs prints.
+6. **Migrations vers le runner** — seulement partielles (BRE ZNIEFF + BRE LRR). Production et parité Python restent historiques.
 7. **Licence absente** — repository public sans contrat de réutilisation du **code**. Les données sources ont de toute façon leurs propres conditions.
-8. **Couverture invisible** — le retour terrain « rien ne ressort » (papillons) est un trou de référentiels. La matrice générée (**PR-A**) le rend inspectable ; elle ne comble pas les trous.
+8. **Couverture lacunaire** — la matrice générée (**PR-A**) rend les trous inspectables (papillons, Corse, etc.) ; elle ne les comble pas.
 
 ---
 
