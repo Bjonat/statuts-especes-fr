@@ -4,6 +4,7 @@ import {
   buildSourceDiagnostic,
   evaluateSourceQuality,
   validateQualityConfig,
+  validateSentinelConfig,
   validateSourceDiagnostic,
 } from './diagnostics.mjs'
 
@@ -191,4 +192,35 @@ test('H — seuil invalide est une erreur de configuration', () => {
       }),
     /Seuil invalide: minResolutionRate=1.2/,
   )
+})
+
+test('sentinelle {} ou cd_ref est une erreur de configuration', () => {
+  assert.throws(() => validateQualityConfig({ sentinels: [{}] }), /cdRef entier strictement positif obligatoire/)
+  assert.throws(() => validateQualityConfig({ sentinels: [{ cd_ref: 97152 }] }), /cdRef entier strictement positif obligatoire/)
+  assert.throws(() => validateQualityConfig({ sentinels: [{ cdRef: 0 }] }), /cdRef entier strictement positif obligatoire/)
+  assert.throws(() => validateSentinelConfig({ note: 'Eryngium viviparum' }), /cdRef entier strictement positif obligatoire/)
+})
+
+test('sentinelle { cdRef } seule est valide, la sentinelle réelle aussi', () => {
+  assert.equal(validateSentinelConfig({ cdRef: 97152 }).cdRef, 97152)
+  assert.equal(
+    validateQualityConfig({
+      sentinels: [
+        {
+          cdRef: 97152,
+          category: 'znieff',
+          value: 'Oui',
+          scope: 'regional',
+          note: 'Eryngium viviparum — déterminante ZNIEFF, raccord CD_NOM, baseline PR-G',
+        },
+      ],
+    }).sentinels[0].cdRef,
+    97152,
+  )
+})
+
+test('categories.znieff négatif rend le sidecar invalide', () => {
+  const diagnostic = build(undefined)
+  diagnostic.metrics.categories.znieff = -1
+  assert.throws(() => validateSourceDiagnostic(diagnostic), /categories\.znieff invalide/)
 })

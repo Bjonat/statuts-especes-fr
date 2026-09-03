@@ -25,10 +25,38 @@ export function validateQualityConfig(quality, sourceId = '<source>') {
   if (quality.requiredCategories != null && !Array.isArray(quality.requiredCategories)) {
     throw new Error(`${sourceId} : requiredCategories doit être un tableau`)
   }
-  if (quality.sentinels != null && !Array.isArray(quality.sentinels)) {
-    throw new Error(`${sourceId} : sentinels doit être un tableau`)
+  if (quality.sentinels != null) {
+    if (!Array.isArray(quality.sentinels)) {
+      throw new Error(`${sourceId} : sentinels doit être un tableau`)
+    }
+    quality.sentinels.forEach((sentinel, index) => validateSentinelConfig(sentinel, sourceId, index))
   }
   return quality
+}
+
+const SENTINEL_SCOPES = new Set(['national', 'regional', 'partial'])
+
+export function validateSentinelConfig(sentinel, sourceId = '<source>', index = 0) {
+  const where = `${sourceId} : sentinelle #${index}`
+  if (!sentinel || typeof sentinel !== 'object' || Array.isArray(sentinel)) {
+    throw new Error(`${where} : objet attendu`)
+  }
+  if (!Number.isInteger(sentinel.cdRef) || sentinel.cdRef <= 0) {
+    throw new Error(`${where} : cdRef entier strictement positif obligatoire`)
+  }
+  if (sentinel.category != null && (typeof sentinel.category !== 'string' || !sentinel.category.trim())) {
+    throw new Error(`${where} : category doit être une chaîne non vide`)
+  }
+  if (sentinel.value != null && (typeof sentinel.value !== 'string' || !sentinel.value.trim())) {
+    throw new Error(`${where} : value doit être une chaîne non vide`)
+  }
+  if (sentinel.scope != null && !SENTINEL_SCOPES.has(sentinel.scope)) {
+    throw new Error(`${where} : scope invalide (${sentinel.scope})`)
+  }
+  if (sentinel.note != null && typeof sentinel.note !== 'string') {
+    throw new Error(`${where} : note doit être une chaîne`)
+  }
+  return sentinel
 }
 
 function countCategories(statuses) {
@@ -190,6 +218,15 @@ export function validateSourceDiagnostic(diagnostic) {
     if (!isNonNegativeFinite(metrics[key])) throw new Error(`Diagnostic : métrique invalide (${key})`)
   }
   if (metrics.resolutionRate > 1) throw new Error('Diagnostic : resolutionRate hors [0,1]')
+  for (const key of ['realms', 'categories']) {
+    const counts = metrics[key]
+    if (!counts || typeof counts !== 'object' || Array.isArray(counts)) {
+      throw new Error(`Diagnostic : ${key} doit être un objet`)
+    }
+    for (const [name, value] of Object.entries(counts)) {
+      if (!isNonNegativeFinite(value)) throw new Error(`Diagnostic : ${key}.${name} invalide`)
+    }
+  }
   if (!QUALITY_STATUSES.has(diagnostic.quality?.status)) {
     throw new Error('Diagnostic : quality.status invalide')
   }

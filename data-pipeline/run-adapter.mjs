@@ -91,6 +91,9 @@ export async function runAdapter({
   if (!adapter) {
     throw new Error(`Adaptateur inconnu: ${source.adapter}`)
   }
+  if (adapter.diagnostics && !diagnosticsPath) {
+    throw new Error(`diagnosticsPath obligatoire pour l'adaptateur ${source.adapter}`)
+  }
 
   const resource = findCsvResource(source)
   await requireFile(taxrefPath, 'TAXREF')

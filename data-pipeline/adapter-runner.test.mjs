@@ -306,6 +306,25 @@ test('un adaptateur inconnu est refusé sans écrire le paquet', async () => {
   })
 })
 
+test('un adaptateur diagnostiqué sans diagnosticsPath est refusé avant écriture', async () => {
+  await withWorkspace(async ({ taxrefPath, inputPath, outputPath, diagnosticsPath }) => {
+    await assert.rejects(
+      () =>
+        runAdapter({
+          registry: registryFixture([sourceFixture()]),
+          sourceId: 'oeb-bretagne-znieff',
+          taxrefPath,
+          inputPath,
+          outputPath,
+          checkedAt: CHECKED_AT,
+        }),
+      /diagnosticsPath obligatoire pour l'adaptateur oeb-csv-znieff/,
+    )
+    await assert.rejects(() => access(outputPath), { code: 'ENOENT' })
+    await assert.rejects(() => access(diagnosticsPath), { code: 'ENOENT' })
+  })
+})
+
 test('une source inconnue est refusée sans écrire le paquet', async () => {
   await withWorkspace(async ({ taxrefPath, inputPath, outputPath }) => {
     await assert.rejects(
