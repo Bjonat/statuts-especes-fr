@@ -322,4 +322,230 @@ describe('resolveStatuses', () => {
     expect(result.statuses[0]?.label).toBe('Libellé  &amp;  officiel')
     expect(result.statuses[0]?.value).toBe('valeur   brute')
   })
+
+  it('sans department est strictement identique à department: undefined', () => {
+    const statuses = [
+      status({
+        cdRef: 80,
+        region: 'OCC',
+        category: 'protection_national',
+        label: 'Protection nationale',
+        scope: 'national',
+      }),
+      status({
+        cdRef: 80,
+        region: 'OCC',
+        category: 'protection_regional',
+        label: 'Protection régionale',
+        scope: 'partial',
+        scopeLabel: 'ancienne région Midi-Pyrénées',
+      }),
+    ]
+    const without = resolveStatuses({ cdRef: 80, region: 'OCC', statuses })
+    const explicit = resolveStatuses({ cdRef: 80, region: 'OCC', department: undefined, statuses })
+    expect(explicit).toEqual(without)
+    expect(without.warnings).toEqual([])
+    expect(without.territory).toEqual({ region: 'OCC' })
+  })
+
+  it('OCC 31 conserve national, régional et Midi-Pyrénées, écarte le Languedoc-Roussillon', () => {
+    const national = status({
+      cdRef: 90,
+      region: 'OCC',
+      category: 'protection_national',
+      label: 'Protection nationale',
+      scope: 'national',
+      sourceId: 'bdc-v18',
+    })
+    const regional = status({
+      cdRef: 90,
+      region: 'OCC',
+      category: 'red_list_regional',
+      label: 'Liste rouge régionale',
+      scope: 'regional',
+      sourceId: 'src-lrr',
+    })
+    const midi = status({
+      cdRef: 90,
+      region: 'OCC',
+      category: 'protection_regional',
+      label: 'Protection régionale',
+      scope: 'partial',
+      scopeLabel: 'ancienne région Midi-Pyrénées',
+      sourceId: 'bdc-midi',
+    })
+    const languedoc = status({
+      cdRef: 90,
+      region: 'OCC',
+      category: 'protection_regional',
+      label: 'Protection régionale LR',
+      scope: 'partial',
+      scopeLabel: 'ancienne région Languedoc-Roussillon',
+      sourceId: 'bdc-lr',
+    })
+
+    const in31 = resolveStatuses({
+      cdRef: 90,
+      region: 'OCC',
+      department: '31',
+      statuses: [languedoc, midi, regional, national],
+    })
+    expect(in31.territory).toEqual({ region: 'OCC', department: '31' })
+    expect(in31.statuses).toEqual([national, midi, regional])
+    expect(in31.sourceIds).toEqual(['bdc-v18', 'bdc-midi', 'src-lrr'])
+    expect(in31.warnings).toEqual([
+      'Portée partielle non applicable au département 31 : ancienne région Languedoc-Roussillon',
+    ])
+
+    const in34 = resolveStatuses({
+      cdRef: 90,
+      region: 'OCC',
+      department: '34',
+      statuses: [languedoc, midi, regional, national],
+    })
+    expect(in34.statuses).toEqual([national, languedoc, regional])
+    expect(in34.sourceIds).toEqual(['bdc-v18', 'bdc-lr', 'src-lrr'])
+    expect(in34.warnings).toEqual([
+      'Portée partielle non applicable au département 34 : ancienne région Midi-Pyrénées',
+    ])
+  })
+
+  it('filtre un département explicite 31 vs 34', () => {
+    const dept31 = status({
+      cdRef: 91,
+      region: 'OCC',
+      category: 'znieff',
+      label: 'Déterminante ZNIEFF',
+      scope: 'partial',
+      scopeLabel: 'département 31',
+      sourceId: 'src-31',
+    })
+
+    const keep = resolveStatuses({ cdRef: 91, region: 'OCC', department: '31', statuses: [dept31] })
+    expect(keep.statuses).toEqual([dept31])
+    expect(keep.warnings).toEqual([])
+
+    const drop = resolveStatuses({ cdRef: 91, region: 'OCC', department: '34', statuses: [dept31] })
+    expect(drop.outcome).toBe('none_in_integrated_sources')
+    expect(drop.statuses).toEqual([])
+    expect(drop.sourceIds).toEqual([])
+    expect(drop.warnings).toEqual(['Portée partielle non applicable au département 34 : département 31'])
+  })
+
+  it('Lotus angustissimus 106634 / NAQ : 33 conserve Aquitaine, 86 l’écarte', () => {
+    const lotus = status({
+      cdRef: 106634,
+      region: 'NAQ',
+      category: 'protection_regional',
+      label: 'Protection régionale',
+      value: 'PR',
+      sourceId: 'bdc-v18',
+      scope: 'partial',
+      scopeLabel: 'Aquitaine',
+    })
+    const prefixed = status({
+      ...lotus,
+      scopeLabel: 'ancienne région Aquitaine',
+    })
+
+    const gironde = resolveStatuses({ cdRef: 106634, region: 'NAQ', department: '33', statuses: [lotus] })
+    expect(gironde.statuses).toEqual([lotus])
+    expect(gironde.warnings).toEqual([])
+
+    const vienne = resolveStatuses({ cdRef: 106634, region: 'NAQ', department: '86', statuses: [lotus] })
+    expect(vienne.statuses).toEqual([])
+    expect(vienne.outcome).toBe('none_in_integrated_sources')
+    expect(vienne.sourceIds).toEqual([])
+    expect(vienne.warnings).toEqual(['Portée partielle non applicable au département 86 : Aquitaine'])
+
+    const prefixedVienne = resolveStatuses({
+      cdRef: 106634,
+      region: 'NAQ',
+      department: '86',
+      statuses: [prefixed],
+    })
+    expect(prefixedVienne.statuses).toEqual([])
+    expect(prefixedVienne.warnings).toEqual([
+      'Portée partielle non applicable au département 86 : ancienne région Aquitaine',
+    ])
+  })
+
+  it('conserve une portée partielle indéterminée avec warning', () => {
+    const vosges = status({
+      cdRef: 100,
+      region: 'GES',
+      category: 'znieff',
+      label: 'Priorité ZNIEFF',
+      scope: 'partial',
+      scopeLabel: 'Massif vosgien',
+      sourceId: 'src-vosges',
+    })
+
+    const result = resolveStatuses({ cdRef: 100, region: 'GES', department: '88', statuses: [vosges] })
+    expect(result.statuses).toEqual([vosges])
+    expect(result.warnings).toEqual(['Portée partielle indéterminée pour le département 88 : Massif vosgien'])
+  })
+
+  it('conserve un partial sans scopeLabel avec warning', () => {
+    const unlabeled = status({
+      cdRef: 101,
+      region: 'OCC',
+      category: 'znieff',
+      label: 'ZNIEFF',
+      scope: 'partial',
+      sourceId: 'src-unknown',
+    })
+
+    const result = resolveStatuses({ cdRef: 101, region: 'OCC', department: '31', statuses: [unlabeled] })
+    expect(result.statuses).toEqual([unlabeled])
+    expect(result.warnings).toEqual(['Portée partielle indéterminée pour le département 31 : sans libellé'])
+  })
+
+  it('rejette un département hors région et normalise 2a en Corse', () => {
+    const naq = status({ cdRef: 102, region: 'NAQ', category: 'znieff', label: 'ZNIEFF' })
+    expect(() => resolveStatuses({ cdRef: 102, region: 'NAQ', department: '31', statuses: [naq] })).toThrow(
+      /Département 31 hors région NAQ/,
+    )
+    expect(() => resolveStatuses({ cdRef: 102, region: 'OCC', department: '2a', statuses: [naq] })).toThrow(
+      /Département 2A hors région OCC/,
+    )
+
+    const corse = status({
+      cdRef: 103,
+      region: 'COR',
+      category: 'protection_regional',
+      label: 'Protection régionale',
+      scope: 'regional',
+    })
+    const result = resolveStatuses({ cdRef: 103, region: 'COR', department: '2a', statuses: [corse] })
+    expect(result.territory).toEqual({ region: 'COR', department: '2A' })
+    expect(result.statuses).toEqual([corse])
+  })
+
+  it('trie les warnings indépendamment de l’ordre d’entrée', () => {
+    const first = status({
+      cdRef: 104,
+      region: 'OCC',
+      category: 'znieff',
+      label: 'A',
+      scope: 'partial',
+      scopeLabel: 'Massif vosgien',
+    })
+    const second = status({
+      cdRef: 104,
+      region: 'OCC',
+      category: 'znieff',
+      label: 'B',
+      scope: 'partial',
+      scopeLabel: 'ancienne région Languedoc-Roussillon',
+    })
+
+    const left = resolveStatuses({ cdRef: 104, region: 'OCC', department: '31', statuses: [first, second] })
+    const right = resolveStatuses({ cdRef: 104, region: 'OCC', department: '31', statuses: [second, first] })
+    expect(left.warnings).toEqual(right.warnings)
+    expect(left.warnings).toEqual([
+      'Portée partielle indéterminée pour le département 31 : Massif vosgien',
+      'Portée partielle non applicable au département 31 : ancienne région Languedoc-Roussillon',
+    ])
+  })
 })
