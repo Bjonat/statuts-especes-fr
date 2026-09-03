@@ -1,10 +1,12 @@
 # Statuts des espèces — France
 
-Ce repository fournit aujourd’hui une **PWA mobile offline-first** et son **pipeline de données** pour consulter les statuts réglementaires et patrimoniaux des espèces de France. La trajectoire architecturale est d’extraire progressivement un moteur de résolution indépendant de l’interface — ce moteur (`resolveStatuses`) n’est **pas** encore livré.
+Ce repository fournit aujourd’hui une **PWA mobile offline-first**, un **moteur `resolveStatuses` indépendant de l’interface**, et le **pipeline de données** pour consulter les statuts réglementaires et patrimoniaux des espèces de France. La résolution se fait par **région** et, facultativement, par **département**.
 
-**Aujourd’hui :** PWA terrain + pipeline v3 + dataset embarqué + [matrice de couverture](docs/generated/source-coverage.md).
+**Aujourd’hui :** PWA terrain + resolver région / département + pipeline v3 + dataset embarqué + [matrice de couverture](docs/generated/source-coverage.md).
 
-**Cible roadmap :** moteur indépendant, puis batch / QGIS / API / package — voir [`docs/ROADMAP.md`](docs/ROADMAP.md). Ces usages ne sont pas disponibles.
+**Priorité actuelle :** PWA terrain → département (livré) → hardening offline / fiabilité / UX / performance — voir [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+CLI/CSV, QGIS et distribution restent documentés mais **différés**. Ces usages ne sont pas disponibles.
 
 ## Produit terrain
 
@@ -12,9 +14,12 @@ Parcours actuel :
 
 1. choisir **Faune** ou **Flore** ;
 2. choisir une **région** ;
-3. rechercher un taxon par nom scientifique, nom vernaculaire ou synonyme ;
-4. consulter les statuts ;
-5. voir les **sources** et **millésimes**.
+3. préciser éventuellement un **département** (`Toute la région` reste le défaut) ;
+4. rechercher un taxon par nom scientifique, nom vernaculaire ou synonyme ;
+5. consulter les **statuts applicables** au territoire choisi ;
+6. voir les **sources** et **millésimes**.
+
+`Toute la région` conserve le comportement historique : aucun filtrage supplémentaire des portées partielles. Un département ne recharge pas le dataset : le filtre est appliqué localement par `resolveStatuses`.
 
 La PWA est le produit effectivement utilisable. Elle fonctionne sans réseau une fois le dataset chargé. Deux catalogues (faune / flore) partagent le même pipeline de données et le même écran de statuts.
 
@@ -103,11 +108,11 @@ npm run coverage:build
 
 ## Limites actuelles
 
-- **Métropole uniquement** (pas DROM, pas marin dédié, pas de sélecteur départemental)
+- **Métropole uniquement** (pas DROM, pas marin dédié)
 - Couverture régionale **variable** — [matrice](docs/generated/source-coverage.md)
+- Portées partielles **non géographiques** parfois indéterminées (le statut reste affiché avec un avertissement)
 - Bundle compact : provenance via `sourceId` + manifeste ; pas de citations / URL documentaires embarquées
 - Acquisition de certaines sources (ARA LRR, BFC 2026) encore fragile
-- Pas de moteur `resolveStatuses` indépendant, pas d’usage batch / QGIS / API
 - Licence du **code** à arbitrer ; les données restent sous les licences de leurs producteurs (TAXREF, BDC, DREAL, OEB, CBN, etc.)
 
 ## Documentation

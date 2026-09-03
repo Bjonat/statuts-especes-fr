@@ -1,9 +1,9 @@
 # Roadmap technique — moteur de statuts d’espèces FR
 
 Document de référence pour les développements à venir.
-Dernière actualisation : 2026-09-03. PR-A à PR-J sont réalisées. PR-K (cette PR) ajoute le département au resolver.
+Dernière actualisation : 2026-09-03. PR-A à PR-L sont réalisées. Cette PR (PR-L) ajoute le sélecteur département dans la PWA.
 
-**Décision mainteneur du 3 septembre 2026 :** priorité absolue à la PWA terrain offline. Après PR-K et PR-L, gel des nouvelles surfaces fonctionnelles et phase de hardening terrain. CLI/CSV, QGIS et distribution sont différés jusqu’à décision explicite ultérieure.
+**Décision mainteneur du 3 septembre 2026 :** priorité absolue à la PWA terrain offline. Après PR-L, gel des nouvelles surfaces fonctionnelles et phase de hardening terrain. CLI/CSV, QGIS et distribution sont différés jusqu’à décision explicite ultérieure.
 
 **Ce document n’autorise aucun chantier.** Chaque phase se traite dans une PR dédiée, petite et vérifiable. Ne pas lancer une refonte générale du pipeline ni du front à partir de ce fichier.
 
@@ -33,11 +33,12 @@ Question unique à laquelle le projet doit rester excellent :
 
 ## 2. État actuel du repository
 
-État au **2026-09-03** (PR-A à PR-J mergées ; PR-K = cette PR). Ce paragraphe est ce que les agents doivent lire en premier.
+État au **2026-09-03** (PR-A à PR-K mergées ; PR-L = cette PR). Ce paragraphe est ce que les agents doivent lire en premier.
 
 - PWA offline-first fonctionnelle (Vite + `vite-plugin-pwa`).
 - `resolveStatuses()` est extrait et **utilisé** par `main.ts` (PR-E / PR-F).
-- Le resolver accepte `department?` (PR-K). Sans département, le comportement reste identique. **Aucun sélecteur département dans la PWA** : c’est PR-L.
+- Le resolver accepte `department?` (PR-K). Sans département, le comportement reste identique.
+- Sélecteur département facultatif dans la recherche et la fiche (PR-L) : `state` / persistance `localStorage["department"]` ; passage direct à `resolveStatuses` ; recalcul local sans réseau ; warnings territoriaux visibles.
 - Matrice de couverture générée depuis `ready-sources.json` (PR-A).
 - Contrat d’acquisition à états explicites (`FETCH_OK`, `ARCHIVED_FALLBACK`, `UNAVAILABLE`, `TYPE_MISMATCH`, `CHANGED_UNVERIFIED`) (PR-C / PR-D).
 - Runner générique `run-adapter.mjs` (PR-G).
@@ -74,7 +75,7 @@ public/data/
 À l’exécution, la PWA :
 
 1. `main.ts` hydrate le règne + les liens d’**une** région (`catalog` / `status-data`) ;
-2. appelle `resolveStatuses({ cdRef, region, statuses })` — aujourd’hui **sans** `department` ;
+2. appelle `resolveStatuses({ cdRef, region, department?, statuses })` — `department` vient du sélecteur PWA (`null` → omis, comportement historique) ;
 3. rend le résultat (`statuses`, `outcome`, `warnings`).
 
 Le filtre utile, le tri et l’`outcome` appartiennent au **resolver**, pas à `main.ts`.
@@ -102,8 +103,7 @@ Les 13 régions métropolitaines sont dans le manifeste. Le socle BDC est nation
 ### 2.4 Ce qui n’existe pas encore (ou est différé)
 
 - Licence du code ; métadonnées GitHub About encore vides.
-- Sélecteur département PWA — **PR-L**, pas encore branchée.
-- Hardening terrain / offline — à auditer et découper **après PR-L**.
+- Hardening terrain / offline — **phase active suivante** : audit puis petites PR selon les problèmes observés. Pas de PR-P / PR-Q / PR-R inventées maintenant.
 - CLI / CSV — **DIFFÉRÉ** (PR-M).
 - QGIS — **DIFFÉRÉ** (PR-N).
 - Distribution / package / API — **DIFFÉRÉE** (PR-O).
@@ -180,9 +180,9 @@ P1-C   resolveStatuses()                    ┘
   ↓
 P1-A / P1-B   Runner + diagnostics (PR-G à PR-J)
   ↓
-P2-A / PR-K   Département dans le resolver
-  ↓
-PR-L          Sélecteur département PWA
+P2-A / PR-K   Département dans le resolver     ┐
+  ↓                                             ├ réalisés
+PR-L          Sélecteur département PWA         ┘
   ↓
 PWA TERRAIN HARDENING
   offline réel · fiabilité · UX mobile · performance · tests terrain
@@ -955,7 +955,7 @@ JSON fractionné vs SQLite vs Parquet vs les trois. Publication npm ou non.
 
 ### 7.5 Niveau de territorialisation PWA
 
-Le département est-il un sélecteur terrain dès P2-A, ou seulement un paramètre du resolver / batch au début ?
+Tranché par PR-K + PR-L : le resolver accepte `department?` ; la PWA expose un sélecteur facultatif (`Toute la région` par défaut). La géolocalisation reste hors périmètre jusqu’à un audit terrain.
 
 ### 7.6 Seuils qualité
 
@@ -1012,7 +1012,7 @@ Ordre proposé. Chaque ligne = **une** PR.
 | **PR-I** | ~~Migrer une **deuxième** source simple (BRE LRR CSV) pour valider l’abstraction~~ **Réalisée** (cette PR) : deuxième adaptateur BRE LRR ; common OEB minimal ; parité stricte ZNIEFF + LRR ; quality sidecars sur les deux sources ; production historique conservée | PR-G, PR-H | adaptateur + registre | Deux sources passent par le runner | Spécificités LRR | Script historique |
 | **PR-J** | ~~Workflow CI générique (matrice) **uniquement** pour les sources migrées~~ **Réalisée** (cette PR) : matrice CI registry-driven sur les sources IMPORTED avec adapter ; ZNIEFF + LRR actuellement ; quality sidecars par job ; smoke Bretagne historique conservé | PR-I | 1 YAML matrice | Équivalence smoke BRE | Casser le dispatch | YAML historique conservé |
 | **PR-K** | ~~Département dans le resolver (sans UI)~~ **Réalisée** (cette PR) : `department?` dans `resolveStatuses` ; filtrage data-driven des portées département / anciennes régions ; sans département = comportement inchangé ; aucune UI | PR-E, table `regions.mjs` | resolver + tests OCC/NAQ | Sans département = inchangé | Mal parser les `scopeLabel` libres | Flag off |
-| **PR-L** | Sélecteur département PWA (opt-in) — **dernière feature active actuellement planifiée** | PR-K, PR-F | `main.ts`, CSS | Terrain : OCC 31 vs 34 | UX | Cacher le sélecteur |
+| **PR-L** | ~~Sélecteur département PWA (opt-in)~~ **Réalisée** (cette PR) : sélecteur facultatif recherche + fiche ; `state.department` / persistance ; passage direct à `resolveStatuses` ; recalcul local sans réseau ; warnings territoriaux visibles | PR-K, PR-F | `main.ts`, CSS | Terrain : OCC 31 vs 34 | UX | Cacher le sélecteur |
 | **PR-M** | CLI liste / CSV — **DIFFÉRÉ / BACKLOG — hors roadmap active** | PR-F | CLI + tests | `ambiguous` / `not_found` / *Hyles* | — | Supprimer le CLI |
 | **PR-N** | Note d’architecture QGIS (choix 1/2/3) puis plugin minimal — **DIFFÉRÉ / BACKLOG — hors roadmap active** | PR-M | `docs/` + plugin | Pas de règles dans le plugin | Portée | Ne pas merger le plugin |
 | **PR-O** | ADR distribution (JSON / SQLite / package / API) — **DIFFÉRÉ / BACKLOG — hors roadmap active** | moteur stable §8 | `docs/` | Décision écrite, **rien publié** | — | — |

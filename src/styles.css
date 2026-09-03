@@ -330,6 +330,35 @@ h2 {
   line-height: 1.4;
 }
 
+.taxon-card .territory-filter {
+  margin-top: 0;
+}
+
+.status-results {
+  margin-top: 18px;
+}
+
+.territory-notice {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: #eef3e8;
+  border: 1px solid #d5decc;
+  color: #3f4a38;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.territory-notice p,
+.territory-notice ul {
+  margin: 0;
+}
+
+.territory-notice ul {
+  padding-left: 1.15em;
+}
+
 .taxon-card .scientific-name {
   margin-bottom: 5px;
   color: #495046;
