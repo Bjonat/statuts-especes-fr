@@ -8,6 +8,8 @@
 - LRR : `oeb-bretagne-lrr-csv-2026-01-29` (CSV data.gouv `937614a8-…`)
 - `build_oeb.py` reste le chemin historique pour ZNIEFF/LRR/responsabilité.
 - ZNIEFF dispose aussi du pilote registry-driven `oeb-csv-znieff`, en double construction de parité.
+- Baseline PR-G (import, pas une vérité biologique) : 901 statuts, `resolutionRate` 0.9967.
+- Quality gate d’import : `minStatuses` 850, `minResolutionRate` 0.99, sentinelle *Eryngium viviparum* (`CD_REF` 97152, déterminante ZNIEFF, raccord `CD_NOM`).
 
 ## Responsabilité biologique régionale — importée
 

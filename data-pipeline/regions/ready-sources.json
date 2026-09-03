@@ -128,6 +128,24 @@
       "name": "Espèces déterminantes ZNIEFF Bretagne",
       "producer": "Observatoire de l'environnement en Bretagne / CSRPN Bretagne",
       "official": true,
+      "quality": {
+        "expectedStatuses": 901,
+        "expectedResolutionRate": 0.9967,
+        "minStatuses": 850,
+        "minResolutionRate": 0.99,
+        "requiredCategories": [
+          "znieff"
+        ],
+        "sentinels": [
+          {
+            "cdRef": 97152,
+            "category": "znieff",
+            "value": "Oui",
+            "scope": "regional",
+            "note": "Eryngium viviparum — déterminante ZNIEFF, raccord CD_NOM, baseline PR-G"
+          }
+        ]
+      },
       "landingPage": "https://data.bretagne-environnement.fr/datasets/especes-determinantes-pour-les-znieff-en-bretagne",
       "resources": [
         {

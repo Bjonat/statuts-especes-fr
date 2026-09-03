@@ -8,6 +8,8 @@ on:
       - 'data-pipeline/regions/bre/**'
       - 'data-pipeline/regional.mjs'
       - 'data-pipeline/run-adapter.mjs'
+      - 'data-pipeline/diagnostics.mjs'
+      - 'data-pipeline/diagnostics.test.mjs'
       - 'data-pipeline/adapters/**'
       - 'data-pipeline/adapter-runner.test.mjs'
       - 'data-pipeline/regions/ready-sources.json'
@@ -65,7 +67,7 @@ jobs:
         run: |
           CHECKED_AT="$(date -u +%F)"
           echo "CHECKED_AT=$CHECKED_AT" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/regional" "$RUNNER_TEMP/regional-candidate"
+          mkdir -p "$RUNNER_TEMP/regional" "$RUNNER_TEMP/regional-candidate" "$RUNNER_TEMP/diagnostics"
           python data-pipeline/regions/bre/build_oeb.py \
             --taxref "$TAXREF_FILE" \
             --znieff "$BRE_ZNIEFF_FILE" \
@@ -79,9 +81,11 @@ jobs:
             --taxref "$TAXREF_FILE" \
             --input "$BRE_ZNIEFF_FILE" \
             --out "$RUNNER_TEMP/regional-candidate/bre-znieff.json" \
+            --diagnostics-out "$RUNNER_TEMP/diagnostics/oeb-bretagne-znieff.json" \
             --checked-at "$CHECKED_AT"
           echo "BRE_LEGACY_ZNIEFF=$RUNNER_TEMP/regional/bre-znieff.json" >> "$GITHUB_ENV"
           echo "BRE_CANDIDATE_ZNIEFF=$RUNNER_TEMP/regional-candidate/bre-znieff.json" >> "$GITHUB_ENV"
+          echo "BRE_ZNIEFF_DIAGNOSTICS=$RUNNER_TEMP/diagnostics/oeb-bretagne-znieff.json" >> "$GITHUB_ENV"
 
       - name: Validate regional package contract
         run: |
@@ -131,10 +135,32 @@ jobs:
           console.log(`Parité ZNIEFF : ${candidate.statuses.length} statuts, matchRate=${candidate.diagnostics.matchRate}`)
           NODE
 
+      - name: Validate ZNIEFF diagnostic sidecar
+        run: |
+          node --input-type=module - <<'NODE'
+          import { readFile } from 'node:fs/promises'
+          const diagnostic = JSON.parse(await readFile(process.env.BRE_ZNIEFF_DIAGNOSTICS, 'utf8'))
+          if (diagnostic.schemaVersion !== 1) throw new Error('schemaVersion diagnostic invalide')
+          if (diagnostic.sourceId !== 'oeb-bretagne-znieff') throw new Error('sourceId diagnostic inattendu')
+          if (diagnostic.packageSourceId !== 'oeb-bretagne-znieff-csv-2026-01-29') throw new Error('packageSourceId inattendu')
+          if (diagnostic.quality.status !== 'pass') throw new Error(`quality.status=${diagnostic.quality.status}`)
+          const { statusesProduced, resolutionRate, duplicatesDropped, unresolved, ambiguous } = diagnostic.metrics
+          console.log({ statusesProduced, resolutionRate, duplicatesDropped, unresolved, ambiguous })
+          NODE
+
       - name: Upload normalized packages
         uses: actions/upload-artifact@v4
         with:
           name: bre-regional-packages
           path: ${{ runner.temp }}/regional/*.json
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload ZNIEFF diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bre-znieff-diagnostics
+          path: ${{ runner.temp }}/diagnostics/oeb-bretagne-znieff.json
+          if-no-files-found: warn
           retention-days: 7
