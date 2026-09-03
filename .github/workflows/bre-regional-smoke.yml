@@ -7,6 +7,7 @@ on:
     paths:
       - 'data-pipeline/regions/bre/**'
       - 'data-pipeline/regional.mjs'
+      - 'data-pipeline/pipeline.mjs'
       - 'data-pipeline/run-adapter.mjs'
       - 'data-pipeline/diagnostics.mjs'
       - 'data-pipeline/diagnostics.test.mjs'

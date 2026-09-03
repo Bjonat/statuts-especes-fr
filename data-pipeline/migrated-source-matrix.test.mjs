@@ -9,6 +9,7 @@ import { buildMigratedSourceMatrix } from './migrated-source-matrix.mjs'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const REAL_REGISTRY = path.join(here, 'regions/ready-sources.json')
 const WORKFLOW = path.join(here, '../.github/workflows/regional-adapters-matrix.yml')
+const SMOKE_WORKFLOW = path.join(here, '../.github/workflows/bre-regional-smoke.yml')
 
 function csvResource(overrides = {}) {
   return {
@@ -178,11 +179,14 @@ test('le CLI écrit un JSON compact compatible fromJSON', () => {
 
 test('le workflow matrice n’hardcode ni sources, ni UUID, ni fail-fast true', async () => {
   const yaml = await readFile(WORKFLOW, 'utf8')
+  const smokeYaml = await readFile(SMOKE_WORKFLOW, 'utf8')
   for (const forbidden of ['oeb-bretagne-znieff', 'oeb-bretagne-lrr', '4ada0b2b', '937614a8']) {
     assert.equal(yaml.includes(forbidden), false, `workflow contient ${forbidden}`)
   }
   assert.equal(yaml.includes('fail-fast: false'), true)
   assert.equal(yaml.includes('fromJSON(needs.discover.outputs.matrix)'), true)
+  assert.equal(yaml.includes('data-pipeline/pipeline.mjs'), true)
+  assert.equal(smokeYaml.includes('data-pipeline/pipeline.mjs'), true)
   assert.equal(/python/i.test(yaml), false)
   assert.match(yaml, /node-version:\s*24/)
 })

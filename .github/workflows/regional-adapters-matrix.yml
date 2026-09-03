@@ -9,6 +9,7 @@ on:
       - 'data-pipeline/run-adapter.mjs'
       - 'data-pipeline/diagnostics.mjs'
       - 'data-pipeline/regional.mjs'
+      - 'data-pipeline/pipeline.mjs'
       - 'data-pipeline/adapters/**'
       - 'data-pipeline/migrated-source-matrix.mjs'
       - 'data-pipeline/migrated-source-matrix.test.mjs'
