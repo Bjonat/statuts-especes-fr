@@ -1,6 +1,7 @@
 import './styles.css'
 import { loadDataStore } from './catalog'
 import { searchTaxa } from './search'
+import { resolveStatuses } from './resolve-statuses'
 import {
   NO_IDENTIFIED_STATUS_MESSAGE,
   buildStatusHelp,
@@ -63,19 +64,6 @@ const STATUS_LABELS: Partial<Record<StatusCategory, string>> = {
   rarity: 'Rareté',
   indigenous_status: 'Indigénat',
 }
-
-const STATUS_ORDER: StatusCategory[] = [
-  'protection_national',
-  'protection_regional',
-  'red_list_national',
-  'red_list_regional',
-  'znieff',
-  'regional_responsibility',
-  'pna',
-  'rarity',
-  'indigenous_status',
-  'other',
-]
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (character) => {
@@ -244,22 +232,6 @@ function renderStatusHelpPanel(status: TaxonStatus, index: number): string {
       <button type="button" class="status-help-close" data-help-close="${index}">Fermer</button>
     </div>
   `
-}
-
-function usefulStatus(status: TaxonStatus): boolean {
-  const label = cleanDisplayText(status.label)
-  const value = cleanDisplayText(status.value)
-  return !/sans objet/i.test(label) && !/sans objet/i.test(value)
-}
-
-function sortedStatuses(statuses: TaxonStatus[]): TaxonStatus[] {
-  return [...statuses]
-    .filter(usefulStatus)
-    .sort((left, right) => {
-      const category = STATUS_ORDER.indexOf(left.category) - STATUS_ORDER.indexOf(right.category)
-      if (category !== 0) return category
-      return shortStatusLabel(left).localeCompare(shortStatusLabel(right), 'fr')
-    })
 }
 
 async function loadRealmData(realm: Realm, region: RegionCode): Promise<void> {
@@ -586,7 +558,11 @@ function renderDetail(): void {
   if (!taxon || !state.realm) return
 
   const region = regions.find((item) => item.code === state.region)
-  const taxonStatuses = sortedStatuses(state.statuses.filter((status) => status.cdRef === taxon.cdRef))
+  const { statuses: taxonStatuses } = resolveStatuses({
+    cdRef: taxon.cdRef,
+    region: state.region,
+    statuses: state.statuses,
+  })
 
   root.innerHTML = `
     <main class="shell">
