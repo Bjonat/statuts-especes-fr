@@ -185,11 +185,10 @@ function createOfficialStore(manifest: DataManifest): DataStore {
   }
 
   async function primeOffline(): Promise<boolean> {
-    if (localStorage.getItem('offlineDatasetVersion') === manifest.datasetVersion) return true
-    if (!navigator.onLine || !('caches' in window)) return false
+    if (!('caches' in window)) return false
 
     const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
-    if (connection?.saveData) return false
+    const canDownload = navigator.onLine && !connection?.saveData
 
     const files = [
       manifest.files.taxa.flora.file,
@@ -200,17 +199,23 @@ function createOfficialStore(manifest: DataManifest): DataStore {
       ),
     ]
 
-    const cache = await caches.open('statuts-data-catalogs')
-    for (const file of files) {
-      const url = new URL(`data/${file}`, document.baseURI).toString()
-      if (await cache.match(url)) continue
-      const response = await fetch(url)
-      if (!response.ok) return false
-      await cache.put(url, response.clone())
+    try {
+      const cache = await caches.open('statuts-data-catalogs')
+      // A persisted version marker cannot prove that the browser kept every file.
+      // Check the actual catalog cache, also when offline or in save-data mode.
+      for (const file of files) {
+        const url = new URL(`data/${file}`, document.baseURI).toString()
+        if (await cache.match(url)) continue
+        if (!canDownload) return false
+        const response = await fetch(url)
+        if (!response.ok) return false
+        await cache.put(url, response.clone())
+      }
+      return true
+    } catch {
+      // Storage quota/access failures and interrupted downloads are not readiness.
+      return false
     }
-
-    localStorage.setItem('offlineDatasetVersion', manifest.datasetVersion)
-    return true
   }
 
   return {
