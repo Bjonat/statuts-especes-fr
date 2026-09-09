@@ -1,5 +1,5 @@
 import './styles.css'
-import { createDemoDataStore, loadDataStore } from './catalog'
+import { createDemoDataStore, loadDataStore, loadOfficialStoreFromActive } from './catalog'
 import type { DataStore, DataStoreLoadResult } from './catalog'
 import { REGIONS, assertDepartmentInRegion } from '../data-pipeline/regions.mjs'
 import { searchTaxa } from './search'
@@ -9,6 +9,8 @@ import {
   buildStatusHelp,
   formatStatusValueForDisplay,
 } from './status-help'
+import type { DatasetCheckStatus, DatasetUpdateCheck, DatasetUpdateProgress } from './dataset-storage'
+import { datasetUpdateFailureReason } from './dataset-storage'
 import type { OfflineDownloadProgress, OfflineInventory } from './offline-data'
 import type { Realm, RegionCode, SourceDataset, StatusCategory, Taxon, TaxonStatus } from './types'
 
@@ -70,7 +72,12 @@ const state: {
   offlinePreparing: RegionCode | null
   offlineProgress: OfflineDownloadProgress | null
   offlineNotice: string | null
+  offlineNoticeAlert: boolean
   offlineConfirmRemove: RegionCode | null
+  datasetCheck: DatasetUpdateCheck | null
+  datasetChecking: boolean
+  datasetUpdating: boolean
+  datasetProgress: DatasetUpdateProgress | null
 } = {
   screen: 'home',
   realm: null,
@@ -87,15 +94,28 @@ const state: {
   offlinePreparing: null,
   offlineProgress: null,
   offlineNotice: null,
+  offlineNoticeAlert: false,
   offlineConfirmRemove: null,
+  datasetCheck: null,
+  datasetChecking: false,
+  datasetUpdating: false,
+  datasetProgress: null,
 }
 
 let offlineAbort: AbortController | null = null
+let datasetAbort: AbortController | null = null
 
 const OFFLINE_INTERRUPTED_MESSAGE =
   'Téléchargement interrompu. Les fichiers déjà récupérés sont conservés.'
 const OFFLINE_STORAGE_MESSAGE =
   'Espace de stockage insuffisant pour terminer le téléchargement. Les fichiers déjà téléchargés sont conservés.'
+const DATASET_INTERRUPTED_MESSAGE =
+  'Mise à jour interrompue. La version actuelle reste utilisable.'
+const DATASET_STORAGE_MESSAGE =
+  'Espace de stockage insuffisant pour installer la mise à jour. La version actuelle reste active.'
+const DATASET_INTEGRITY_MESSAGE =
+  'La nouvelle version n’a pas pu être vérifiée. La version actuelle a été conservée.'
+const DATASET_INSTALLED_MESSAGE = 'Mise à jour installée.'
 
 const STATUS_LABELS: Partial<Record<StatusCategory, string>> = {
   red_list_national: 'Liste rouge nationale',
@@ -178,6 +198,29 @@ function volumeMarkup(bytes: number | undefined, suffix = ''): string {
   return `<p class="offline-volume">${escapeHtml(formatEstimatedVolume(bytes))}${suffix ? ` ${escapeHtml(suffix)}` : ''}</p>`
 }
 
+function cacheMutationBusy(): boolean {
+  return state.offlinePreparing !== null || state.datasetUpdating
+}
+
+function formatDatasetDate(value: string): string {
+  const parsed = Date.parse(value)
+  if (!Number.isFinite(parsed)) return value
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short' }).format(new Date(parsed))
+}
+
+function shortDatasetVersion(version: string): string {
+  return version.length <= 8 ? version : version.slice(0, 8)
+}
+
+function setOfflineNotice(message: string | null, alert = false): void {
+  state.offlineNotice = message
+  state.offlineNoticeAlert = Boolean(message) && alert
+}
+
+function regionName(code: RegionCode): string {
+  return store().regions.find((region) => region.code === code)?.name ?? code
+}
+
 async function inspectOfflineCache(): Promise<void> {
   const current = activeStore()
   if (!current?.offline) {
@@ -194,6 +237,7 @@ async function openOffline(): Promise<void> {
   state.query = ''
   state.selectedTaxon = null
   state.offlineNotice = null
+  state.offlineNoticeAlert = false
   state.offlineConfirmRemove = null
   render()
   await inspectOfflineCache()
@@ -202,14 +246,15 @@ async function openOffline(): Promise<void> {
 
 function closeOffline(): void {
   offlineAbort?.abort()
+  datasetAbort?.abort()
   state.screen = 'home'
   state.offlineConfirmRemove = null
-  state.offlineNotice = null
+  setOfflineNotice(null)
   render()
 }
 
 async function refreshOfflineScreen(): Promise<void> {
-  if (state.offlinePreparing) return
+  if (cacheMutationBusy()) return
   await inspectOfflineCache()
   if (state.screen === 'offline') render()
   else refreshOfflineBadges()
@@ -217,16 +262,16 @@ async function refreshOfflineScreen(): Promise<void> {
 
 async function prepareOfflineRegion(region: RegionCode): Promise<void> {
   const manager = store().offline
-  if (!manager || state.offlinePreparing) return
+  if (!manager || cacheMutationBusy()) return
   if (!navigator.onLine) {
-    state.offlineNotice = 'Connexion nécessaire pour télécharger cette région.'
+    setOfflineNotice('Connexion nécessaire pour télécharger cette région.')
     render()
     return
   }
 
   state.offlinePreparing = region
   state.offlineProgress = null
-  state.offlineNotice = null
+  setOfflineNotice(null)
   state.offlineConfirmRemove = null
   offlineAbort = new AbortController()
   render()
@@ -247,11 +292,14 @@ async function prepareOfflineRegion(region: RegionCode): Promise<void> {
     state.offlineProgress = null
     offlineAbort = null
     if (result.outcome === 'cancelled') {
-      state.offlineNotice = OFFLINE_INTERRUPTED_MESSAGE
+      setOfflineNotice(OFFLINE_INTERRUPTED_MESSAGE)
     } else if (result.outcome === 'failed') {
-      state.offlineNotice = result.reason === 'storage' ? OFFLINE_STORAGE_MESSAGE : OFFLINE_INTERRUPTED_MESSAGE
+      setOfflineNotice(
+        result.reason === 'storage' ? OFFLINE_STORAGE_MESSAGE : OFFLINE_INTERRUPTED_MESSAGE,
+        result.reason === 'integrity',
+      )
     } else {
-      state.offlineNotice = null
+      setOfflineNotice(null)
     }
   }
 
@@ -275,11 +323,190 @@ function cancelRemoveOfflineRegion(): void {
 
 async function confirmRemoveOfflineRegion(region: RegionCode): Promise<void> {
   const manager = store().offline
-  if (!manager) return
+  if (!manager || cacheMutationBusy()) return
   state.offlineConfirmRemove = null
   const result = await manager.removeRegion(region)
   state.offlineInventory = result.inventory
   render()
+}
+
+function datasetCheckStatusLabel(status: DatasetCheckStatus | undefined): string {
+  if (state.datasetChecking) return 'Vérification…'
+  if (state.datasetUpdating) return 'Mise à jour…'
+  if (!status) return 'Vérification des mises à jour non lancée'
+  if (status === 'up_to_date') return 'À jour'
+  if (status === 'update_available') return 'Mise à jour disponible'
+  if (status === 'remote_older') return 'La version distante est plus ancienne que la version active'
+  if (status === 'invalid') return 'La description distante est invalide. La version actuelle a été conservée.'
+  if (status === 'storage_unavailable') return 'Les mises à jour persistantes sont indisponibles dans ce navigateur.'
+  return 'Impossible de vérifier les mises à jour. La version actuelle reste utilisable.'
+}
+
+function renderDatasetVersionBlock(): string {
+  const current = store()
+  if (!current.official || !current.updates) return ''
+  const check = state.datasetCheck
+  const busy = cacheMutationBusy()
+  const updating = state.datasetUpdating
+  const candidate = check?.status === 'update_available' ? check.remote : null
+  const protectedRegions = check?.protectedRegions ?? []
+  const statusText = datasetCheckStatusLabel(check?.status)
+
+  const progress = updating && state.datasetProgress
+    ? `<p class="offline-progress" aria-live="polite">Mise à jour… ${state.datasetProgress.completedFiles} / ${state.datasetProgress.totalFiles} fichiers${
+        state.datasetProgress.bytesCompleted
+          ? ` · ${escapeHtml(formatEstimatedVolume(state.datasetProgress.bytesCompleted))}`
+          : ''
+      }</p>`
+    : ''
+
+  let candidateMarkup = ''
+  if (candidate && !updating) {
+    const preserved = protectedRegions.length
+      ? `<p>La mise à jour préservera :</p><ul class="dataset-protected-list">${protectedRegions
+          .map((code) => `<li>${escapeHtml(regionName(code))}</li>`)
+          .join('')}</ul>`
+      : '<p>Aucune région hors ligne à préserver.</p>'
+    const incompleteHint = state.offlineInventory?.regions.some((region) => region.availability === 'partial')
+      ? `<p class="field-hint">Les téléchargements incomplets devront être repris après la mise à jour.</p>`
+      : ''
+    candidateMarkup = `
+      <div class="dataset-candidate">
+        <p class="offline-region-status">Mise à jour disponible</p>
+        <p>Version du ${escapeHtml(formatDatasetDate(candidate.generatedAt))}</p>
+        ${preserved}
+        ${incompleteHint}
+        ${check?.requiredBytes ? volumeMarkup(check.requiredBytes, 'à télécharger') : protectedRegions.length === 0 ? '' : volumeMarkup(check?.requiredBytes)}
+        <button class="primary-button" id="dataset-update" type="button" ${busy || !navigator.onLine ? 'disabled' : ''}>Mettre à jour</button>
+      </div>
+    `
+  }
+
+  const actions = updating
+    ? `<button class="secondary-button" id="dataset-cancel" type="button">Annuler</button>`
+    : `<button class="secondary-button" id="dataset-check" type="button" ${busy || state.datasetChecking ? 'disabled' : ''}>Vérifier les mises à jour</button>`
+
+  return `
+    <section class="offline-version" aria-labelledby="dataset-version-title">
+      <h2 id="dataset-version-title">Version des données</h2>
+      <p class="offline-region-status">Version active</p>
+      <p class="dataset-active-date">${escapeHtml(formatDatasetDate(current.generatedAt))}</p>
+      <p class="dataset-active-hash">${escapeHtml(shortDatasetVersion(current.datasetVersion))}</p>
+      <p class="dataset-check-status" aria-live="polite">${escapeHtml(statusText)}</p>
+      ${progress}
+      ${candidateMarkup}
+      <div class="dataset-version-actions">${actions}</div>
+    </section>
+  `
+}
+
+function scheduleBackgroundUpdateCheck(current: DataStore): void {
+  if (!current.official || !current.updates || !navigator.onLine) return
+  void current.updates.checkForUpdate().then((result) => {
+    if (dataMode.state !== 'official' || dataMode.store !== current) return
+    state.datasetCheck = result
+    if (state.screen === 'offline') render()
+  })
+}
+
+async function checkDatasetUpdates(): Promise<void> {
+  const manager = store().updates
+  if (!manager || cacheMutationBusy() || state.datasetChecking) return
+  if (!navigator.onLine) {
+    setOfflineNotice('Connexion nécessaire pour vérifier les mises à jour.')
+    render()
+    return
+  }
+  state.datasetChecking = true
+  setOfflineNotice(null)
+  render()
+  try {
+    state.datasetCheck = await manager.checkForUpdate()
+  } catch {
+    state.datasetCheck = {
+      status: 'unavailable',
+      remote: null,
+      protectedRegions: [],
+      requiredFiles: [],
+      requiredBytes: 0,
+    }
+  } finally {
+    state.datasetChecking = false
+  }
+  if (state.screen === 'offline') render()
+}
+
+async function applyActivatedStore(next: DataStore): Promise<void> {
+  dataMode = { state: 'official', store: next }
+  state.taxa = []
+  state.statuses = []
+  state.regionSources = []
+  state.datasetUpdating = false
+  state.datasetProgress = null
+  state.datasetCheck = {
+    status: 'up_to_date',
+    remote: null,
+    protectedRegions: [],
+    requiredFiles: [],
+    requiredBytes: 0,
+  }
+  datasetAbort = null
+  setOfflineNotice(DATASET_INSTALLED_MESSAGE)
+  if (next.offline) {
+    state.offlineInventory = await next.offline.inspect()
+  }
+  if (state.screen === 'offline') render()
+  else {
+    refreshOfflineBadges()
+    render()
+  }
+}
+
+async function startDatasetUpdate(): Promise<void> {
+  const manager = store().updates
+  const candidate = state.datasetCheck?.remote
+  if (!manager || !candidate || cacheMutationBusy()) return
+  if (state.datasetCheck?.status !== 'update_available') return
+
+  state.datasetUpdating = true
+  state.datasetProgress = null
+  setOfflineNotice(null)
+  datasetAbort = new AbortController()
+  render()
+
+  try {
+    await manager.prepareAndActivate(candidate, {
+      signal: datasetAbort.signal,
+      onProgress: (progress) => {
+        if (!state.datasetUpdating) return
+        state.datasetProgress = progress
+        if (state.screen === 'offline') render()
+      },
+    })
+    const next = await loadOfficialStoreFromActive()
+    if (!next) {
+      setOfflineNotice(DATASET_INTERRUPTED_MESSAGE)
+      return
+    }
+    await applyActivatedStore(next)
+  } catch (error) {
+    const reason = datasetUpdateFailureReason(error)
+    if (reason === 'integrity') setOfflineNotice(DATASET_INTEGRITY_MESSAGE, true)
+    else if (reason === 'quota' || reason === 'storage') setOfflineNotice(DATASET_STORAGE_MESSAGE)
+    else setOfflineNotice(DATASET_INTERRUPTED_MESSAGE)
+  } finally {
+    if (state.datasetUpdating) {
+      state.datasetUpdating = false
+      state.datasetProgress = null
+      datasetAbort = null
+    }
+  }
+  if (state.screen === 'offline') render()
+  else refreshOfflineBadges()
+}
+
+function cancelDatasetUpdate(): void {
+  datasetAbort?.abort()
 }
 
 function sharedStatusLabel(availability: OfflineInventory['shared']['availability']): string {
@@ -294,7 +521,7 @@ function renderOfflineRegionCard(regionCode: RegionCode): string {
   const status = inventory?.regions.find((item) => item.region === regionCode)
   const name = region?.name ?? regionCode
   const preparing = state.offlinePreparing === regionCode
-  const busy = state.offlinePreparing !== null
+  const busy = cacheMutationBusy()
   const online = navigator.onLine
 
   if (!inventory?.storageAvailable) {
@@ -372,6 +599,13 @@ function bindOfflineActions(): void {
   document.querySelector<HTMLButtonElement>('#offline-refresh')?.addEventListener('click', () => {
     void refreshOfflineScreen()
   })
+  document.querySelector<HTMLButtonElement>('#dataset-check')?.addEventListener('click', () => {
+    void checkDatasetUpdates()
+  })
+  document.querySelector<HTMLButtonElement>('#dataset-update')?.addEventListener('click', () => {
+    void startDatasetUpdate()
+  })
+  document.querySelector<HTMLButtonElement>('#dataset-cancel')?.addEventListener('click', cancelDatasetUpdate)
   document.querySelectorAll<HTMLButtonElement>('[data-prepare-region]').forEach((button) => {
     button.addEventListener('click', () => {
       void prepareOfflineRegion(button.dataset.prepareRegion as RegionCode)
@@ -411,14 +645,16 @@ function renderOffline(): void {
         <p class="intro">Préparez les régions dont vous aurez besoin avant votre sortie terrain.</p>
 
         <div class="offline-toolbar">
-          <button class="secondary-button" id="offline-refresh" type="button" ${state.offlinePreparing ? 'disabled' : ''}>Actualiser</button>
+          <button class="secondary-button" id="offline-refresh" type="button" ${cacheMutationBusy() ? 'disabled' : ''}>Actualiser</button>
         </div>
 
         ${
           state.offlineNotice
-            ? `<p class="offline-notice" role="status" aria-live="polite">${escapeHtml(state.offlineNotice)}</p>`
+            ? `<p class="offline-notice" ${state.offlineNoticeAlert ? 'role="alert"' : 'role="status" aria-live="polite"'}>${escapeHtml(state.offlineNotice)}</p>`
             : ''
         }
+
+        ${renderDatasetVersionBlock()}
 
         ${
           !inventory
@@ -1109,8 +1345,14 @@ function enterLoadedStore(mode: 'official' | 'demo', next: DataStore): void {
   state.offlinePreparing = null
   state.offlineProgress = null
   state.offlineNotice = null
+  state.offlineNoticeAlert = false
   state.offlineConfirmRemove = null
+  state.datasetCheck = null
+  state.datasetChecking = false
+  state.datasetUpdating = false
+  state.datasetProgress = null
   offlineAbort = null
+  datasetAbort = null
   render()
   if (mode !== 'official' || !next.offline) return
   void next.offline.inspect().then((inventory) => {
@@ -1119,6 +1361,7 @@ function enterLoadedStore(mode: 'official' | 'demo', next: DataStore): void {
     if (state.screen === 'offline') render()
     else refreshOfflineBadges()
   })
+  scheduleBackgroundUpdateCheck(next)
 }
 
 function applyLoadResult(result: DataStoreLoadResult): void {

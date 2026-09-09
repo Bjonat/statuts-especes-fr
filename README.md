@@ -4,7 +4,7 @@ Ce repository fournit aujourd’hui une **PWA mobile offline-first**, un **moteu
 
 **Aujourd’hui :** PWA terrain + resolver région / département + pipeline v3 + dataset embarqué + [matrice de couverture](docs/generated/source-coverage.md).
 
-**Priorité actuelle :** hardening PWA terrain — Données hors ligne par région (PR-PWA-02) puis mises à jour atomiques (PR-PWA-03) — voir [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Priorité actuelle :** hardening PWA terrain — mises à jour atomiques des données (PR-PWA-03) puis validation navigateur (PR-PWA-04) — voir [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 CLI/CSV, QGIS et distribution restent documentés mais **différés**. Ces usages ne sont pas disponibles.
 
@@ -88,7 +88,9 @@ npm run dev
 
 Tant qu’aucun jeu officiel n’est disponible (fichier `public/data/manifest.json` absent, invalide ou injoignable), **la PWA ne bascule jamais automatiquement** vers les fixtures de démonstration. Un écran explique la situation ; le mode démonstration n’existe qu’après un clic explicite **Ouvrir la démonstration**, reste clairement signalé (badge et avertissement) et n’est pas persisté. Un redémarrage retente toujours les données officielles.
 
-Le démarrage officiel **ne télécharge plus** les 13 régions. Il charge le manifeste, inspecte Cache Storage et affiche l’état existant. L’écran **Données hors ligne** (absent en démonstration) permet de préparer une région, suivre la progression, interrompre puis reprendre, et supprimer les données régionales. Le socle partagé (catalogues flore/faune + définitions) est téléchargé automatiquement avec la première région et retiré avec la dernière. Cache Storage reste la seule source de vérité : aucun marqueur `localStorage` de readiness. Si le manifeste fournit `bytes`, l’écran affiche un volume estimé (`≈ X Mio`) ; sinon le volume est omis. Ce n’est pas encore une gestion atomique des versions (PR-PWA-03).
+Le démarrage officiel **ne télécharge plus** les 13 régions. S’il existe un manifeste **actif** en Cache Storage, la PWA l’ouvre immédiatement, y compris hors ligne, sans fetch réseau. L’écran **Données hors ligne** (absent en démonstration) permet de préparer une région, suivre la progression, interrompre puis reprendre, et supprimer les données régionales. Le socle partagé (catalogues flore/faune + définitions) est téléchargé automatiquement avec la première région et retiré avec la dernière.
+
+Les catalogues vivent dans des **caches versionnés** (`statuts-data-catalogs-v-…`), distincts du shell Workbox. Une nouvelle version n’est activée que sur action explicite, après téléchargement isolé et vérification SHA-256 / JSON / count / bytes des fichiers nécessaires aux régions déjà `ready`. Jusque-là la version active reste utilisable ; une interruption se reprend sans retélécharger les fichiers déjà validés. L’ancienne version est conservée comme `previous`. Cache Storage reste la seule source de vérité du dataset : aucun marqueur `localStorage` de version. Si le manifeste fournit `bytes`, l’écran affiche un volume estimé (`≈ X Mio`). Les parcours navigateur automatisés arriveront avec PR-PWA-04.
 
 Socle national (dumps TAXREF / BDC déjà extraits, non versionnés) :
 

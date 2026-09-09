@@ -1,11 +1,21 @@
+import {
+  DatasetIntegrityError,
+  catalogFileUrl,
+  openDatasetCache,
+  putVerifiedDatasetFile,
+  regionDatasetFiles,
+  sharedDatasetFiles,
+  allRegionalDatasetFiles,
+} from './dataset-storage'
 import { METROPOLITAN_REGION_CODES } from './types'
 import type { DataManifest, DatasetFile, RegionCode } from './types'
 
-export const OFFLINE_CATALOG_CACHE = 'statuts-data-catalogs'
+export { catalogFileUrl, sharedDatasetFiles, regionDatasetFiles, allRegionalDatasetFiles }
+export { LEGACY_CATALOG_CACHE as OFFLINE_CATALOG_CACHE } from './dataset-storage'
 
 export type OfflineAvailability = 'ready' | 'partial' | 'missing'
 
-export type OfflinePrepareFailureReason = 'offline' | 'network' | 'http' | 'storage'
+export type OfflinePrepareFailureReason = 'offline' | 'network' | 'http' | 'storage' | 'integrity'
 
 export interface OfflineSharedStatus {
   availability: OfflineAvailability
@@ -63,22 +73,6 @@ export interface OfflineDataManager {
   removeRegion(region: RegionCode): Promise<OfflineRemoveResult>
 }
 
-export function catalogFileUrl(file: string, baseURI = document.baseURI): string {
-  return new URL(`data/${file}`, baseURI).toString()
-}
-
-export function sharedDatasetFiles(manifest: DataManifest): DatasetFile[] {
-  return [manifest.files.taxa.flora, manifest.files.taxa.fauna, manifest.files.statusDefinitions]
-}
-
-export function regionDatasetFiles(manifest: DataManifest, region: RegionCode): DatasetFile[] {
-  return [manifest.files.statusLinks.flora[region], manifest.files.statusLinks.fauna[region]]
-}
-
-export function allRegionalDatasetFiles(manifest: DataManifest): DatasetFile[] {
-  return METROPOLITAN_REGION_CODES.flatMap((region) => regionDatasetFiles(manifest, region))
-}
-
 function sumKnownBytes(files: DatasetFile[]): number | undefined {
   if (files.some((file) => typeof file.bytes !== 'number')) return undefined
   return files.reduce((total, file) => total + (file.bytes ?? 0), 0)
@@ -121,17 +115,6 @@ function emptyInventory(manifest: DataManifest, storageAvailable: boolean): Offl
       totalFiles: 2,
     })),
     readyRegionCount: 0,
-  }
-}
-
-async function openCatalogCache(): Promise<Cache | null> {
-  if (typeof window === 'undefined' || !('caches' in window) || typeof caches?.open !== 'function') {
-    return null
-  }
-  try {
-    return await caches.open(OFFLINE_CATALOG_CACHE)
-  } catch {
-    return null
   }
 }
 
@@ -198,7 +181,7 @@ function buildInventory(manifest: DataManifest, present: Set<string>): OfflineIn
 }
 
 async function inspectManifest(manifest: DataManifest): Promise<OfflineInventory> {
-  const cache = await openCatalogCache()
+  const cache = await openDatasetCache(manifest.datasetVersion)
   if (!cache) return emptyInventory(manifest, false)
 
   try {
@@ -243,7 +226,7 @@ export function createOfflineDataManager(manifest: DataManifest): OfflineDataMan
     try {
       if (options?.signal?.aborted) return cancelledResult()
 
-      const cache = await openCatalogCache()
+      const cache = await openDatasetCache(manifest.datasetVersion)
       if (!cache) {
         return { outcome: 'failed', reason: 'storage', inventory: await inspect() }
       }
@@ -288,7 +271,7 @@ export function createOfflineDataManager(manifest: DataManifest): OfflineDataMan
 
         let response: Response
         try {
-          response = await fetch(url, { signal: options?.signal })
+          response = await fetch(url, { cache: 'no-store', signal: options?.signal })
         } catch (error) {
           if (isAbortError(error) || options?.signal?.aborted) return cancelledResult()
           const offline = typeof navigator !== 'undefined' && navigator.onLine === false
@@ -300,9 +283,20 @@ export function createOfflineDataManager(manifest: DataManifest): OfflineDataMan
           return { outcome: 'failed', reason: 'http', inventory: await inspect() }
         }
 
+        let buffer: ArrayBuffer
         try {
-          await cache.put(url, response.clone())
+          buffer = await response.arrayBuffer()
         } catch (error) {
+          if (isAbortError(error) || options?.signal?.aborted) return cancelledResult()
+          return { outcome: 'failed', reason: 'network', inventory: await inspect() }
+        }
+
+        try {
+          await putVerifiedDatasetFile(cache, file, buffer)
+        } catch (error) {
+          if (error instanceof DatasetIntegrityError) {
+            return { outcome: 'failed', reason: 'integrity', inventory: await inspect() }
+          }
           if (isQuotaError(error)) {
             return { outcome: 'failed', reason: 'storage', inventory: await inspect() }
           }
@@ -325,13 +319,12 @@ export function createOfflineDataManager(manifest: DataManifest): OfflineDataMan
   }
 
   async function removeRegion(region: RegionCode): Promise<OfflineRemoveResult> {
-    const cache = await openCatalogCache()
+    const cache = await openDatasetCache(manifest.datasetVersion)
     if (!cache) {
       return { inventory: emptyInventory(manifest, false) }
     }
 
-    // Shared cleanup is fail-safe: delete the shared base only after a complete
-    // successful scan proves that no current-manifest regional file remains.
+    // Shared cleanup is fail-safe and limited to this active versioned cache.
     let sharedCleanupSafe = true
 
     for (const file of regionDatasetFiles(manifest, region)) {

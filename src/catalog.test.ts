@@ -1,10 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+// @ts-expect-error Node builtin resolved by Vitest; no @types/node in the app tsconfig.
+import { createHash } from 'node:crypto'
 import { createDemoDataStore, loadDataStore } from './catalog'
 import { METROPOLITAN_REGION_CODES } from './types'
 
+const EMPTY_JSON = '[]'
+const EMPTY_HASH = createHash('sha256').update(EMPTY_JSON).digest('hex').slice(0, 12)
+
 const regions = METROPOLITAN_REGION_CODES.map((code) => ({ code, name: code }))
 const file = (name: string, bytes?: number) =>
-  bytes === undefined ? { file: `${name}-abcdef.json`, count: 0 } : { file: `${name}-abcdef.json`, count: 0, bytes }
+  bytes === undefined
+    ? { file: `${name}-${EMPTY_HASH}.json`, count: 0 }
+    : { file: `${name}-${EMPTY_HASH}.json`, count: 0, bytes }
 const manifest = {
   schemaVersion: 3, official: true, generatedAt: '2026-09-08',
   datasetVersion: 'current', taxrefVersion: '18', bdcVersion: '18',
@@ -65,10 +72,29 @@ describe('offline catalog readiness', () => {
     }
     network = { onLine: false, connection: { saveData: false } }
     const storage = new Map([['offlineDatasetVersion', manifest.datasetVersion]])
+    const metadataEntries = new Map<string, Response>()
+    const metadataCache = {
+      match: vi.fn(async (url: string) => metadataEntries.get(url)?.clone()),
+      put: vi.fn(async (url: string, response: Response) => { metadataEntries.set(url, response) }),
+      delete: vi.fn(async (url: string) => metadataEntries.delete(url)),
+    }
+    const emptyCache = {
+      match: vi.fn(async () => undefined),
+      put: vi.fn(async () => {}),
+      delete: vi.fn(async () => false),
+    }
     vi.stubGlobal('document', { baseURI })
     vi.stubGlobal('navigator', network)
     vi.stubGlobal('window', { caches: {} })
-    vi.stubGlobal('caches', { open: vi.fn(async () => cache) })
+    vi.stubGlobal('caches', {
+      open: vi.fn(async (name: string) => {
+        if (name.startsWith('statuts-data-catalogs-v-') || name === 'statuts-data-catalogs') return cache
+        if (name === 'statuts-data-metadata') return metadataCache
+        return emptyCache
+      }),
+      keys: async () => [],
+      delete: async () => true,
+    })
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => storage.get(key) ?? null,
       setItem: (key: string, value: string) => { storage.set(key, value) },
@@ -273,6 +299,102 @@ describe('official catalog bootstrap', () => {
 
   it('treats a structurally incomplete manifest as manifest_invalid', async () => {
     fetchMock.mockResolvedValue(Response.json({ ...manifest, files: { taxa: manifest.files.taxa } }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('rejects a negative count as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: { ...manifest.files, statusDefinitions: { ...manifest.files.statusDefinitions, count: -1 } },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('rejects a non-integer count as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: { ...manifest.files, taxa: { ...manifest.files.taxa, flora: { ...manifest.files.taxa.flora, count: 1.5 } } },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+  })
+
+  it('rejects an unusable generatedAt as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ...manifest, generatedAt: 'not-a-date' }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('accepts a DatasetFile whose SHA suffix is exactly 12 hex', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: {
+        ...manifest.files,
+        taxa: { ...manifest.files.taxa, flora: { file: 'taxa-flora-012345abcdef.json', count: 0 } },
+      },
+    }))
+    const result = await loadDataStore()
+    expect(result.state).toBe('available')
+  })
+
+  it('rejects a 1-hex DatasetFile suffix as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: {
+        ...manifest.files,
+        taxa: { ...manifest.files.taxa, flora: { file: 'taxa-flora-a.json', count: 0 } },
+      },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('rejects an 11-hex DatasetFile suffix as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: {
+        ...manifest.files,
+        taxa: { ...manifest.files.taxa, flora: { file: 'taxa-flora-012345abcde.json', count: 0 } },
+      },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+  })
+
+  it('rejects a 13-hex DatasetFile suffix as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: {
+        ...manifest.files,
+        taxa: { ...manifest.files.taxa, flora: { file: 'taxa-flora-012345abcdef0.json', count: 0 } },
+      },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+  })
+
+  it('rejects an empty datasetVersion as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ...manifest, datasetVersion: '' }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('rejects a datasetVersion with a forbidden character as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ...manifest, datasetVersion: 'a/b' }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('rejects a datasetVersion longer than 80 characters as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ...manifest, datasetVersion: `${'x'.repeat(81)}` }))
     const result = await loadDataStore()
     expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
     expectNoDemoStore(result)

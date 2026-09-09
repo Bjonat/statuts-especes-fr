@@ -1,6 +1,9 @@
 # Documentation métier
 
 - [Roadmap technique](ROADMAP.md) — vision moteur, audit, phases, futures PR
+- [Disponibilité hors ligne](offline-cache-readiness.md) — inventaire Cache Storage de la version active
+- [Atomicité des mises à jour](data-update-atomicity.md) — active / previous / candidate
+- [Couverture des sources (générée)](generated/source-coverage.md) — matrice registre × territoire, pas l’applicabilité juridique
 - [Couverture des sources (générée)](generated/source-coverage.md) — matrice registre × territoire, pas l’applicabilité juridique
 - [Pipeline de données](../data-pipeline/README.md) — construction, contrat compact, sentinelles
 - [Déploiement FTP](deployment-ftp.md)
