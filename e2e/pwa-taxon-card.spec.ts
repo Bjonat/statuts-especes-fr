@@ -39,9 +39,9 @@ test.describe('PWA fiche taxon lisible', () => {
     await expect(page.getByText('Les statuts affichés correspondent à ce territoire.')).toBeVisible()
 
     await expect(page.getByRole('heading', { name: 'Statuts' })).toBeVisible()
-    await expect(page.getByText('Liste rouge régionale')).toBeVisible()
+    await expect(page.locator('.status-type', { hasText: 'Liste rouge régionale' })).toBeVisible()
     await expect(page.getByText('VU - fixture e2e-a')).toBeVisible()
-    await expect(page.getByText('Déterminante ZNIEFF')).toHaveCount(2)
+    await expect(page.locator('.status-type', { hasText: 'Déterminante ZNIEFF' })).toHaveCount(2)
     await expect(page.getByText(/Portée : Midi-Pyrénées/)).toBeVisible()
     await expect(page.getByText(/Sources et versions/)).toBeVisible()
 
@@ -53,7 +53,8 @@ test.describe('PWA fiche taxon lisible', () => {
     expect(panelId).toBeTruthy()
     const panel = page.locator(`#${panelId}`)
     await expect(panel).toBeVisible()
-    await expect(panel.getByText(/Liste rouge|Protection|ZNIEFF|statut/i)).toBeVisible()
+    await expect(panel.locator('.status-help-family')).toHaveText('Liste rouge')
+    await expect(panel.getByText('Vulnérable.')).toBeVisible()
     await panel.getByRole('button', { name: 'Fermer' }).click()
     await expect(help).toHaveAttribute('aria-expanded', 'false')
     await expect(panel).toBeHidden()
@@ -70,7 +71,7 @@ test.describe('PWA fiche taxon lisible', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Animal de test' })).toBeVisible()
     await expect(page.getByText('Animalia testensis')).toBeVisible()
     await expect(page.locator('.territory-region')).toHaveText('Occitanie')
-    await expect(page.getByText('Liste rouge régionale')).toBeVisible()
+    await expect(page.locator('.status-type', { hasText: 'Liste rouge régionale' })).toBeVisible()
     await expect(page.getByText('NT - fixture e2e-a')).toBeVisible()
 
     const help = page.getByRole('button', { name: 'Aide sur ce statut' }).first()
@@ -135,6 +136,7 @@ test.describe('PWA fiche taxon lisible', () => {
       { width: 320, height: 720 },
       { width: 360, height: 800 },
       { width: 390, height: 844 },
+      { width: 1280, height: 720 },
     ]) {
       await page.setViewportSize(viewport)
       await expect(page.getByRole('heading', { level: 1, name: 'Plante fictive de test' })).toBeVisible()

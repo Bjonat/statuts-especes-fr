@@ -42,7 +42,7 @@ describe('PWA taxon card presentation', () => {
     expect(body).toMatch(/département \$\{state\.department\}/)
     expect(body).toMatch(/Toute la région/)
     expect(body).toMatch(/Les statuts affichés correspondent à ce territoire/)
-    expect(body).toMatch(/taxonStatuses\.map\(/)
+    expect(body).toMatch(/taxonStatuses\s*\.map\(/)
     expect(body).toMatch(/shortStatusLabel\(status\)/)
     expect(body).toMatch(/shortStatusValue\(status\)/)
     expect(body).toMatch(/status\.scope === 'partial'/)
