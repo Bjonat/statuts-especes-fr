@@ -1,5 +1,6 @@
 import {
   DatasetIntegrityError,
+  isDatasetVersion,
   parseDataManifest,
   verifyDatasetBuffer,
 } from './manifest'
@@ -39,8 +40,16 @@ export type DatasetUpdateProgress = {
 }
 
 export function datasetCacheName(datasetVersion: string): string {
-  const sanitized = datasetVersion.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
-  return `${DATASET_CACHE_PREFIX}${sanitized || 'unknown'}`
+  if (!isDatasetVersion(datasetVersion)) {
+    throw new Error(`datasetVersion invalide : ${datasetVersion}`)
+  }
+  return `${DATASET_CACHE_PREFIX}${datasetVersion}`
+}
+
+export function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError')
+  }
 }
 
 export function catalogFileUrl(file: string, baseURI = document.baseURI): string {
@@ -496,10 +505,12 @@ export async function prepareAndActivateCandidate(
 ): Promise<DataManifest> {
   const files = requiredUpdateFiles(candidate, protectedRegions)
   await stageRequiredFiles(candidate, files, options)
+  throwIfAborted(options.signal)
   const valid = await validateRequiredFilesInCache(candidate, files)
   if (!valid) {
     throw new DatasetIntegrityError('La nouvelle version n’a pas pu être vérifiée.')
   }
+  throwIfAborted(options.signal)
   await commitActivation(active, candidate)
   await cleanupObsoleteCatalogCaches(candidate.datasetVersion, active.datasetVersion)
   return candidate

@@ -313,6 +313,28 @@ describe('dataset storage', () => {
     expect(requiredUpdateFiles(manifestB, [])).toHaveLength(0)
   })
 
+  it('maps distinct accepted datasetVersion values to distinct cache names', () => {
+    const versions = [
+      'version-a',
+      'version-b',
+      'version-c',
+      '35647eeda4b2',
+      'current',
+      'a.b',
+      'a_b',
+      'a-b',
+      'x'.repeat(80),
+      `${'x'.repeat(79)}y`,
+    ]
+    const names = versions.map((version) => datasetCacheName(version))
+    expect(new Set(names).size).toBe(versions.length)
+    expect(datasetCacheName('version-a')).toBe('statuts-data-catalogs-v-version-a')
+    expect(datasetCacheName('35647eeda4b2')).toBe('statuts-data-catalogs-v-35647eeda4b2')
+    expect(() => datasetCacheName('a/b')).toThrow(/datasetVersion invalide/)
+    expect(() => datasetCacheName('')).toThrow(/datasetVersion invalide/)
+    expect(() => datasetCacheName('x'.repeat(81))).toThrow(/datasetVersion invalide/)
+  })
+
   it('interrupts a candidate after two files and leaves active A intact', async () => {
     await persistActive(manifestA)
     seedVersion(manifestA, EMPTY_JSON, [
@@ -340,6 +362,44 @@ describe('dataset storage', () => {
     const occA = await createOfflineDataManager(manifestA).inspect()
     expect(occA.regions.find((region) => region.region === 'OCC')?.consultableOffline).toBe(true)
     expect(openVersion(manifestB.datasetVersion).entries.size).toBe(2)
+  })
+
+  it('aborts at completedFiles === totalFiles before writing active B', async () => {
+    await persistActive(manifestA)
+    seedVersion(manifestA, EMPTY_JSON, [
+      manifestA.files.taxa.flora,
+      manifestA.files.taxa.fauna,
+      manifestA.files.statusDefinitions,
+      manifestA.files.statusLinks.flora.OCC,
+      manifestA.files.statusLinks.fauna.OCC,
+    ])
+    for (const file of requiredUpdateFiles(manifestB, ['OCC'])) {
+      payloads.set(file.file, OTHER_JSON)
+    }
+    const metadataPuts: Array<{ url: string; datasetVersion: string }> = []
+    const meta = metadata()
+    meta.put.mockImplementation(async (url: string, response: Response) => {
+      const body = JSON.parse(await response.clone().text()) as { datasetVersion?: string }
+      metadataPuts.push({ url: String(url), datasetVersion: String(body.datasetVersion ?? '') })
+      meta.entries.set(String(url), response.clone())
+    })
+    const controller = new AbortController()
+    await expect(
+      prepareAndActivateCandidate(manifestA, manifestB, ['OCC'], {
+        signal: controller.signal,
+        onProgress: (progress) => {
+          if (progress.completedFiles === progress.totalFiles) controller.abort()
+        },
+      }),
+    ).rejects.toMatchObject({ name: 'AbortError' })
+    const activeUrl = new URL(ACTIVE_MANIFEST_PATH, baseURI).href
+    expect(metadataPuts.some((entry) => entry.url === activeUrl && entry.datasetVersion === 'version-b')).toBe(false)
+    expect((await readActiveManifest())?.datasetVersion).toBe('version-a')
+    expect(await readPreviousManifest()).toBeNull()
+    const occA = await createOfflineDataManager(manifestA).inspect()
+    expect(occA.regions.find((region) => region.region === 'OCC')?.consultableOffline).toBe(true)
+    expect(openVersion(manifestA.datasetVersion).entries.size).toBe(5)
+    expect(openVersion(manifestB.datasetVersion).entries.size).toBe(5)
   })
 
   it('reloads the active A inventory after an interrupted candidate', async () => {

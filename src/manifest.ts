@@ -10,10 +10,17 @@ export class DatasetIntegrityError extends Error {
   }
 }
 
+export const DATASET_VERSION_PATTERN = /^[A-Za-z0-9._-]{1,80}$/
+export const DATASET_FILE_NAME_PATTERN = /^[a-z0-9-]+-[a-f0-9]{12}\.json$/i
+
+export function isDatasetVersion(value: unknown): value is string {
+  return typeof value === 'string' && DATASET_VERSION_PATTERN.test(value)
+}
+
 export function isDatasetFile(value: unknown): value is DatasetFile {
   if (!value || typeof value !== 'object') return false
   const candidate = value as { file?: unknown; count?: unknown; bytes?: unknown }
-  if (typeof candidate.file !== 'string' || !/^[a-z0-9-]+-[a-f0-9]+\.json$/i.test(candidate.file)) return false
+  if (typeof candidate.file !== 'string' || !DATASET_FILE_NAME_PATTERN.test(candidate.file)) return false
   if (typeof candidate.count !== 'number' || !Number.isInteger(candidate.count) || candidate.count < 0) return false
   if (candidate.bytes !== undefined) {
     if (
@@ -47,8 +54,7 @@ export function isDataManifest(value: unknown): value is DataManifest {
     candidate.official !== true ||
     typeof candidate.generatedAt !== 'string' ||
     !Number.isFinite(Date.parse(candidate.generatedAt)) ||
-    typeof candidate.datasetVersion !== 'string' ||
-    candidate.datasetVersion.length === 0 ||
+    !isDatasetVersion(candidate.datasetVersion) ||
     !Array.isArray(candidate.regions) ||
     candidate.regions.length !== METROPOLITAN_REGION_CODES.length ||
     !candidate.regions.every(isRegion) ||
@@ -85,7 +91,7 @@ export function parseDataManifest(value: unknown): DataManifest | null {
 }
 
 export function datasetFileHashSuffix(fileName: string): string | null {
-  const match = fileName.match(/-([a-f0-9]+)\.json$/i)
+  const match = fileName.match(/-([a-f0-9]{12})\.json$/i)
   return match ? match[1].toLowerCase() : null
 }
 

@@ -330,6 +330,76 @@ describe('official catalog bootstrap', () => {
     expectNoDemoStore(result)
   })
 
+  it('accepts a DatasetFile whose SHA suffix is exactly 12 hex', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: {
+        ...manifest.files,
+        taxa: { ...manifest.files.taxa, flora: { file: 'taxa-flora-012345abcdef.json', count: 0 } },
+      },
+    }))
+    const result = await loadDataStore()
+    expect(result.state).toBe('available')
+  })
+
+  it('rejects a 1-hex DatasetFile suffix as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: {
+        ...manifest.files,
+        taxa: { ...manifest.files.taxa, flora: { file: 'taxa-flora-a.json', count: 0 } },
+      },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('rejects an 11-hex DatasetFile suffix as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: {
+        ...manifest.files,
+        taxa: { ...manifest.files.taxa, flora: { file: 'taxa-flora-012345abcde.json', count: 0 } },
+      },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+  })
+
+  it('rejects a 13-hex DatasetFile suffix as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: {
+        ...manifest.files,
+        taxa: { ...manifest.files.taxa, flora: { file: 'taxa-flora-012345abcdef0.json', count: 0 } },
+      },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+  })
+
+  it('rejects an empty datasetVersion as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ...manifest, datasetVersion: '' }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('rejects a datasetVersion with a forbidden character as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ...manifest, datasetVersion: 'a/b' }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('rejects a datasetVersion longer than 80 characters as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ...manifest, datasetVersion: `${'x'.repeat(81)}` }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
   it('creates a demo store only through createDemoDataStore()', () => {
     const store = createDemoDataStore()
     expect(store.official).toBe(false)
