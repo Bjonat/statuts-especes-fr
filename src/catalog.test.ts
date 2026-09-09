@@ -3,7 +3,8 @@ import { createDemoDataStore, loadDataStore } from './catalog'
 import { METROPOLITAN_REGION_CODES } from './types'
 
 const regions = METROPOLITAN_REGION_CODES.map((code) => ({ code, name: code }))
-const file = (name: string) => ({ file: `${name}-abcdef.json`, count: 0 })
+const file = (name: string, bytes?: number) =>
+  bytes === undefined ? { file: `${name}-abcdef.json`, count: 0 } : { file: `${name}-abcdef.json`, count: 0, bytes }
 const manifest = {
   schemaVersion: 3, official: true, generatedAt: '2026-09-08',
   datasetVersion: 'current', taxrefVersion: '18', bdcVersion: '18',
@@ -13,6 +14,16 @@ const manifest = {
     statusDefinitions: file('status-definitions'),
     statusLinks: Object.fromEntries(['flora', 'fauna'].map((realm) => [
       realm, Object.fromEntries(regions.map(({ code }) => [code, file(`status-links-${realm}-${code.toLowerCase()}`)])),
+    ])),
+  },
+}
+const manifestWithBytes = {
+  ...manifest,
+  files: {
+    taxa: { flora: file('taxa-flora', 10), fauna: file('taxa-fauna', 20) },
+    statusDefinitions: file('status-definitions', 30),
+    statusLinks: Object.fromEntries(['flora', 'fauna'].map((realm) => [
+      realm, Object.fromEntries(regions.map(({ code }) => [code, file(`status-links-${realm}-${code.toLowerCase()}`, 4)])),
     ])),
   },
 }
@@ -35,12 +46,13 @@ async function loadOfficialStore() {
   if (result.state !== 'available') throw new Error('expected available official store')
   expect(result.store.official).toBe(true)
   expect(result.store.datasetVersion).not.toBe('demo')
+  expect(result.store.offline).not.toBeNull()
   return result.store
 }
 
 describe('offline catalog readiness', () => {
   let entries: Map<string, Response>
-  let cache: { match: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn> }
+  let cache: { match: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> }
   let network: { onLine: boolean; connection: { saveData: boolean } }
   let fetchMock: ReturnType<typeof vi.fn>
 
@@ -49,6 +61,7 @@ describe('offline catalog readiness', () => {
     cache = {
       match: vi.fn(async (url: string) => entries.get(url)?.clone()),
       put: vi.fn(async (url: string, response: Response) => { entries.set(url, response) }),
+      delete: vi.fn(async (url: string) => entries.delete(url)),
     }
     network = { onLine: false, connection: { saveData: false } }
     const storage = new Map([['offlineDatasetVersion', manifest.datasetVersion]])
@@ -73,17 +86,22 @@ describe('offline catalog readiness', () => {
   it('rejects a stale readiness marker when one regional file was evicted', async () => {
     entries.delete(files.at(-1)!)
     const store = await loadOfficialStore()
-    expect(store.official).toBe(true)
-    expect(await store.primeOffline()).toBe(false)
+    const inventory = await store.offline!.inspect()
+    expect(inventory.readyRegionCount).toBe(12)
+    const pac = inventory.regions.find((region) => region.region === 'PAC')
+    expect(pac?.consultableOffline).toBe(false)
+    expect(pac?.availability).toBe('partial')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('repairs the missing file online despite the old marker, respecting the subdirectory', async () => {
+  it('repairs the missing regional file online without re-fetching the rest', async () => {
     const missing = files.at(-1)!
     entries.delete(missing)
     network.onLine = true
     const store = await loadOfficialStore()
-    expect(await store.primeOffline()).toBe(true)
+    const result = await store.offline!.prepareRegion('PAC')
+    expect(result.outcome).toBe('complete')
+    expect(result.inventory.regions.find((region) => region.region === 'PAC')?.consultableOffline).toBe(true)
     expect(cache.put).toHaveBeenCalledTimes(1)
     expect(entries.has(missing)).toBe(true)
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -92,43 +110,63 @@ describe('offline catalog readiness', () => {
   it('accepts a complete cache offline without any readiness marker', async () => {
     vi.stubGlobal('localStorage', { getItem: () => null })
     const store = await loadOfficialStore()
-    expect(await store.primeOffline()).toBe(true)
+    const inventory = await store.offline!.inspect()
+    expect(inventory.shared.availability).toBe('ready')
+    expect(inventory.readyRegionCount).toBe(13)
+    expect(inventory.regions.every((region) => region.consultableOffline)).toBe(true)
     expect(cache.match).toHaveBeenCalledTimes(29)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('checks completeness even in save-data mode and does not download a missing file', async () => {
+  it('inspects completeness even in save-data mode and does not download during inspect', async () => {
     network.onLine = true
     network.connection.saveData = true
     const store = await loadOfficialStore()
-    expect(await store.primeOffline()).toBe(true)
+    expect((await store.offline!.inspect()).readyRegionCount).toBe(13)
     entries.delete(files[0])
-    expect(await store.primeOffline()).toBe(false)
+    expect((await store.offline!.inspect()).shared.availability).not.toBe('ready')
+    expect((await store.offline!.inspect()).readyRegionCount).toBe(0)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('returns false when Cache Storage is unavailable despite a readiness marker', async () => {
+  it('returns no ready region when Cache Storage is unavailable despite a readiness marker', async () => {
     vi.stubGlobal('window', {})
     const store = await loadOfficialStore()
-    expect(await store.primeOffline()).toBe(false)
+    const inventory = await store.offline!.inspect()
+    expect(inventory.storageAvailable).toBe(false)
+    expect(inventory.readyRegionCount).toBe(0)
+    expect(inventory.regions.every((region) => !region.consultableOffline)).toBe(true)
   })
 
-  it('returns false if writing the missing file exceeds quota', async () => {
+  it('does not mark a region ready if writing the missing file exceeds quota', async () => {
     network.onLine = true
     entries.delete(files[0])
     cache.put.mockRejectedValue(new DOMException('quota', 'QuotaExceededError'))
     const store = await loadOfficialStore()
-    expect(await store.primeOffline()).toBe(false)
+    const result = await store.offline!.prepareRegion('OCC')
+    expect(result.outcome).toBe('failed')
+    if (result.outcome !== 'failed') throw new Error('expected failed')
+    expect(result.reason).toBe('storage')
+    expect(result.inventory.regions.find((region) => region.region === 'OCC')?.consultableOffline).toBe(false)
   })
 
-  it('returns false on a network failure or HTTP error', async () => {
+  it('does not mark a region ready on a network failure or HTTP error', async () => {
     network.onLine = true
     entries.delete(files[0])
     const store = await loadOfficialStore()
     fetchMock.mockRejectedValueOnce(new TypeError('network failure'))
-    expect(await store.primeOffline()).toBe(false)
+    const networkResult = await store.offline!.prepareRegion('OCC')
+    expect(networkResult.outcome).toBe('failed')
+    if (networkResult.outcome !== 'failed') throw new Error('expected failed')
+    expect(networkResult.reason).toBe('network')
+    expect(networkResult.inventory.regions.find((region) => region.region === 'OCC')?.consultableOffline).toBe(false)
+
     fetchMock.mockResolvedValueOnce(new Response('', { status: 503 }))
-    expect(await store.primeOffline()).toBe(false)
+    const httpResult = await store.offline!.prepareRegion('OCC')
+    expect(httpResult.outcome).toBe('failed')
+    if (httpResult.outcome !== 'failed') throw new Error('expected failed')
+    expect(httpResult.reason).toBe('http')
+    expect(httpResult.inventory.regions.find((region) => region.region === 'OCC')?.consultableOffline).toBe(false)
   })
 })
 
@@ -153,6 +191,47 @@ describe('official catalog bootstrap', () => {
     if (result.state !== 'available') throw new Error('expected available')
     expect(result.store.official).toBe(true)
     expect(result.store.datasetVersion).toBe('current')
+    expect(result.store.offline).not.toBeNull()
+  })
+
+  it('accepts a v3 manifest that includes optional bytes', async () => {
+    fetchMock.mockResolvedValue(Response.json(manifestWithBytes))
+    const result = await loadDataStore()
+    expect(result.state).toBe('available')
+  })
+
+  it('accepts a legacy v3 manifest without bytes', async () => {
+    fetchMock.mockResolvedValue(Response.json(manifest))
+    const result = await loadDataStore()
+    expect(result.state).toBe('available')
+  })
+
+  it('rejects negative bytes as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: { ...manifest.files, statusDefinitions: { ...manifest.files.statusDefinitions, bytes: -1 } },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('rejects non-integer bytes as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: { ...manifest.files, taxa: { ...manifest.files.taxa, flora: { ...manifest.files.taxa.flora, bytes: 1.5 } } },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+  })
+
+  it('rejects non-numeric bytes as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({
+      ...manifest,
+      files: { ...manifest.files, taxa: { ...manifest.files.taxa, fauna: { ...manifest.files.taxa.fauna, bytes: '12' } } },
+    }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
   })
 
   it('treats HTTP 503 as a recoverable error without creating a demo store', async () => {
@@ -203,6 +282,7 @@ describe('official catalog bootstrap', () => {
     const store = createDemoDataStore()
     expect(store.official).toBe(false)
     expect(store.datasetVersion).toBe('demo')
+    expect(store.offline).toBeNull()
   })
 
   it('does not fall back to demo when official manifest loading fails', async () => {

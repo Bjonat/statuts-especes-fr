@@ -94,6 +94,12 @@ export interface Catalog {
 export interface DatasetFile {
   file: string
   count: number
+  /**
+   * Taille du fichier JSON généré, en octets.
+   * Estimation de volume de données, pas la consommation réseau,
+   * l’espace Cache Storage réel ni le volume HTTP compressé.
+   */
+  bytes?: number
 }
 
 export interface DataManifest {

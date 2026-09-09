@@ -4,7 +4,7 @@ Ce repository fournit aujourd’hui une **PWA mobile offline-first**, un **moteu
 
 **Aujourd’hui :** PWA terrain + resolver région / département + pipeline v3 + dataset embarqué + [matrice de couverture](docs/generated/source-coverage.md).
 
-**Priorité actuelle :** hardening PWA terrain — chargement / démo explicite (PR-PWA-01) puis écran Données hors ligne, mises à jour atomiques, validation appareils — voir [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Priorité actuelle :** hardening PWA terrain — Données hors ligne par région (PR-PWA-02) puis mises à jour atomiques (PR-PWA-03) — voir [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 CLI/CSV, QGIS et distribution restent documentés mais **différés**. Ces usages ne sont pas disponibles.
 
@@ -88,7 +88,7 @@ npm run dev
 
 Tant qu’aucun jeu officiel n’est disponible (fichier `public/data/manifest.json` absent, invalide ou injoignable), **la PWA ne bascule jamais automatiquement** vers les fixtures de démonstration. Un écran explique la situation ; le mode démonstration n’existe qu’après un clic explicite **Ouvrir la démonstration**, reste clairement signalé (badge et avertissement) et n’est pas persisté. Un redémarrage retente toujours les données officielles.
 
-La disponibilité hors ligne du jeu officiel est contrôlée à partir des fichiers réellement présents dans Cache Storage (PR #40). Cela ne constitue pas encore une gestion atomique des versions (PR-PWA-03).
+Le démarrage officiel **ne télécharge plus** les 13 régions. Il charge le manifeste, inspecte Cache Storage et affiche l’état existant. L’écran **Données hors ligne** (absent en démonstration) permet de préparer une région, suivre la progression, interrompre puis reprendre, et supprimer les données régionales. Le socle partagé (catalogues flore/faune + définitions) est téléchargé automatiquement avec la première région et retiré avec la dernière. Cache Storage reste la seule source de vérité : aucun marqueur `localStorage` de readiness. Si le manifeste fournit `bytes`, l’écran affiche un volume estimé (`≈ X Mio`) ; sinon le volume est omis. Ce n’est pas encore une gestion atomique des versions (PR-PWA-03).
 
 Socle national (dumps TAXREF / BDC déjà extraits, non versionnés) :
 

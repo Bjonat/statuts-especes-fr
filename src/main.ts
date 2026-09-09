@@ -9,6 +9,7 @@ import {
   buildStatusHelp,
   formatStatusValueForDisplay,
 } from './status-help'
+import type { OfflineDownloadProgress, OfflineInventory } from './offline-data'
 import type { Realm, RegionCode, SourceDataset, StatusCategory, Taxon, TaxonStatus } from './types'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -54,7 +55,7 @@ let installPrompt: BeforeInstallPromptEvent | null = null
 let iosInstallHelpVisible = false
 
 const state: {
-  screen: 'home' | 'sources'
+  screen: 'home' | 'sources' | 'offline'
   realm: Realm | null
   region: RegionCode
   department: string | null
@@ -65,7 +66,11 @@ const state: {
   regionSources: SourceDataset[]
   loading: boolean
   error: string | null
-  offlineReady: boolean
+  offlineInventory: OfflineInventory | null
+  offlinePreparing: RegionCode | null
+  offlineProgress: OfflineDownloadProgress | null
+  offlineNotice: string | null
+  offlineConfirmRemove: RegionCode | null
 } = {
   screen: 'home',
   realm: null,
@@ -78,8 +83,19 @@ const state: {
   regionSources: [],
   loading: false,
   error: null,
-  offlineReady: false,
+  offlineInventory: null,
+  offlinePreparing: null,
+  offlineProgress: null,
+  offlineNotice: null,
+  offlineConfirmRemove: null,
 }
+
+let offlineAbort: AbortController | null = null
+
+const OFFLINE_INTERRUPTED_MESSAGE =
+  'Téléchargement interrompu. Les fichiers déjà récupérés sont conservés.'
+const OFFLINE_STORAGE_MESSAGE =
+  'Espace de stockage insuffisant pour terminer le téléchargement. Les fichiers déjà téléchargés sont conservés.'
 
 const STATUS_LABELS: Partial<Record<StatusCategory, string>> = {
   red_list_national: 'Liste rouge nationale',
@@ -130,9 +146,13 @@ function renderDataNotice(): string {
 
 function offlineBadgeText(): string {
   if (dataMode.state === 'demo') return 'Démonstration'
-  if (state.offlineReady) return 'Hors ligne prêt'
-  if (navigator.onLine) return 'Préparation hors ligne...'
-  return 'Données hors ligne partielles'
+  const inventory = state.offlineInventory
+  if (!inventory) return 'Vérification hors ligne…'
+  if (inventory.readyRegionCount === 0) return 'Aucune région hors ligne'
+  if (inventory.readyRegionCount === inventory.regions.length) {
+    return `${inventory.readyRegionCount} régions hors ligne`
+  }
+  return `Hors ligne : ${inventory.readyRegionCount}/${inventory.regions.length} régions`
 }
 
 function offlineBadge(): string {
@@ -144,6 +164,284 @@ function refreshOfflineBadges(): void {
   document.querySelectorAll<HTMLElement>('.offline-badge').forEach((badge) => {
     badge.textContent = offlineBadgeText()
   })
+}
+
+function formatEstimatedVolume(bytes: number): string {
+  const mio = bytes / (1024 * 1024)
+  return `≈ ${mio.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} Mio`
+}
+
+function volumeMarkup(bytes: number | undefined, suffix = ''): string {
+  if (bytes === undefined) {
+    return `<p class="offline-volume">Volume non disponible pour cette version</p>`
+  }
+  return `<p class="offline-volume">${escapeHtml(formatEstimatedVolume(bytes))}${suffix ? ` ${escapeHtml(suffix)}` : ''}</p>`
+}
+
+async function inspectOfflineCache(): Promise<void> {
+  const current = activeStore()
+  if (!current?.offline) {
+    state.offlineInventory = null
+    return
+  }
+  state.offlineInventory = await current.offline.inspect()
+}
+
+async function openOffline(): Promise<void> {
+  if (dataMode.state !== 'official' || !store().offline) return
+  state.screen = 'offline'
+  state.realm = null
+  state.query = ''
+  state.selectedTaxon = null
+  state.offlineNotice = null
+  state.offlineConfirmRemove = null
+  render()
+  await inspectOfflineCache()
+  if (state.screen === 'offline') render()
+}
+
+function closeOffline(): void {
+  offlineAbort?.abort()
+  state.screen = 'home'
+  state.offlineConfirmRemove = null
+  state.offlineNotice = null
+  render()
+}
+
+async function refreshOfflineScreen(): Promise<void> {
+  if (state.offlinePreparing) return
+  await inspectOfflineCache()
+  if (state.screen === 'offline') render()
+  else refreshOfflineBadges()
+}
+
+async function prepareOfflineRegion(region: RegionCode): Promise<void> {
+  const manager = store().offline
+  if (!manager || state.offlinePreparing) return
+  if (!navigator.onLine) {
+    state.offlineNotice = 'Connexion nécessaire pour télécharger cette région.'
+    render()
+    return
+  }
+
+  state.offlinePreparing = region
+  state.offlineProgress = null
+  state.offlineNotice = null
+  state.offlineConfirmRemove = null
+  offlineAbort = new AbortController()
+  render()
+
+  const result = await manager.prepareRegion(region, {
+    signal: offlineAbort.signal,
+    onProgress: (progress) => {
+      if (state.offlinePreparing !== region) return
+      state.offlineProgress = progress
+      if (state.screen === 'offline') render()
+    },
+  })
+
+  if (dataMode.state !== 'official') return
+  state.offlineInventory = result.inventory
+  if (state.offlinePreparing === region) {
+    state.offlinePreparing = null
+    state.offlineProgress = null
+    offlineAbort = null
+    if (result.outcome === 'cancelled') {
+      state.offlineNotice = OFFLINE_INTERRUPTED_MESSAGE
+    } else if (result.outcome === 'failed') {
+      state.offlineNotice = result.reason === 'storage' ? OFFLINE_STORAGE_MESSAGE : OFFLINE_INTERRUPTED_MESSAGE
+    } else {
+      state.offlineNotice = null
+    }
+  }
+
+  if (state.screen === 'offline') render()
+  else refreshOfflineBadges()
+}
+
+function cancelOfflinePrepare(): void {
+  offlineAbort?.abort()
+}
+
+function requestRemoveOfflineRegion(region: RegionCode): void {
+  state.offlineConfirmRemove = region
+  render()
+}
+
+function cancelRemoveOfflineRegion(): void {
+  state.offlineConfirmRemove = null
+  render()
+}
+
+async function confirmRemoveOfflineRegion(region: RegionCode): Promise<void> {
+  const manager = store().offline
+  if (!manager) return
+  state.offlineConfirmRemove = null
+  const result = await manager.removeRegion(region)
+  state.offlineInventory = result.inventory
+  render()
+}
+
+function sharedStatusLabel(availability: OfflineInventory['shared']['availability']): string {
+  if (availability === 'ready') return 'Prêt'
+  if (availability === 'partial') return 'Partiel'
+  return 'Non téléchargé'
+}
+
+function renderOfflineRegionCard(regionCode: RegionCode): string {
+  const inventory = state.offlineInventory
+  const region = store().regions.find((item) => item.code === regionCode)
+  const status = inventory?.regions.find((item) => item.region === regionCode)
+  const name = region?.name ?? regionCode
+  const preparing = state.offlinePreparing === regionCode
+  const busy = state.offlinePreparing !== null
+  const online = navigator.onLine
+
+  if (!inventory?.storageAvailable) {
+    return `
+      <li class="offline-region-card">
+        <div>
+          <h2>${escapeHtml(name)}</h2>
+          <p class="offline-region-status">Stockage indisponible</p>
+        </div>
+      </li>
+    `
+  }
+
+  if (!status) return ''
+
+  let statusText = 'À télécharger'
+  if (status.consultableOffline) statusText = 'Disponible hors ligne'
+  else if (status.availability === 'partial') statusText = 'Téléchargement incomplet'
+  if (preparing) statusText = 'Téléchargement…'
+
+  const progress = preparing && state.offlineProgress
+    ? `<p class="offline-progress" aria-live="polite">${state.offlineProgress.completedFiles} / ${state.offlineProgress.totalFiles} fichiers${
+        state.offlineProgress.bytesTotal !== undefined && state.offlineProgress.bytesCompleted !== undefined
+          ? ` · ${escapeHtml(formatEstimatedVolume(state.offlineProgress.bytesCompleted))} / ${escapeHtml(formatEstimatedVolume(state.offlineProgress.bytesTotal))}`
+          : ''
+      }</p>`
+    : status.availability === 'partial' && !preparing
+      ? `<p class="offline-progress">${status.cachedFiles} / ${status.totalFiles} fichiers régionaux</p>`
+      : ''
+
+  const volume = status.consultableOffline
+    ? volumeMarkup(status.bytesTotal, 'de données régionales')
+    : volumeMarkup(status.bytesTotal)
+
+  let actions = ''
+  if (state.offlineConfirmRemove === regionCode) {
+    actions = `
+      <div class="offline-confirm" role="group" aria-label="Confirmation de suppression">
+        <p>Supprimer les données hors ligne pour ${escapeHtml(name)}&nbsp;?</p>
+        <button class="secondary-button" type="button" data-cancel-remove="${regionCode}">Annuler</button>
+        <button class="danger-button" type="button" data-confirm-remove="${regionCode}">Supprimer</button>
+      </div>
+    `
+  } else if (preparing) {
+    actions = `<button class="secondary-button" type="button" data-cancel-prepare="${regionCode}">Annuler</button>`
+  } else {
+    const prepareDisabled = busy || !online
+    const prepareLabel = status.availability === 'missing' ? 'Télécharger' : status.availability === 'partial' ? 'Reprendre' : ''
+    const prepareTitle = !online ? 'Connexion nécessaire' : ''
+    const prepareButton = prepareLabel
+      ? `<button class="primary-button" type="button" data-prepare-region="${regionCode}" ${prepareDisabled ? 'disabled' : ''} ${prepareTitle ? `title="${prepareTitle}"` : ''}>${prepareLabel}</button>${!online && !busy ? '<p class="field-hint">Connexion nécessaire</p>' : ''}`
+      : ''
+    const removeButton =
+      status.availability !== 'missing'
+        ? `<button class="danger-button" type="button" data-remove-region="${regionCode}" ${busy ? 'disabled' : ''}>Supprimer</button>`
+        : ''
+    actions = `<div class="offline-region-actions">${prepareButton}${removeButton}</div>`
+  }
+
+  return `
+    <li class="offline-region-card">
+      <div>
+        <h2>${escapeHtml(name)}</h2>
+        <p class="offline-region-status">${escapeHtml(statusText)}</p>
+        ${progress}
+        ${volume}
+      </div>
+      ${actions}
+    </li>
+  `
+}
+
+function bindOfflineActions(): void {
+  document.querySelector<HTMLButtonElement>('#offline-back')?.addEventListener('click', closeOffline)
+  document.querySelector<HTMLButtonElement>('#offline-refresh')?.addEventListener('click', () => {
+    void refreshOfflineScreen()
+  })
+  document.querySelectorAll<HTMLButtonElement>('[data-prepare-region]').forEach((button) => {
+    button.addEventListener('click', () => {
+      void prepareOfflineRegion(button.dataset.prepareRegion as RegionCode)
+    })
+  })
+  document.querySelectorAll<HTMLButtonElement>('[data-cancel-prepare]').forEach((button) => {
+    button.addEventListener('click', cancelOfflinePrepare)
+  })
+  document.querySelectorAll<HTMLButtonElement>('[data-remove-region]').forEach((button) => {
+    button.addEventListener('click', () => {
+      requestRemoveOfflineRegion(button.dataset.removeRegion as RegionCode)
+    })
+  })
+  document.querySelectorAll<HTMLButtonElement>('[data-cancel-remove]').forEach((button) => {
+    button.addEventListener('click', cancelRemoveOfflineRegion)
+  })
+  document.querySelectorAll<HTMLButtonElement>('[data-confirm-remove]').forEach((button) => {
+    button.addEventListener('click', () => {
+      void confirmRemoveOfflineRegion(button.dataset.confirmRemove as RegionCode)
+    })
+  })
+}
+
+function renderOffline(): void {
+  const inventory = state.offlineInventory
+
+  root.innerHTML = `
+    <main class="shell">
+      <header class="topbar">
+        <button class="link-button" id="offline-back" type="button">← Accueil</button>
+        ${offlineBadge()}
+      </header>
+
+      <section class="panel" aria-labelledby="offline-title">
+        <p class="eyebrow">Préparation terrain</p>
+        <h1 id="offline-title">Données hors ligne</h1>
+        <p class="intro">Préparez les régions dont vous aurez besoin avant votre sortie terrain.</p>
+
+        <div class="offline-toolbar">
+          <button class="secondary-button" id="offline-refresh" type="button" ${state.offlinePreparing ? 'disabled' : ''}>Actualiser</button>
+        </div>
+
+        ${
+          state.offlineNotice
+            ? `<p class="offline-notice" role="status" aria-live="polite">${escapeHtml(state.offlineNotice)}</p>`
+            : ''
+        }
+
+        ${
+          !inventory
+            ? `<p class="empty-state" aria-live="polite">Vérification du cache local…</p>`
+            : !inventory.storageAvailable
+              ? `<p class="empty-state" role="status">Le stockage hors ligne n’est pas disponible dans ce navigateur.</p>`
+              : `
+              <section class="offline-shared" aria-labelledby="offline-shared-title">
+                <h2 id="offline-shared-title">Socle partagé</h2>
+                <p class="offline-region-status">${escapeHtml(sharedStatusLabel(inventory.shared.availability))}</p>
+                ${volumeMarkup(inventory.shared.bytesTotal)}
+                <p class="field-hint">Géré automatiquement</p>
+              </section>
+              <ul class="offline-region-list">
+                ${inventory.regions.map((item) => renderOfflineRegionCard(item.region)).join('')}
+              </ul>
+            `
+        }
+      </section>
+    </main>
+  `
+
+  bindOfflineActions()
 }
 
 function isStandalone(): boolean {
@@ -443,6 +741,11 @@ function renderRealmChoice(): void {
         </div>
         ${installMarkup()}
         <button class="sources-button" id="open-sources" type="button">Sources</button>
+        ${
+          dataMode.state === 'official'
+            ? '<button class="sources-button" id="open-offline" type="button">Données hors ligne</button>'
+            : ''
+        }
         <div class="home-status">${offlineBadge()}</div>
       </section>
       ${renderDataNotice()}
@@ -456,6 +759,9 @@ function renderRealmChoice(): void {
   })
   document.querySelector<HTMLButtonElement>('#open-sources')?.addEventListener('click', () => {
     void openSources()
+  })
+  document.querySelector<HTMLButtonElement>('#open-offline')?.addEventListener('click', () => {
+    void openOffline()
   })
   bindInstallAction()
 }
@@ -799,13 +1105,19 @@ function enterLoadedStore(mode: 'official' | 'demo', next: DataStore): void {
   state.regionSources = []
   state.loading = false
   state.error = null
-  state.offlineReady = false
+  state.offlineInventory = null
+  state.offlinePreparing = null
+  state.offlineProgress = null
+  state.offlineNotice = null
+  state.offlineConfirmRemove = null
+  offlineAbort = null
   render()
-  if (mode !== 'official') return
-  void next.primeOffline().then((ready) => {
+  if (mode !== 'official' || !next.offline) return
+  void next.offline.inspect().then((inventory) => {
     if (dataMode.state !== 'official' || dataMode.store !== next) return
-    state.offlineReady = ready
-    refreshOfflineBadges()
+    state.offlineInventory = inventory
+    if (state.screen === 'offline') render()
+    else refreshOfflineBadges()
   })
 }
 
@@ -914,6 +1226,11 @@ function render(): void {
     return
   }
 
+  if (state.screen === 'offline') {
+    renderOffline()
+    return
+  }
+
   if (state.screen === 'sources') {
     renderSources()
     bindDataNoticeActions()
@@ -958,8 +1275,24 @@ window.addEventListener('appinstalled', () => {
   refreshInstallArea()
 })
 
-window.addEventListener('online', refreshOfflineBadges)
-window.addEventListener('offline', refreshOfflineBadges)
+window.addEventListener('online', () => {
+  refreshOfflineBadges()
+  if (state.screen === 'offline') render()
+})
+window.addEventListener('offline', () => {
+  refreshOfflineBadges()
+  if (state.screen === 'offline') render()
+})
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return
+  if (dataMode.state !== 'official') return
+  if (state.offlinePreparing) return
+  void inspectOfflineCache().then(() => {
+    if (state.screen === 'offline') render()
+    else refreshOfflineBadges()
+  })
+})
 
 async function start(): Promise<void> {
   render()
