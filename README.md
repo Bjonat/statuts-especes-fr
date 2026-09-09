@@ -4,7 +4,7 @@ Ce repository fournit aujourd’hui une **PWA mobile offline-first**, un **moteu
 
 **Aujourd’hui :** PWA terrain + resolver région / département + pipeline v3 + dataset embarqué + [matrice de couverture](docs/generated/source-coverage.md).
 
-**Priorité actuelle :** hardening PWA terrain — mises à jour atomiques des données (PR-PWA-03) puis validation navigateur (PR-PWA-04) — voir [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Priorité actuelle :** hardening PWA terrain — validation navigateur automatisée (PR-PWA-04) ; validation appareils réels encore à compléter ; PWA-05 non lancée — voir [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 CLI/CSV, QGIS et distribution restent documentés mais **différés**. Ces usages ne sont pas disponibles.
 
@@ -90,7 +90,7 @@ Tant qu’aucun jeu officiel n’est disponible (fichier `public/data/manifest.j
 
 Le démarrage officiel **ne télécharge plus** les 13 régions. S’il existe un manifeste **actif** en Cache Storage, la PWA l’ouvre immédiatement, y compris hors ligne, sans fetch réseau. L’écran **Données hors ligne** (absent en démonstration) permet de préparer une région, suivre la progression, interrompre puis reprendre, et supprimer les données régionales. Le socle partagé (catalogues flore/faune + définitions) est téléchargé automatiquement avec la première région et retiré avec la dernière.
 
-Les catalogues vivent dans des **caches versionnés** (`statuts-data-catalogs-v-…`), distincts du shell Workbox. Une nouvelle version n’est activée que sur action explicite, après téléchargement isolé et vérification SHA-256 / JSON / count / bytes des fichiers nécessaires aux régions déjà `ready`. Jusque-là la version active reste utilisable ; une interruption se reprend sans retélécharger les fichiers déjà validés. L’ancienne version est conservée comme `previous`. Cache Storage reste la seule source de vérité du dataset : aucun marqueur `localStorage` de version. Si le manifeste fournit `bytes`, l’écran affiche un volume estimé (`≈ X Mio`). Les parcours navigateur automatisés arriveront avec PR-PWA-04.
+Les catalogues vivent dans des **caches versionnés** (`statuts-data-catalogs-v-…`), distincts du shell Workbox. Une nouvelle version n’est activée que sur action explicite, après téléchargement isolé et vérification SHA-256 / JSON / count / bytes des fichiers nécessaires aux régions déjà `ready`. Jusque-là la version active reste utilisable ; une interruption se reprend sans retélécharger les fichiers déjà validés. L’ancienne version est conservée comme `previous`. Cache Storage reste la seule source de vérité du dataset : aucun marqueur `localStorage` de version. Si le manifeste fournit `bytes`, l’écran affiche un volume estimé (`≈ X Mio`). Les parcours critiques sont exercés dans un vrai Chromium contre le `dist/` de production (PR-PWA-04) ; la validation Android / iOS réelle reste un protocole manuel.
 
 Socle national (dumps TAXREF / BDC déjà extraits, non versionnés) :
 
@@ -110,6 +110,27 @@ npm run build
 npm run coverage:build
 ```
 
+`npm test` reste limité à Vitest et aux tests Node du pipeline. Il n’exécute pas Playwright.
+
+## Tests navigateur
+
+Les parcours PWA critiques s’exécutent **uniquement** contre le build de production (`dist/`), avec le vrai service worker `generateSW`, la vraie Cache Storage, des reloads et le mode offline du navigateur. Chromium est le moteur automatisé de référence. Ce n’est pas un test Chrome Android ni Safari iOS.
+
+```bash
+npm run build
+npm run test:e2e
+```
+
+Le serveur E2E local (`e2e/test-server.mjs`) sert `dist/` et un dataset miniature synthétique sous `/data/` (versions `e2e-a` / `e2e-b`). Aucun accès aux sources distantes, à INPN, ni au dataset de production. Les endpoints `/__test__/*` n’existent pas dans le bundle déployé.
+
+En local, installer Chromium une fois :
+
+```bash
+npx playwright install chromium
+```
+
+Rapports : [`docs/browser-validation.md`](docs/browser-validation.md) (suite automatisée) et [`docs/device-validation.md`](docs/device-validation.md) (protocole appareils réels).
+
 ## Limites actuelles
 
 - **Métropole uniquement** (pas DROM, pas marin dédié)
@@ -125,6 +146,8 @@ npm run coverage:build
 | --- | --- |
 | [`docs/README.md`](docs/README.md) | Index |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Trajectoire et chantiers |
+| [`docs/browser-validation.md`](docs/browser-validation.md) | Validation Chromium automatisée |
+| [`docs/device-validation.md`](docs/device-validation.md) | Protocole Android / iOS réel |
 | [`docs/generated/source-coverage.md`](docs/generated/source-coverage.md) | Couverture actuelle |
 | [`data-pipeline/README.md`](data-pipeline/README.md) | Pipeline et reproductions |
 | [`docs/deployment-ftp.md`](docs/deployment-ftp.md) | Déploiement |

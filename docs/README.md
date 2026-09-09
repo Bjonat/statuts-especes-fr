@@ -1,6 +1,8 @@
 # Documentation métier
 
 - [Roadmap technique](ROADMAP.md) — vision moteur, audit, phases, futures PR
+- [Validation navigateur](browser-validation.md) — suite Playwright Chromium contre `dist/` (PR-PWA-04)
+- [Validation appareils](device-validation.md) — protocole manuel Android Chrome et iOS Safari
 - [Disponibilité hors ligne](offline-cache-readiness.md) — inventaire Cache Storage de la version active
 - [Atomicité des mises à jour](data-update-atomicity.md) — active / previous / candidate
 - [Couverture des sources (générée)](generated/source-coverage.md) — matrice registre × territoire, pas l’applicabilité juridique
