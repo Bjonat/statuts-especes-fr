@@ -330,28 +330,34 @@ export function createOfflineDataManager(manifest: DataManifest): OfflineDataMan
       return { inventory: emptyInventory(manifest, false) }
     }
 
+    // Shared cleanup is fail-safe: delete the shared base only after a complete
+    // successful scan proves that no current-manifest regional file remains.
+    let sharedCleanupSafe = true
+
     for (const file of regionDatasetFiles(manifest, region)) {
       try {
         await cache.delete(catalogFileUrl(file.file))
       } catch {
-        // Exact current-manifest URLs only; a failed delete is not a wildcard sweep.
+        sharedCleanupSafe = false
       }
     }
 
     let remainingRegional = false
-    for (const file of allRegionalDatasetFiles(manifest)) {
-      try {
-        if (await cache.match(catalogFileUrl(file.file))) {
-          remainingRegional = true
+    if (sharedCleanupSafe) {
+      for (const file of allRegionalDatasetFiles(manifest)) {
+        try {
+          if (await cache.match(catalogFileUrl(file.file))) {
+            remainingRegional = true
+            break
+          }
+        } catch {
+          sharedCleanupSafe = false
           break
         }
-      } catch {
-        remainingRegional = false
-        break
       }
     }
 
-    if (!remainingRegional) {
+    if (sharedCleanupSafe && !remainingRegional) {
       for (const file of sharedDatasetFiles(manifest)) {
         try {
           await cache.delete(catalogFileUrl(file.file))

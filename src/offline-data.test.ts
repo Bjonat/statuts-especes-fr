@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   catalogFileUrl,
   createOfflineDataManager,
+  allRegionalDatasetFiles,
   regionDatasetFiles,
   sharedDatasetFiles,
 } from './offline-data'
@@ -266,6 +267,46 @@ describe('offline data manager', () => {
     const deleted = cache.delete.mock.calls.map((call) => call[0])
     for (const file of [...regionDatasetFiles(manifest, 'OCC'), ...sharedDatasetFiles(manifest)]) {
       expect(deleted).toContain(urlFor(file.file))
+    }
+  })
+
+  it('keeps the shared base if cache.match fails before another region is proven present', async () => {
+    seedFiles([
+      ...sharedDatasetFiles(manifest).map((item) => item.file),
+      ...regionDatasetFiles(manifest, 'OCC').map((item) => item.file),
+      ...regionDatasetFiles(manifest, 'NAQ').map((item) => item.file),
+    ])
+    const occUrls = new Set(regionDatasetFiles(manifest, 'OCC').map((item) => urlFor(item.file)))
+    cache.match.mockImplementation(async (url: string) => {
+      if (!occUrls.has(url) && allRegionalDatasetFiles(manifest).some((item) => urlFor(item.file) === url)) {
+        throw new Error('cache match failed')
+      }
+      return entries.get(url)?.clone()
+    })
+    await createOfflineDataManager(manifest).removeRegion('OCC')
+    const deleted = cache.delete.mock.calls.map((call) => String(call[0]))
+    for (const file of sharedDatasetFiles(manifest)) {
+      expect(deleted).not.toContain(urlFor(file.file))
+      expect(entries.has(urlFor(file.file))).toBe(true)
+    }
+  })
+
+  it('keeps the shared base if deleting a regional file throws', async () => {
+    seedFiles([
+      ...sharedDatasetFiles(manifest).map((item) => item.file),
+      ...regionDatasetFiles(manifest, 'OCC').map((item) => item.file),
+    ])
+    cache.delete.mockImplementation(async (url: string) => {
+      if (regionDatasetFiles(manifest, 'OCC').some((item) => urlFor(item.file) === url)) {
+        throw new Error('cache delete failed')
+      }
+      entries.delete(url)
+    })
+    await createOfflineDataManager(manifest).removeRegion('OCC')
+    const deleted = cache.delete.mock.calls.map((call) => String(call[0]))
+    for (const file of sharedDatasetFiles(manifest)) {
+      expect(deleted).not.toContain(urlFor(file.file))
+      expect(entries.has(urlFor(file.file))).toBe(true)
     }
   })
 
