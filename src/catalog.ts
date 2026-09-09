@@ -1,8 +1,11 @@
 import { DEMO_DATA_WARNING, regions as demoRegions, sources as demoSources, statuses as demoStatuses, taxa as demoTaxa } from './demo'
+import { createOfflineDataManager } from './offline-data'
+import type { OfflineDataManager } from './offline-data'
 import { collectSourceIdsFromLinks, hydrateStatusLinks } from './status-data'
 import { METROPOLITAN_REGION_CODES } from './types'
 import type {
   DataManifest,
+  DatasetFile,
   Realm,
   Region,
   RegionCode,
@@ -26,7 +29,8 @@ export interface DataStore {
   loadStatuses(realm: Realm, region: RegionCode): Promise<TaxonStatus[]>
   /** Socle national + sources citées dans les statuts flore/faune de la région. */
   listSourcesForRegion(region: RegionCode): Promise<SourceDataset[]>
-  primeOffline(): Promise<boolean>
+  /** Gestionnaire hors ligne du jeu officiel. Null en démonstration. */
+  offline: OfflineDataManager | null
 }
 
 function sortSources(sources: SourceDataset[]): SourceDataset[] {
@@ -38,10 +42,22 @@ function sortSources(sources: SourceDataset[]): SourceDataset[] {
   })
 }
 
-function isDatasetFile(value: unknown): value is { file: string; count: number } {
+function isDatasetFile(value: unknown): value is DatasetFile {
   if (!value || typeof value !== 'object') return false
-  const candidate = value as { file?: unknown; count?: unknown }
-  return typeof candidate.file === 'string' && /^[a-z0-9-]+-[a-f0-9]+\.json$/i.test(candidate.file) && typeof candidate.count === 'number'
+  const candidate = value as { file?: unknown; count?: unknown; bytes?: unknown }
+  if (typeof candidate.file !== 'string' || !/^[a-z0-9-]+-[a-f0-9]+\.json$/i.test(candidate.file)) return false
+  if (typeof candidate.count !== 'number') return false
+  if (candidate.bytes !== undefined) {
+    if (
+      typeof candidate.bytes !== 'number' ||
+      !Number.isFinite(candidate.bytes) ||
+      !Number.isInteger(candidate.bytes) ||
+      candidate.bytes < 0
+    ) {
+      return false
+    }
+  }
+  return true
 }
 
 function isRegion(value: unknown): value is Region {
@@ -133,9 +149,7 @@ export function createDemoDataStore(): DataStore {
       for (const id of NATIONAL_SOURCE_IDS) used.add(id)
       return sortSources(demoSources.filter((source) => used.has(source.id)))
     },
-    async primeOffline() {
-      return true
-    },
+    offline: null,
   }
 }
 
@@ -192,40 +206,6 @@ function createOfficialStore(manifest: DataManifest): DataStore {
     return rows
   }
 
-  async function primeOffline(): Promise<boolean> {
-    if (!('caches' in window)) return false
-
-    const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
-    const canDownload = navigator.onLine && !connection?.saveData
-
-    const files = [
-      manifest.files.taxa.flora.file,
-      manifest.files.taxa.fauna.file,
-      manifest.files.statusDefinitions.file,
-      ...(['flora', 'fauna'] as Realm[]).flatMap((realm) =>
-        METROPOLITAN_REGION_CODES.map((region) => manifest.files.statusLinks[realm][region].file),
-      ),
-    ]
-
-    try {
-      const cache = await caches.open('statuts-data-catalogs')
-      // A persisted version marker cannot prove that the browser kept every file.
-      // Check the actual catalog cache, also when offline or in save-data mode.
-      for (const file of files) {
-        const url = new URL(`data/${file}`, document.baseURI).toString()
-        if (await cache.match(url)) continue
-        if (!canDownload) return false
-        const response = await fetch(url)
-        if (!response.ok) return false
-        await cache.put(url, response.clone())
-      }
-      return true
-    } catch {
-      // Storage quota/access failures and interrupted downloads are not readiness.
-      return false
-    }
-  }
-
   return {
     official: true,
     generatedAt: manifest.generatedAt,
@@ -235,7 +215,7 @@ function createOfficialStore(manifest: DataManifest): DataStore {
     loadTaxa,
     loadStatuses,
     listSourcesForRegion,
-    primeOffline,
+    offline: createOfflineDataManager(manifest),
   }
 }
 

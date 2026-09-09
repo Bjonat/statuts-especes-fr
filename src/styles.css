@@ -170,6 +170,123 @@ h2 {
   outline-offset: 2px;
 }
 
+.offline-toolbar {
+  margin: 0 0 14px;
+}
+
+.offline-toolbar .secondary-button {
+  width: 100%;
+}
+
+.offline-notice {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: #fff3d8;
+  border: 1px solid #eed69c;
+  color: #604c1d;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.offline-shared {
+  margin: 0 0 16px;
+  padding: 14px 12px;
+  border-radius: 12px;
+  background: #f3f4ef;
+  border: 1px solid #e0e3da;
+}
+
+.offline-shared h2 {
+  margin: 0 0 4px;
+  font-size: 1.02rem;
+}
+
+.offline-region-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.offline-region-card {
+  border: 1px solid #e0e3da;
+  border-radius: 12px;
+  padding: 14px 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.offline-region-card h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.offline-region-status {
+  margin: 4px 0 0;
+  color: #3f4a38;
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.offline-volume,
+.offline-progress {
+  margin: 6px 0 0;
+  color: #646b60;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.offline-region-actions,
+.offline-confirm {
+  display: grid;
+  gap: 8px;
+}
+
+.offline-confirm p {
+  margin: 0 0 2px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.danger-button {
+  min-height: 46px;
+  border: 1px solid #c9b4a8;
+  border-radius: 11px;
+  padding: 10px 16px;
+  background: #f7efe9;
+  color: #6a3b2c;
+  font-weight: 750;
+}
+
+.danger-button:hover,
+.danger-button:focus-visible {
+  outline: 3px solid #e4cfc4;
+  outline-offset: 2px;
+}
+
+button:disabled,
+.primary-button:disabled,
+.secondary-button:disabled,
+.danger-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.offline-badge {
+  font-size: 0.78rem;
+  color: #566151;
+  background: #e9eee4;
+  border-radius: 999px;
+  padding: 6px 9px;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: right;
+  max-width: 12.5rem;
+}
+
 .source-list {
   list-style: none;
   margin: 18px 0 0;
@@ -224,15 +341,6 @@ h2 {
   background: #566f4e;
   color: #fff;
   font-weight: 750;
-}
-
-.offline-badge {
-  font-size: 0.78rem;
-  color: #566151;
-  background: #e9eee4;
-  border-radius: 999px;
-  padding: 6px 9px;
-  white-space: nowrap;
 }
 
 .loading-panel {
