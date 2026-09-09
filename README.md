@@ -78,7 +78,7 @@ public/data/
 └── status-links-<realm>-<region>-<hash>.json
 ```
 
-Une définition embarquée = `{ category, label, value, sourceId }`. Les citations longues et URL documentaires ne sont pas dans le bundle mobile. La PWA affiche le nom de source, le millésime et la date de vérification.
+Une définition embarquée = `{ category, label, value, sourceId, document? }`. Les statuts BDC conservent leur preuve documentaire (`cd_doc`, citation, URL) lorsqu’elle est fournie par la source. La PWA affiche le nom de source, le millésime, la date de vérification, et, si elle existe, la pièce d’origine dans le panneau Source.
 
 ## Lancer en local
 
@@ -137,7 +137,7 @@ Rapports : [`docs/browser-validation.md`](docs/browser-validation.md) (suite aut
 - **Métropole uniquement** (pas DROM, pas marin dédié)
 - Couverture régionale **variable** — [matrice](docs/generated/source-coverage.md)
 - Portées partielles **non géographiques** parfois indéterminées (le statut reste affiché avec un avertissement)
-- Bundle compact : provenance via `sourceId` + manifeste ; pas de citations / URL documentaires embarquées
+- Bundle compact : provenance via `sourceId` + manifeste ; preuve documentaire BDC embarquée seulement si la source la fournit (`document.cdDoc`)
 - Acquisition de certaines sources (ARA LRR, BFC 2026) encore fragile
 - Licence du **code** à arbitrer ; les données restent sous les licences de leurs producteurs (TAXREF, BDC, DREAL, OEB, CBN, etc.)
 

@@ -5,6 +5,8 @@ import {
   MISSING_STATUS_SOURCE_MESSAGE,
   findStatusSource,
   formatSourceCheckedAt,
+  safeDocumentHref,
+  statusDocumentView,
   statusSourceFields,
   statusSourceView,
 } from './source-display'
@@ -147,5 +149,72 @@ describe('statusSourceView', () => {
     if (first.state !== 'found' || second.state !== 'found') return
     expect(first.source).toBe(znieff)
     expect(second.source).toBe(znieff)
+  })
+})
+
+describe('safeDocumentHref', () => {
+  it('accepte uniquement http et https, sans réécrire l’URL', () => {
+    expect(safeDocumentHref('https://example.test/fixture-doc-1')).toBe('https://example.test/fixture-doc-1')
+    expect(safeDocumentHref('http://example.test/doc')).toBe('http://example.test/doc')
+  })
+
+  it('refuse les schémas dangereux ou non HTTP(S)', () => {
+    expect(safeDocumentHref('javascript:alert(1)')).toBeNull()
+    expect(safeDocumentHref('data:text/html,hi')).toBeNull()
+    expect(safeDocumentHref('file:///C:/Users/cregnier/Downloads/lr.pdf')).toBeNull()
+    expect(safeDocumentHref('not a url')).toBeNull()
+    expect(safeDocumentHref('')).toBeNull()
+    expect(safeDocumentHref(undefined)).toBeNull()
+  })
+})
+
+describe('statusDocumentView', () => {
+  it('expose citation, CD_DOC et href seulement si l’URL est HTTP(S)', () => {
+    expect(
+      statusDocumentView(
+        status({
+          document: {
+            cdDoc: 'fixture-doc-1',
+            citation: 'Citation fictive explicite',
+            url: 'https://example.test/fixture-doc-1',
+          },
+        }),
+      ),
+    ).toEqual({
+      cdDoc: 'fixture-doc-1',
+      citation: 'Citation fictive explicite',
+      href: 'https://example.test/fixture-doc-1',
+    })
+  })
+
+  it('conserve cdDoc sans fabriquer de lien si l’URL est absente', () => {
+    expect(statusDocumentView(status({ document: { cdDoc: '411507', citation: 'Sans URL' } }))).toEqual({
+      cdDoc: '411507',
+      citation: 'Sans URL',
+    })
+  })
+
+  it('conserve la preuve textuelle si l’URL n’est pas cliquable', () => {
+    expect(
+      statusDocumentView(
+        status({
+          document: { cdDoc: 'DOC-FILE', citation: 'Chemin local BDC', url: 'file:///tmp/doc.pdf' },
+        }),
+      ),
+    ).toEqual({
+      cdDoc: 'DOC-FILE',
+      citation: 'Chemin local BDC',
+    })
+  })
+
+  it('n’affiche rien sans cdDoc, même si une citation existe', () => {
+    expect(
+      statusDocumentView(
+        status({
+          document: { cdDoc: '  ', citation: 'Orpheline', url: 'https://example.test/x' },
+        }),
+      ),
+    ).toBeNull()
+    expect(statusDocumentView(status())).toBeNull()
   })
 })

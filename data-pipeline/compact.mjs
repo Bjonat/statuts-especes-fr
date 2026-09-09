@@ -4,12 +4,27 @@ const SCOPE_CODES = {
   partial: 2,
 }
 
+function definitionDocumentPayload(document) {
+  const cdDoc = typeof document?.cdDoc === 'string' ? document.cdDoc.trim() : ''
+  if (!cdDoc) return undefined
+
+  const citation = typeof document.citation === 'string' ? document.citation.trim() : ''
+  const url = typeof document.url === 'string' ? document.url.trim() : ''
+  return {
+    cdDoc,
+    ...(citation ? { citation } : {}),
+    ...(url ? { url } : {}),
+  }
+}
+
 function definitionPayload(status) {
+  const document = definitionDocumentPayload(status.document)
   return {
     category: status.category,
     label: status.label,
     value: status.value,
     sourceId: status.sourceId,
+    ...(document ? { document } : {}),
   }
 }
 

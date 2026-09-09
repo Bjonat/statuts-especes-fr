@@ -52,7 +52,63 @@ const definitions = await readJson(path.join(directory, manifest.files.statusDef
 assert.ok(flora.length > 20_000, 'volume flore plausible')
 assert.ok(fauna.length > 50_000, 'volume faune plausible')
 assert.ok(definitions.length > 100, 'dictionnaire de statuts plausible')
-assert.ok(definitions.every((definition) => !('citation' in definition) && !('documentUrl' in definition)), 'aucune citation longue ni URL documentaire dans les définitions')
+function assertDocumentEvidence(document, context) {
+  assert.equal(typeof document, 'object', `${context}: document doit être un objet`)
+  assert.ok(document, `${context}: document ne doit pas être null`)
+  assert.equal(typeof document.cdDoc, 'string', `${context}: cdDoc chaîne`)
+  assert.ok(document.cdDoc.length > 0, `${context}: cdDoc non vide`)
+  assert.equal(document.cdDoc.trim(), document.cdDoc, `${context}: cdDoc déjà trimé`)
+  for (const key of Object.keys(document)) {
+    assert.ok(['cdDoc', 'citation', 'url'].includes(key), `${context}: clé documentaire inattendue ${key}`)
+  }
+  if ('citation' in document) {
+    assert.equal(typeof document.citation, 'string', `${context}: citation chaîne`)
+    assert.ok(document.citation.length > 0, `${context}: citation vide interdite`)
+  }
+  if ('url' in document) {
+    assert.equal(typeof document.url, 'string', `${context}: url chaîne`)
+    assert.ok(document.url.length > 0, `${context}: url vide interdite`)
+  }
+}
+
+assert.ok(
+  definitions.every((definition) => !('citation' in definition) && !('documentUrl' in definition)),
+  'aucune citation / documentUrl au premier niveau des définitions',
+)
+const visualToDocs = new Map()
+for (const [index, definition] of definitions.entries()) {
+  if ('document' in definition) {
+    assertDocumentEvidence(definition.document, `définition #${index}`)
+  }
+  const visual = JSON.stringify([definition.category, definition.label, definition.value, definition.sourceId])
+  const docs = visualToDocs.get(visual) ?? new Set()
+  if (definition.document?.cdDoc) docs.add(definition.document.cdDoc)
+  visualToDocs.set(visual, docs)
+}
+const splitVisuals = [...visualToDocs.values()].filter((docs) => docs.size > 1)
+assert.ok(
+  splitVisuals.length >= 1,
+  'plusieurs CD_DOC pour un même triplet visuel doivent rester des définitions distinctes',
+)
+
+const papillons = definitions.filter((definition) => definition.document?.cdDoc === '443486')
+if (papillons.length) {
+  assert.ok(
+    papillons.every(
+      (definition) =>
+        definition.document.citation.includes('Papillons de jour et Zygènes') &&
+        definition.document.url === 'https://inpn.mnhn.fr/docs-web/docs/download/443486',
+    ),
+    'sentinelle CD_DOC 443486 : citation et URL BDC conservées',
+  )
+}
+const odonates = definitions.filter((definition) => definition.document?.cdDoc === '411507')
+if (odonates.length) {
+  assert.ok(
+    odonates.every((definition) => definition.document.citation.includes('libellules') && !('url' in definition.document)),
+    'sentinelle CD_DOC 411507 : citation conservée, pas d’URL inventée',
+  )
+}
 const longValues = definitions.filter((definition) => typeof definition.value !== 'string' || definition.value.length > 80)
 assert.equal(
   longValues.length,

@@ -22,4 +22,12 @@ test('les libellés documentaires longs ne sont pas embarqués dans la valeur af
   assert.equal(statuses.length, 13)
   assert.ok(statuses.every((status) => status.value === 'INPN'))
   assert.ok(statuses.every((status) => !('citation' in status) && !('documentUrl' in status)))
+  assert.ok(
+    statuses.every(
+      (status) =>
+        status.document?.cdDoc === 'DOC1' &&
+        status.document.citation === 'Citation très longue' &&
+        status.document.url === 'https://example.test/source',
+    ),
+  )
 })

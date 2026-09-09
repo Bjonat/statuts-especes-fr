@@ -1,6 +1,6 @@
-# Validation navigateur (PR-PWA-04, étendue par PR-PWA-05 et PR-PWA-06)
+# Validation navigateur (PR-PWA-04, étendue par PR-PWA-05, PR-PWA-06 et PR-DATA-01)
 
-Checkpoint de fiabilité hors ligne **automatisé**. Les parcours s’exécutent dans Chromium contre le build Vite de production (`dist/`), le service worker `generateSW`, la vraie Cache Storage, des reloads et le mode offline du navigateur. PR-PWA-06 y ajoute la provenance par statut, sans preuve documentaire (`cd_doc`) ni protocole appareils réels.
+Checkpoint de fiabilité hors ligne **automatisé**. Les parcours s’exécutent dans Chromium contre le build Vite de production (`dist/`), le service worker `generateSW`, la vraie Cache Storage, des reloads et le mode offline du navigateur. PR-PWA-06 y ajoute la provenance par statut. PR-DATA-01 y ajoute la preuve documentaire embarquée (`document.cdDoc` / citation / URL http(s) seulement), sans protocole appareils réels.
 
 Ce document n’équivaut pas à une validation Chrome Android ni Safari iOS. Voir [`device-validation.md`](device-validation.md).
 
@@ -15,7 +15,7 @@ npm run test:e2e
 - Navigateur CI : **Chromium uniquement**
 - Serveur : `node e2e/test-server.mjs` (127.0.0.1, `dist/` + `/data/` synthétique)
 - Datasets : `e2e-a` (2026-09-09T10:00:00Z) et `e2e-b` (2026-09-10T10:00:00Z)
-- Taxons : `Planta fictiva`, `Taxon testus`, `Flora vacua` (aucun statut OCC), `Status orbus` (sourceId absent), `Animalia testensis`, `Herba imaginaria` (B uniquement)
+- Taxons : `Planta fictiva`, `Taxon testus`, `Flora vacua` (aucun statut OCC), `Status orbus` (sourceId absent, document présent), `Documenta gemina` (deux `cdDoc`), `Animalia testensis`, `Herba imaginaria` (B uniquement)
 - Aucune source distante, aucun dataset `public/data/` de production
 
 ## Matrice
@@ -64,6 +64,11 @@ Les résultats ci-dessous correspondent à la suite `e2e/*.spec.ts` exécutée l
 | Panneau source hors ligne (navigateur offline) | oui | PASS |
 | sourceId absent : fail visible, pas de substitution | oui | PASS |
 | Source + Aide accessibles à 320 / 360 / 390 | oui | PASS |
+| Preuve documentaire complète (citation, CD_DOC, href) | oui | PASS |
+| Document absent : panneau Source historique | oui | PASS |
+| sourceId absent + document exact | oui | PASS |
+| Deux cdDoc distincts non fusionnés | oui | PASS |
+| Citation / CD_DOC consultables offline | oui | PASS |
 
 ## Checkpoint
 

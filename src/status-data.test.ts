@@ -31,6 +31,61 @@ describe('hydrateStatusLinks', () => {
   it('échoue si le lien référence une définition absente', () => {
     expect(() => hydrateStatusLinks([], [[3571, 42, 0]], 'CVL')).toThrow('Définition de statut #42 introuvable')
   })
+
+  it('restitue StatusDefinition.document sur TaxonStatus sans modifier le lien compact', () => {
+    const definitions: StatusDefinition[] = [
+      {
+        category: 'red_list_regional',
+        label: 'Liste rouge régionale',
+        value: 'VU',
+        sourceId: 'bdc-v18',
+        document: {
+          cdDoc: '443486',
+          citation: 'Citation test',
+          url: 'https://example.test/doc',
+        },
+      },
+    ]
+    const links: StatusLink[] = [[53663, 0, 1]]
+
+    expect(hydrateStatusLinks(definitions, links, 'CVL')).toEqual([
+      {
+        cdRef: 53663,
+        region: 'CVL',
+        category: 'red_list_regional',
+        label: 'Liste rouge régionale',
+        value: 'VU',
+        sourceId: 'bdc-v18',
+        document: {
+          cdDoc: '443486',
+          citation: 'Citation test',
+          url: 'https://example.test/doc',
+        },
+        scope: 'regional',
+      },
+    ])
+    expect(links[0]).toEqual([53663, 0, 1])
+  })
+
+  it('sans document : contrat historique inchangé', () => {
+    const definitions: StatusDefinition[] = [
+      {
+        category: 'znieff',
+        label: 'Déterminante ZNIEFF',
+        value: 'Oui',
+        sourceId: 'fixture-znieff-occ',
+      },
+    ]
+    expect(hydrateStatusLinks(definitions, [[900001, 0, 1]], 'OCC')[0]).toEqual({
+      cdRef: 900001,
+      region: 'OCC',
+      category: 'znieff',
+      label: 'Déterminante ZNIEFF',
+      value: 'Oui',
+      sourceId: 'fixture-znieff-occ',
+      scope: 'regional',
+    })
+  })
 })
 
 describe('collectSourceIdsFromLinks', () => {

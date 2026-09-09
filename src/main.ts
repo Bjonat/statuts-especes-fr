@@ -9,7 +9,7 @@ import {
   buildStatusHelp,
   formatStatusValueForDisplay,
 } from './status-help'
-import { statusSourceView } from './source-display'
+import { statusDocumentView, statusSourceView } from './source-display'
 import type { DatasetCheckStatus, DatasetUpdateCheck, DatasetUpdateProgress } from './dataset-storage'
 import { datasetUpdateFailureReason } from './dataset-storage'
 import type { OfflineDownloadProgress, OfflineInventory } from './offline-data'
@@ -858,6 +858,26 @@ function renderStatusHelpPanel(status: TaxonStatus, index: number): string {
   `
 }
 
+function renderStatusDocumentBlock(status: TaxonStatus): string {
+  const documentView = statusDocumentView(status)
+  if (!documentView) return ''
+
+  const citation = documentView.citation
+    ? `<p class="status-source-citation">${escapeHtml(cleanDisplayText(documentView.citation))}</p>`
+    : ''
+  const link = documentView.href
+    ? `<p class="status-source-doc-link"><a href="${escapeHtml(documentView.href)}" target="_blank" rel="noopener noreferrer">Consulter le document</a></p>`
+    : ''
+
+  return `
+      <div class="status-source-document">
+        <p class="status-source-document-kicker">Document d’origine</p>
+        ${citation}
+        <p class="status-source-cddoc">CD_DOC ${escapeHtml(documentView.cdDoc)}</p>
+        ${link}
+      </div>`
+}
+
 function renderStatusSourcePanel(status: TaxonStatus, index: number): string {
   const view = statusSourceView(status, store().sources)
   const body =
@@ -877,6 +897,7 @@ function renderStatusSourcePanel(status: TaxonStatus, index: number): string {
     <div class="status-source" id="status-source-${index}" hidden>
       <p class="status-source-kicker">Source du statut</p>
       ${body}
+      ${renderStatusDocumentBlock(status)}
       <button type="button" class="status-help-close" data-source-close="${index}">Fermer</button>
     </div>
   `
