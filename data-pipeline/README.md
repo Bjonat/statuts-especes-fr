@@ -148,6 +148,13 @@ Sur le **socle TAXREF v18 + BDC v18** métropole (hors enrichissements régionau
 
 Les enrichissements régionaux augmentent relations et définitions selon les sources du build. Ne pas utiliser d’anciens totaux « trois régions pilotes » (229 813 / 686) comme métrique courante.
 
+Mesure PR-DATA-01 sur le socle national TAXREF v18 + BDC v18 (hors paquets régionaux), même 877 930 relations :
+
+- définitions **sans** clé documentaire : 292 (~30 Ko) ;
+- définitions **avec** `document` : 1 411 (~625 Ko, +1 119 définitions / +594 Ko).
+
+L’augmentation vient surtout des citations BDC conservées et de la non-fusion de `cdDoc` distincts. Pas d’optimisation prématurée : +0,6 Mo sur ~43 Mo de JSON brut.
+
 ## Validation métier
 
 ```bash
