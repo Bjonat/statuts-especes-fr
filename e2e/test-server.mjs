@@ -88,7 +88,7 @@ function shouldDelay(fileName) {
   if (state.dataset === 'slow-b' && fileName === fixtures.b.files.statusDefinitions.file) {
     return true
   }
-  if (state.dataset === 'slow-region' && fileName === fixtures.a.files.statusDefinitions.file) {
+  if (state.dataset === 'slow-region' && fileName === fixtures.a.files.statusLinks.fauna.NAQ.file) {
     return true
   }
   return false
@@ -181,9 +181,12 @@ async function handleData(req, res, url) {
     return
   }
 
-  const filePath = join(currentVersionDir(), fileName)
-  const normalized = normalize(filePath)
-  if (!normalized.startsWith(currentVersionDir()) || !existsSync(normalized)) {
+  const fixturePath = join(currentVersionDir(), fileName)
+  const fixtureNormalized = normalize(fixturePath)
+  const fromFixture = fixtureNormalized.startsWith(currentVersionDir()) && existsSync(fixtureNormalized)
+  const distFallback = safeDistPath(`/data/${fileName}`)
+  const filePath = fromFixture ? fixtureNormalized : distFallback && existsSync(distFallback) ? distFallback : null
+  if (!filePath) {
     res.writeHead(404)
     res.end('Not found')
     return
@@ -192,12 +195,12 @@ async function handleData(req, res, url) {
   const abort = new AbortController()
   req.on('close', () => abort.abort())
 
-  if (shouldDelay(fileName) && !abort.signal.aborted) {
+  if (fromFixture && shouldDelay(fileName) && !abort.signal.aborted) {
     await delay(SLOW_DELAY_MS, abort.signal)
     if (abort.signal.aborted || res.writableEnded) return
   }
 
-  sendBuffer(res, 200, readFileSync(normalized))
+  sendBuffer(res, 200, readFileSync(filePath))
 }
 
 async function handleTest(req, res, url) {

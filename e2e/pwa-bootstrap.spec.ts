@@ -41,7 +41,12 @@ test.describe('PWA bootstrap', () => {
     expect(inventory.names).toContain(METADATA_CACHE)
     expect(inventory.names).not.toContain(LEGACY_MANIFEST_CACHE)
     expect(inventory.names).not.toContain(LEGACY_CATALOG_CACHE)
-    expect(inventory.names.filter((name) => name.startsWith(CATALOG_PREFIX))).toEqual([])
+    expect(inventory.names.some((name) => name.startsWith('workbox-precache'))).toBeTruthy()
+    const versioned = inventory.names.filter((name) => name.startsWith(CATALOG_PREFIX))
+    for (const name of versioned) {
+      const files = (inventory.details[name] ?? []).filter((path) => path.startsWith('data/') && path.endsWith('.json'))
+      expect(files, `${name} ne doit pas contenir de catalogues au bootstrap`).toEqual([])
+    }
 
     const dataPaths = await dataRequests(request)
     const catalogs = catalogRequestPaths(dataPaths)

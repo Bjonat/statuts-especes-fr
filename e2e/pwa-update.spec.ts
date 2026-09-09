@@ -15,6 +15,7 @@ import {
   openOfflineScreen,
   openPwa,
   prepareRegion,
+  primeRegion,
   regionCard,
   resetServer,
   searchTaxon,
@@ -73,6 +74,7 @@ test.describe('PWA mises à jour A → B', () => {
     expect(await catalogFiles(page, 'e2e-a')).toHaveLength(5)
 
     await goHomeFromOffline(page)
+    await primeRegion(page, 'Occitanie')
     await goOfflineAndReload(context, page)
     await expectOfficialHome(page)
     await expectActiveVersion(page, 'e2e-a')
@@ -81,15 +83,15 @@ test.describe('PWA mises à jour A → B', () => {
 
     await searchTaxon(page, 'Flore', 'Planta')
     await openFirstResult(page, 'Plante fictive de test')
-    await expect(page.getByText('VU — fixture e2e-a')).toBeVisible()
+    await expect(page.getByText('VU - fixture e2e-a')).toBeVisible()
     await page.getByLabel(/Département/).selectOption('31')
-    await expect(page.getByText('Oui — Midi-Pyrénées (fixture)')).toBeVisible()
+    await expect(page.getByText('Oui - Midi-Pyrénées (fixture)')).toBeVisible()
     await page.getByLabel(/Département/).selectOption('34')
-    await expect(page.getByText('Oui — Languedoc-Roussillon (fixture)')).toBeVisible()
+    await expect(page.getByText('Oui - Languedoc-Roussillon (fixture)')).toBeVisible()
     await backToHomeFromDetail(page, 'Flore')
     await searchTaxon(page, 'Faune', 'Animalia')
     await openFirstResult(page, 'Animal de test')
-    await expect(page.getByText('NT — fixture e2e-a')).toBeVisible()
+    await expect(page.getByText('NT - fixture e2e-a')).toBeVisible()
     await backToHomeFromDetail(page, 'Faune')
 
     await context.setOffline(false)
@@ -121,8 +123,8 @@ test.describe('PWA mises à jour A → B', () => {
     await searchTaxon(page, 'Flore', 'Herba')
     await openFirstResult(page, 'Herbe imaginaire de test')
     await expect(page.getByText('Herba imaginaria')).toBeVisible()
-    await expect(page.getByText('VU — fixture e2e-b')).toBeVisible()
-    await expect(page.getByText('VU — fixture e2e-a')).toHaveCount(0)
+    await expect(page.getByText('VU - fixture e2e-b')).toBeVisible()
+    await expect(page.getByText('VU - fixture e2e-a')).toHaveCount(0)
   })
 
   test('candidate B corrompue : A reste active et utilisable hors ligne', async ({ page, context, request }) => {
@@ -146,13 +148,14 @@ test.describe('PWA mises à jour A → B', () => {
     await expect(page.getByText('Herba imaginaria')).toHaveCount(0)
 
     await goHomeFromOffline(page)
+    await primeRegion(page, 'Occitanie')
     await goOfflineAndReload(context, page)
     await expectOfficialHome(page)
     await expectActiveVersion(page, 'e2e-a')
     await searchTaxon(page, 'Flore', 'Planta')
     await openFirstResult(page, 'Plante fictive de test')
-    await expect(page.getByText('VU — fixture e2e-a')).toBeVisible()
-    await expect(page.getByText('VU — fixture e2e-b')).toHaveCount(0)
+    await expect(page.getByText('VU - fixture e2e-a')).toBeVisible()
+    await expect(page.getByText('VU - fixture e2e-b')).toHaveCount(0)
     await expect(page.getByText('Herba imaginaria')).toHaveCount(0)
   })
 })

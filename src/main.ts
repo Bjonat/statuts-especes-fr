@@ -1094,11 +1094,14 @@ function renderError(): void {
         <p class="eyebrow">Données indisponibles</p>
         <h1>Référentiel non chargé</h1>
         <p class="intro">${escapeHtml(state.error ?? 'Une erreur est survenue.')}</p>
+        <label class="field-label" for="region-select">Région</label>
+        <select id="region-select" class="field-control">${regionOptions()}</select>
         <button class="primary-button" id="retry-load" type="button">Réessayer</button>
       </section>
     </main>
   `
 
+  bindRegionSelect()
   document.querySelector<HTMLButtonElement>('#error-back')?.addEventListener('click', () => {
     state.realm = null
     state.screen = 'home'

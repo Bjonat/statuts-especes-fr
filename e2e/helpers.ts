@@ -69,7 +69,7 @@ export async function ensureControlled(page: Page): Promise<void> {
 
 export async function openPwa(page: Page): Promise<void> {
   attachSameOriginGuard(page)
-  await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await page.goto('/', { waitUntil: 'load' })
 }
 
 export async function expectOfficialHome(page: Page): Promise<void> {
@@ -162,6 +162,15 @@ export async function prepareRegion(page: Page, name: string): Promise<void> {
 
 export async function goHomeFromOffline(page: Page): Promise<void> {
   await page.getByRole('button', { name: /Accueil/ }).click()
+  await expectOfficialHome(page)
+}
+
+export async function primeRegion(page: Page, regionLabel = 'Occitanie'): Promise<void> {
+  await page.getByRole('button', { name: 'Flore', exact: true }).click()
+  await expect(page.getByLabel('Espèce')).toBeVisible()
+  await page.getByLabel('Région').selectOption({ label: regionLabel })
+  await expect(page.getByLabel('Espèce')).toBeVisible()
+  await page.getByRole('button', { name: /Flore/ }).click()
   await expectOfficialHome(page)
 }
 

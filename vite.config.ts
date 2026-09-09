@@ -39,10 +39,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,json}'],
         globIgnores: [
-          'data/manifest.json',
-          'data/taxa-*.json',
-          'data/status-definitions-*.json',
-          'data/status-links-*.json',
+          // Aucun fichier de dataset ne doit entrer dans le précache Workbox.
+          // Les catalogues vivent exclusivement dans Cache Storage applicatif.
+          'data/**',
         ],
       },
     }),

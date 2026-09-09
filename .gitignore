@@ -9,3 +9,4 @@ playwright-report/
 test-results/
 blob-report/
 e2e/fixtures/generated/
+public/data/

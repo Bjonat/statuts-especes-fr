@@ -65,16 +65,40 @@ Le checkpoint « L’application fonctionne de manière fiable hors ligne » **n
 
 ## Findings
 
-Aucun BLOCKER / P0 / P1 / P2 ouvert au moment de la rédaction, sous réserve que la suite E2E locale et le job `browser-e2e` restent verts.
+Aucun BLOCKER / P0 / P1 ouvert.
 
-Si un finding est ajouté plus tard, utiliser :
+### PWA-04-P2-01 — précache Workbox de fichiers `data/` hors contrat
 
-```text
-ID
-sévérité          BLOCKER | P0 | P1 | P2
-scénario
-attendu
-observé
-reproduction
-statut            ouvert | corrigé | reporté
-```
+- **sévérité :** P2
+- **scénario :** installation neuve avec des fichiers `public/data/manifest-a.json` / `manifest-b.json` (restes locaux, hors manifeste v3)
+- **attendu :** Workbox ne précache aucun dataset
+- **observé :** `globIgnores` ne listait que `data/manifest.json` ; `manifest-a.json` / `manifest-b.json` entraient dans le précache ; le SW n’installait pas si `/data/` était servi par le serveur E2E
+- **reproduction :** `npm run build` en présence de `public/data/manifest-a.json` ; inspecter `dist/sw.js`
+- **statut :** corrigé — `globIgnores: ['data/**']`
+
+### PWA-04-P2-02 — caches legacy vides créés au bootstrap
+
+- **sévérité :** P2
+- **scénario :** bootstrap officiel, contexte neuf
+- **attendu :** `statuts-data-manifest` / `statuts-data-catalogs` absents (pas recréés par Workbox, ni ouverts à vide)
+- **observé :** `caches.open` pendant la migration legacy créait un cache vide `statuts-data-manifest`
+- **reproduction :** ouvrir la PWA sur un contexte neuf, `caches.keys()`
+- **statut :** corrigé — `namedCacheExists` avant `open`
+
+### PWA-04-P2-03 — écran d’erreur sans sélecteur de région
+
+- **sévérité :** P2
+- **scénario :** OCC prête, offline, sélection de NAQ non préparée, puis retour à OCC
+- **attendu :** l’application reste récupérable ; OCC fonctionne encore
+- **observé :** « Référentiel non chargé » n’offrait que Retour / Réessayer ; Retour conservait NAQ ; un nouveau choix de règne rechargeait NAQ
+- **reproduction :** préparer OCC, offline, Faune → NAQ, puis ← Retour → Flore
+- **statut :** corrigé — sélecteur Région sur l’écran d’erreur
+
+### PWA-04-P2-04 — région par défaut CVL hors ligne
+
+- **sévérité :** P2
+- **scénario :** OCC préparée, jamais consultée, Flore ouverte hors ligne
+- **attendu :** un écologue qui n’a préparé que OCC peut consulter OCC
+- **observé :** le défaut mémoire est CVL ; Flore charge CVL et échoue hors ligne si CVL n’est pas prête
+- **reproduction :** préparer OCC sans changer de région, offline, Flore
+- **statut :** ouvert — contournement : choisir OCC (en ligne, ou depuis l’écran d’erreur) avant le parcours terrain. Pas de changement de défaut dans cette PR (hors périmètre métier). À traiter plutôt en PWA-05 / UX.

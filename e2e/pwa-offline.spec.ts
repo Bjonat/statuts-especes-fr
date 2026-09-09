@@ -14,6 +14,7 @@ import {
   openOfflineScreen,
   openPwa,
   prepareRegion,
+  primeRegion,
   regionCard,
   resetServer,
   searchTaxon,
@@ -48,6 +49,7 @@ test.describe('PWA offline terrain', () => {
     await expectActiveVersion(page, 'e2e-a')
 
     await goHomeFromOffline(page)
+    await primeRegion(page, 'Occitanie')
     await goOfflineAndReload(context, page)
     await expectOfficialHome(page)
     await expect(page.getByText('Hors ligne : 1/13 régions')).toBeVisible()
@@ -58,16 +60,16 @@ test.describe('PWA offline terrain', () => {
     await searchTaxon(page, 'Flore', 'Planta')
     await openFirstResult(page, 'Plante fictive de test')
     await expect(page.getByText('Planta fictiva')).toBeVisible()
-    await expect(page.getByText('VU — fixture e2e-a')).toBeVisible()
+    await expect(page.getByText('VU - fixture e2e-a')).toBeVisible()
 
     await page.getByLabel(/Département/).selectOption('31')
-    await expect(page.getByText('Oui — Midi-Pyrénées (fixture)')).toBeVisible()
+    await expect(page.getByText('Oui - Midi-Pyrénées (fixture)')).toBeVisible()
     await expect(page.getByText(/non applicable au département 31/)).toBeVisible()
     await expect(page.getByText('Planta fictiva')).toBeVisible()
 
     await clearRequestLog(request)
     await page.getByLabel(/Département/).selectOption('34')
-    await expect(page.getByText('Oui — Languedoc-Roussillon (fixture)')).toBeVisible()
+    await expect(page.getByText('Oui - Languedoc-Roussillon (fixture)')).toBeVisible()
     await expect(page.getByText(/non applicable au département 34/)).toBeVisible()
     await expect(page.getByText('Planta fictiva')).toBeVisible()
     expect(catalogRequestPaths(await dataRequests(request))).toEqual([])
@@ -77,7 +79,7 @@ test.describe('PWA offline terrain', () => {
     await searchTaxon(page, 'Faune', 'Animalia')
     await openFirstResult(page, 'Animal de test')
     await expect(page.getByText('Animalia testensis')).toBeVisible()
-    await expect(page.getByText('NT — fixture e2e-a')).toBeVisible()
+    await expect(page.getByText('NT - fixture e2e-a')).toBeVisible()
     await page.getByRole('button', { name: /Recherche/ }).click()
 
     await page.getByLabel('Région').selectOption({ label: 'Nouvelle-Aquitaine' })
@@ -87,10 +89,11 @@ test.describe('PWA offline terrain', () => {
     ).toBeVisible()
     await expect(page.getByText('Animalia testensis')).toHaveCount(0)
 
-    await page.getByRole('button', { name: /Retour/ }).click()
-    await searchTaxon(page, 'Flore', 'Taxon')
-    await openFirstResult(page, 'Taxon de test')
-    await expect(page.getByText('Taxon testus')).toBeVisible()
+    await page.getByLabel('Région').selectOption({ label: 'Occitanie' })
+    await expect(page.getByLabel('Espèce')).toBeVisible()
+    await page.getByLabel('Espèce').fill('Animalia')
+    await openFirstResult(page, 'Animal de test')
+    await expect(page.getByText('Animalia testensis')).toBeVisible()
 
     const restarted = await context.newPage()
     await restarted.goto('/', { waitUntil: 'domcontentloaded' })
@@ -119,7 +122,7 @@ test.describe('PWA offline terrain', () => {
     const naq = regionCard(page, 'Nouvelle-Aquitaine')
     await naq.getByRole('button', { name: 'Télécharger' }).click()
     await expect(naq.getByText('Téléchargement…')).toBeVisible()
-    const stored = await waitForCachedFileCount(page, 'e2e-a', 1)
+    const stored = await waitForCachedFileCount(page, 'e2e-a', 4)
     expect(stored.length).toBeGreaterThanOrEqual(1)
     await naq.getByRole('button', { name: 'Annuler' }).click()
 
