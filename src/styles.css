@@ -330,6 +330,48 @@ h2 {
   line-height: 1.4;
 }
 
+.warning p {
+  margin: 0;
+}
+
+.warning .link-button {
+  display: inline-block;
+  margin-top: 8px;
+  color: #604c1d;
+}
+
+.offline-badge--demo {
+  background: #fff3d8;
+  color: #604c1d;
+}
+
+.bootstrap-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.bootstrap-actions .primary-button,
+.bootstrap-actions .secondary-button {
+  width: 100%;
+}
+
+.secondary-button {
+  min-height: 46px;
+  border: 1px solid #cfd2c8;
+  border-radius: 11px;
+  padding: 10px 16px;
+  background: #fafbf7;
+  color: #34422f;
+  font-weight: 750;
+}
+
+.secondary-button:hover,
+.secondary-button:focus-visible {
+  outline: 3px solid #c9d6be;
+  outline-offset: 2px;
+}
+
 .taxon-card .territory-filter {
   margin-top: 0;
 }
