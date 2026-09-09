@@ -1,5 +1,6 @@
 import './styles.css'
-import { loadDataStore } from './catalog'
+import { createDemoDataStore, loadDataStore } from './catalog'
+import type { DataStore, DataStoreLoadResult } from './catalog'
 import { REGIONS, assertDepartmentInRegion } from '../data-pipeline/regions.mjs'
 import { searchTaxa } from './search'
 import { resolveStatuses } from './resolve-statuses'
@@ -19,11 +20,24 @@ const rootElement = document.querySelector<HTMLDivElement>('#app')
 if (!rootElement) throw new Error('Élément #app introuvable')
 const root = rootElement
 
-const dataStore = await loadDataStore()
-const { regions, sources } = dataStore
+type AppDataMode =
+  | { state: 'loading' }
+  | { state: 'official'; store: DataStore }
+  | { state: 'download_required'; reason: 'offline_without_data' }
+  | { state: 'recoverable_error'; reason: 'manifest_unavailable' | 'manifest_invalid' }
+  | { state: 'demo'; store: DataStore }
 
-const storedRegion = localStorage.getItem('region')
-const defaultRegion = regions.some((region) => region.code === storedRegion) ? (storedRegion as RegionCode) : 'CVL'
+let dataMode: AppDataMode = { state: 'loading' }
+
+function activeStore(): DataStore | null {
+  return dataMode.state === 'official' || dataMode.state === 'demo' ? dataMode.store : null
+}
+
+function store(): DataStore {
+  const current = activeStore()
+  if (!current) throw new Error('Jeu de données non chargé')
+  return current
+}
 
 function readStoredDepartment(region: RegionCode): string | null {
   const stored = localStorage.getItem('department')
@@ -55,8 +69,8 @@ const state: {
 } = {
   screen: 'home',
   realm: null,
-  region: defaultRegion,
-  department: readStoredDepartment(defaultRegion),
+  region: 'CVL',
+  department: null,
   query: '',
   selectedTaxon: null,
   taxa: [],
@@ -64,7 +78,7 @@ const state: {
   regionSources: [],
   loading: false,
   error: null,
-  offlineReady: dataStore.datasetVersion === 'demo',
+  offlineReady: false,
 }
 
 const STATUS_LABELS: Partial<Record<StatusCategory, string>> = {
@@ -102,18 +116,28 @@ function cleanDisplayText(value: string): string {
 }
 
 function renderDataNotice(): string {
-  if (!dataStore.warning) return ''
-  return `<aside class="warning" role="note">${escapeHtml(cleanDisplayText(dataStore.warning))}</aside>`
+  const current = activeStore()
+  if (!current?.warning) return ''
+  const retryOfficial =
+    dataMode.state === 'demo'
+      ? `<button class="link-button" id="retry-official-from-demo" type="button">Réessayer les données officielles</button>`
+      : ''
+  return `<aside class="warning" role="note">
+    <p>${escapeHtml(cleanDisplayText(current.warning))}</p>
+    ${retryOfficial}
+  </aside>`
 }
 
 function offlineBadgeText(): string {
+  if (dataMode.state === 'demo') return 'Démonstration'
   if (state.offlineReady) return 'Hors ligne prêt'
   if (navigator.onLine) return 'Préparation hors ligne...'
   return 'Données hors ligne partielles'
 }
 
 function offlineBadge(): string {
-  return `<span class="offline-badge">${escapeHtml(offlineBadgeText())}</span>`
+  const demoClass = dataMode.state === 'demo' ? ' offline-badge--demo' : ''
+  return `<span class="offline-badge${demoClass}">${escapeHtml(offlineBadgeText())}</span>`
 }
 
 function refreshOfflineBadges(): void {
@@ -175,8 +199,8 @@ function bindInstallAction(): void {
 }
 
 function regionOptions(): string {
-  return regions
-    .map(
+  return store()
+    .regions.map(
       (region) =>
         `<option value="${region.code}" ${region.code === state.region ? 'selected' : ''}>${escapeHtml(region.name)}</option>`,
     )
@@ -241,13 +265,13 @@ function formatCheckedDate(value?: string): string {
 }
 
 function sourceSummary(statuses: TaxonStatus[]): string {
-  if (!dataStore.official) return 'Sources et versions : données de démonstration'
+  if (!store().official) return 'Sources et versions : données de démonstration'
 
-  const taxref = sources.find((source) => source.id === 'taxref-v18')
-  const bdc = sources.find((source) => source.id === 'bdc-v18')
-  const bdcVersion = bdc?.version ?? taxref?.version ?? dataStore.datasetVersion
+  const taxref = store().sources.find((source) => source.id === 'taxref-v18')
+  const bdc = store().sources.find((source) => source.id === 'bdc-v18')
+  const bdcVersion = bdc?.version ?? taxref?.version ?? store().datasetVersion
   const usedSourceIds = new Set(statuses.map((status) => status.sourceId))
-  const regionalSources = sources.filter(
+  const regionalSources = store().sources.filter(
     (source) => !['taxref-v18', 'bdc-v18'].includes(source.id) && usedSourceIds.has(source.id),
   )
 
@@ -305,7 +329,7 @@ async function loadRealmData(realm: Realm, region: RegionCode): Promise<void> {
   render()
 
   try {
-    const [taxa, statuses] = await Promise.all([dataStore.loadTaxa(realm), dataStore.loadStatuses(realm, region)])
+    const [taxa, statuses] = await Promise.all([store().loadTaxa(realm), store().loadStatuses(realm, region)])
     if (state.realm !== realm || state.region !== region) return
     state.taxa = taxa
     state.statuses = statuses
@@ -352,7 +376,7 @@ async function loadRegionSources(region: RegionCode): Promise<void> {
   render()
 
   try {
-    const regionSources = await dataStore.listSourcesForRegion(region)
+    const regionSources = await store().listSourcesForRegion(region)
     if (state.screen !== 'sources' || state.region !== region) return
     state.regionSources = regionSources
     state.loading = false
@@ -437,7 +461,7 @@ function renderRealmChoice(): void {
 }
 
 function renderSources(): void {
-  const region = regions.find((item) => item.code === state.region)
+  const region = store().regions.find((item) => item.code === state.region)
 
   root.innerHTML = `
     <main class="shell">
@@ -634,7 +658,7 @@ function renderDetail(): void {
   const taxon = state.selectedTaxon
   if (!taxon || !state.realm) return
 
-  const region = regions.find((item) => item.code === state.region)
+  const region = store().regions.find((item) => item.code === state.region)
   const result = resolveStatuses({
     cdRef: taxon.cdRef,
     region: state.region,
@@ -758,14 +782,147 @@ function renderDetail(): void {
   })
 }
 
+function enterLoadedStore(mode: 'official' | 'demo', next: DataStore): void {
+  dataMode = { state: mode, store: next }
+  const storedRegion = localStorage.getItem('region')
+  const defaultRegion = next.regions.some((region) => region.code === storedRegion)
+    ? (storedRegion as RegionCode)
+    : 'CVL'
+  state.screen = 'home'
+  state.realm = null
+  state.region = defaultRegion
+  state.department = readStoredDepartment(defaultRegion)
+  state.query = ''
+  state.selectedTaxon = null
+  state.taxa = []
+  state.statuses = []
+  state.regionSources = []
+  state.loading = false
+  state.error = null
+  state.offlineReady = false
+  render()
+  if (mode !== 'official') return
+  void next.primeOffline().then((ready) => {
+    if (dataMode.state !== 'official' || dataMode.store !== next) return
+    state.offlineReady = ready
+    refreshOfflineBadges()
+  })
+}
+
+function applyLoadResult(result: DataStoreLoadResult): void {
+  if (result.state === 'available') {
+    enterLoadedStore('official', result.store)
+    return
+  }
+  dataMode = result
+  render()
+}
+
+async function retryOfficialData(): Promise<void> {
+  dataMode = { state: 'loading' }
+  render()
+  applyLoadResult(await loadDataStore())
+}
+
+function openDemonstration(): void {
+  enterLoadedStore('demo', createDemoDataStore())
+}
+
+function bindBootstrapActions(): void {
+  document.querySelector<HTMLButtonElement>('#retry-official')?.addEventListener('click', () => {
+    void retryOfficialData()
+  })
+  document.querySelector<HTMLButtonElement>('#open-demo')?.addEventListener('click', openDemonstration)
+}
+
+function bindDataNoticeActions(): void {
+  document.querySelector<HTMLButtonElement>('#retry-official-from-demo')?.addEventListener('click', () => {
+    void retryOfficialData()
+  })
+}
+
+function bootstrapActionsMarkup(): string {
+  return `
+    <div class="bootstrap-actions">
+      <button class="primary-button" id="retry-official" type="button">Réessayer</button>
+      <button class="secondary-button" id="open-demo" type="button">Ouvrir la démonstration</button>
+    </div>
+  `
+}
+
+function renderBootstrap(): void {
+  if (dataMode.state === 'loading') {
+    root.innerHTML = `
+      <main class="shell shell--centered">
+        <section class="panel loading-panel" aria-live="polite" aria-labelledby="bootstrap-title">
+          <p class="eyebrow">Statuts espèces FR</p>
+          <h1 id="bootstrap-title">Chargement des données…</h1>
+          <p class="intro">Vérification du jeu officiel sur cet appareil.</p>
+        </section>
+      </main>
+    `
+    return
+  }
+
+  if (dataMode.state === 'download_required') {
+    root.innerHTML = `
+      <main class="shell shell--centered">
+        <section class="panel" role="alert" aria-labelledby="bootstrap-title">
+          <p class="eyebrow">Première utilisation</p>
+          <h1 id="bootstrap-title">Données nécessaires</h1>
+          <p class="intro">Les données officielles ne sont pas encore disponibles sur cet appareil.</p>
+          <p class="intro">Connectez-vous à Internet pour préparer l'application avant votre sortie terrain.</p>
+          ${bootstrapActionsMarkup()}
+        </section>
+      </main>
+    `
+    bindBootstrapActions()
+    return
+  }
+
+  if (dataMode.state === 'recoverable_error' && dataMode.reason === 'manifest_invalid') {
+    root.innerHTML = `
+      <main class="shell shell--centered">
+        <section class="panel" role="alert" aria-labelledby="bootstrap-title">
+          <p class="eyebrow">Jeu de données</p>
+          <h1 id="bootstrap-title">Jeu de données non reconnu</h1>
+          <p class="intro">La description du jeu de données reçue est invalide. L'application refuse de l'utiliser pour éviter d'afficher des résultats incohérents.</p>
+          ${bootstrapActionsMarkup()}
+        </section>
+      </main>
+    `
+    bindBootstrapActions()
+    return
+  }
+
+  root.innerHTML = `
+    <main class="shell shell--centered">
+      <section class="panel" role="alert" aria-labelledby="bootstrap-title">
+        <p class="eyebrow">Données officielles</p>
+        <h1 id="bootstrap-title">Impossible de charger les données officielles</h1>
+        <p class="intro">Le serveur de données est momentanément indisponible. Les données officielles ne peuvent pas être chargées actuellement. Vos données locales existantes ne sont pas remplacées.</p>
+        ${bootstrapActionsMarkup()}
+      </section>
+    </main>
+  `
+  bindBootstrapActions()
+}
+
 function render(): void {
+  if (dataMode.state === 'loading' || dataMode.state === 'download_required' || dataMode.state === 'recoverable_error') {
+    renderBootstrap()
+    return
+  }
+
   if (state.screen === 'sources') {
     renderSources()
+    bindDataNoticeActions()
     return
   }
 
   if (!state.realm) {
     renderRealmChoice()
+    bindDataNoticeActions()
     return
   }
 
@@ -781,10 +938,12 @@ function render(): void {
 
   if (state.selectedTaxon) {
     renderDetail()
+    bindDataNoticeActions()
     return
   }
 
   renderSearch()
+  bindDataNoticeActions()
 }
 
 window.addEventListener('beforeinstallprompt', (event) => {
@@ -802,8 +961,9 @@ window.addEventListener('appinstalled', () => {
 window.addEventListener('online', refreshOfflineBadges)
 window.addEventListener('offline', refreshOfflineBadges)
 
-render()
-void dataStore.primeOffline().then((ready) => {
-  state.offlineReady = ready
-  refreshOfflineBadges()
-})
+async function start(): Promise<void> {
+  render()
+  applyLoadResult(await loadDataStore())
+}
+
+void start()

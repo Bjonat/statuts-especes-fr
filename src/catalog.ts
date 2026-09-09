@@ -103,7 +103,15 @@ async function fetchArray<T>(file: string): Promise<T[]> {
   return data as T[]
 }
 
-function createDemoStore(): DataStore {
+export type DataLoadFailureReason = 'offline_without_data' | 'manifest_unavailable' | 'manifest_invalid'
+
+export type DataStoreLoadResult =
+  | { state: 'available'; store: DataStore }
+  | { state: 'download_required'; reason: Extract<DataLoadFailureReason, 'offline_without_data'> }
+  | { state: 'recoverable_error'; reason: Exclude<DataLoadFailureReason, 'offline_without_data'> }
+
+/** Seule voie runtime vers les fixtures. Ne pas appeler depuis loadDataStore(). */
+export function createDemoDataStore(): DataStore {
   return {
     official: false,
     warning: DEMO_DATA_WARNING,
@@ -231,15 +239,36 @@ function createOfficialStore(manifest: DataManifest): DataStore {
   }
 }
 
-export async function loadDataStore(): Promise<DataStore> {
+/**
+ * Charge uniquement le jeu officiel. Une panne ne produit jamais de store de démonstration.
+ * La démo n’existe que via createDemoDataStore(), après un choix utilisateur.
+ */
+export async function loadDataStore(): Promise<DataStoreLoadResult> {
+  let manifestResponse: Response
   try {
     const manifestUrl = new URL('data/manifest.json', document.baseURI)
-    const manifestResponse = await fetch(manifestUrl, { cache: 'no-cache' })
-    if (!manifestResponse.ok) return createDemoStore()
-
-    const manifestData: unknown = await manifestResponse.json()
-    return isManifest(manifestData) ? createOfficialStore(manifestData) : createDemoStore()
+    manifestResponse = await fetch(manifestUrl, { cache: 'no-cache' })
   } catch {
-    return createDemoStore()
+    if (!navigator.onLine) {
+      return { state: 'download_required', reason: 'offline_without_data' }
+    }
+    return { state: 'recoverable_error', reason: 'manifest_unavailable' }
   }
+
+  if (!manifestResponse.ok) {
+    return { state: 'recoverable_error', reason: 'manifest_unavailable' }
+  }
+
+  let manifestData: unknown
+  try {
+    manifestData = await manifestResponse.json()
+  } catch {
+    return { state: 'recoverable_error', reason: 'manifest_invalid' }
+  }
+
+  if (!isManifest(manifestData)) {
+    return { state: 'recoverable_error', reason: 'manifest_invalid' }
+  }
+
+  return { state: 'available', store: createOfficialStore(manifestData) }
 }

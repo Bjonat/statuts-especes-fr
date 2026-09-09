@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadDataStore } from './catalog'
+import { createDemoDataStore, loadDataStore } from './catalog'
 import { METROPOLITAN_REGION_CODES } from './types'
 
 const regions = METROPOLITAN_REGION_CODES.map((code) => ({ code, name: code }))
@@ -23,6 +23,20 @@ const files = [
   manifest.files.statusDefinitions,
   ...Object.values(manifest.files.statusLinks).flatMap((links) => Object.values(links)),
 ].map(({ file }) => urlFor(file))
+
+function expectNoDemoStore(result: Awaited<ReturnType<typeof loadDataStore>>): void {
+  expect(result.state).not.toBe('available')
+  expect(result).not.toHaveProperty('store')
+}
+
+async function loadOfficialStore() {
+  const result = await loadDataStore()
+  expect(result.state).toBe('available')
+  if (result.state !== 'available') throw new Error('expected available official store')
+  expect(result.store.official).toBe(true)
+  expect(result.store.datasetVersion).not.toBe('demo')
+  return result.store
+}
 
 describe('offline catalog readiness', () => {
   let entries: Map<string, Response>
@@ -58,7 +72,7 @@ describe('offline catalog readiness', () => {
 
   it('rejects a stale readiness marker when one regional file was evicted', async () => {
     entries.delete(files.at(-1)!)
-    const store = await loadDataStore()
+    const store = await loadOfficialStore()
     expect(store.official).toBe(true)
     expect(await store.primeOffline()).toBe(false)
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -68,7 +82,7 @@ describe('offline catalog readiness', () => {
     const missing = files.at(-1)!
     entries.delete(missing)
     network.onLine = true
-    const store = await loadDataStore()
+    const store = await loadOfficialStore()
     expect(await store.primeOffline()).toBe(true)
     expect(cache.put).toHaveBeenCalledTimes(1)
     expect(entries.has(missing)).toBe(true)
@@ -77,7 +91,7 @@ describe('offline catalog readiness', () => {
 
   it('accepts a complete cache offline without any readiness marker', async () => {
     vi.stubGlobal('localStorage', { getItem: () => null })
-    const store = await loadDataStore()
+    const store = await loadOfficialStore()
     expect(await store.primeOffline()).toBe(true)
     expect(cache.match).toHaveBeenCalledTimes(29)
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -86,7 +100,7 @@ describe('offline catalog readiness', () => {
   it('checks completeness even in save-data mode and does not download a missing file', async () => {
     network.onLine = true
     network.connection.saveData = true
-    const store = await loadDataStore()
+    const store = await loadOfficialStore()
     expect(await store.primeOffline()).toBe(true)
     entries.delete(files[0])
     expect(await store.primeOffline()).toBe(false)
@@ -95,7 +109,7 @@ describe('offline catalog readiness', () => {
 
   it('returns false when Cache Storage is unavailable despite a readiness marker', async () => {
     vi.stubGlobal('window', {})
-    const store = await loadDataStore()
+    const store = await loadOfficialStore()
     expect(await store.primeOffline()).toBe(false)
   })
 
@@ -103,14 +117,14 @@ describe('offline catalog readiness', () => {
     network.onLine = true
     entries.delete(files[0])
     cache.put.mockRejectedValue(new DOMException('quota', 'QuotaExceededError'))
-    const store = await loadDataStore()
+    const store = await loadOfficialStore()
     expect(await store.primeOffline()).toBe(false)
   })
 
   it('returns false on a network failure or HTTP error', async () => {
     network.onLine = true
     entries.delete(files[0])
-    const store = await loadDataStore()
+    const store = await loadOfficialStore()
     fetchMock.mockRejectedValueOnce(new TypeError('network failure'))
     expect(await store.primeOffline()).toBe(false)
     fetchMock.mockResolvedValueOnce(new Response('', { status: 503 }))
@@ -118,3 +132,121 @@ describe('offline catalog readiness', () => {
   })
 })
 
+describe('official catalog bootstrap', () => {
+  let network: { onLine: boolean }
+  let fetchMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    network = { onLine: true }
+    vi.stubGlobal('document', { baseURI })
+    vi.stubGlobal('navigator', network)
+    fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('loads a valid official manifest as available', async () => {
+    fetchMock.mockResolvedValue(Response.json(manifest))
+    const result = await loadDataStore()
+    expect(result.state).toBe('available')
+    if (result.state !== 'available') throw new Error('expected available')
+    expect(result.store.official).toBe(true)
+    expect(result.store.datasetVersion).toBe('current')
+  })
+
+  it('treats HTTP 503 as a recoverable error without creating a demo store', async () => {
+    fetchMock.mockResolvedValue(new Response('', { status: 503 }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_unavailable' })
+    expectNoDemoStore(result)
+  })
+
+  it('treats a fetch throw while offline as download_required', async () => {
+    network.onLine = false
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'download_required', reason: 'offline_without_data' })
+    expectNoDemoStore(result)
+  })
+
+  it('treats a fetch throw while online as a recoverable error', async () => {
+    network.onLine = true
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_unavailable' })
+    expectNoDemoStore(result)
+  })
+
+  it('treats invalid JSON as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(new Response('{', { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('treats a wrong schemaVersion as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ...manifest, schemaVersion: 2 }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('treats a structurally incomplete manifest as manifest_invalid', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ...manifest, files: { taxa: manifest.files.taxa } }))
+    const result = await loadDataStore()
+    expect(result).toEqual({ state: 'recoverable_error', reason: 'manifest_invalid' })
+    expectNoDemoStore(result)
+  })
+
+  it('creates a demo store only through createDemoDataStore()', () => {
+    const store = createDemoDataStore()
+    expect(store.official).toBe(false)
+    expect(store.datasetVersion).toBe('demo')
+  })
+
+  it('does not fall back to demo when official manifest loading fails', async () => {
+    const failures: Array<{ name: string; setup: () => void }> = [
+      {
+        name: '503',
+        setup: () => {
+          network.onLine = true
+          fetchMock.mockResolvedValue(new Response('', { status: 503 }))
+        },
+      },
+      {
+        name: 'throw online',
+        setup: () => {
+          network.onLine = true
+          fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+        },
+      },
+      {
+        name: 'throw offline',
+        setup: () => {
+          network.onLine = false
+          fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+        },
+      },
+      {
+        name: 'invalid json',
+        setup: () => {
+          fetchMock.mockResolvedValue(new Response('not json', { status: 200 }))
+        },
+      },
+      {
+        name: 'invalid schema',
+        setup: () => {
+          fetchMock.mockResolvedValue(Response.json({ ...manifest, schemaVersion: 2 }))
+        },
+      },
+    ]
+
+    for (const failure of failures) {
+      failure.setup()
+      const result = await loadDataStore()
+      expectNoDemoStore(result)
+      if (result.state === 'available') throw new Error(`${failure.name} opened official/demo data`)
+    }
+  })
+})

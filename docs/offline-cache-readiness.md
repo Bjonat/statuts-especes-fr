@@ -13,6 +13,10 @@ Un cache complet reste reconnu hors connexion et en mode économie de données.
 Les erreurs de réseau, de quota et d'accès au stockage renvoient `false`.
 Le marqueur historique n'est plus lu ni écrit.
 
+Le fallback automatique vers la démonstration lorsque le manifeste officiel
+est indisponible ou invalide est corrigé dans PR-PWA-01 : le mode
+démonstration n'existe plus que par choix utilisateur explicite.
+
 ## Vérification automatisée
 
 `npx vitest run src/catalog.test.ts`

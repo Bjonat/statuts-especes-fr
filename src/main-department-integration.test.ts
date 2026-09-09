@@ -33,7 +33,7 @@ function functionBody(source: string, name: string): string {
 describe('PWA department selector wiring', () => {
   it('declares an explicit department state (null = whole region)', () => {
     expect(mainSource).toMatch(/department:\s*string\s*\|\s*null/)
-    expect(mainSource).toMatch(/department:\s*readStoredDepartment\(/)
+    expect(functionBody(mainSource, 'enterLoadedStore')).toMatch(/state\.department\s*=\s*readStoredDepartment\(/)
     expect(mainSource).not.toMatch(/department\?:\s*string/)
   })
 

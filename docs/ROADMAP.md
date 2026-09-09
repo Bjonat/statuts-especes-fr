@@ -1,9 +1,9 @@
 # Roadmap technique — moteur de statuts d’espèces FR
 
 Document de référence pour les développements à venir.
-Dernière actualisation : 2026-09-03. PR-A à PR-L sont réalisées. Cette PR (PR-L) ajoute le sélecteur département dans la PWA.
+Dernière actualisation : 2026-09-09. PR-A à PR-L et PR #40 (contrôle réel du cache) sont réalisées. Cette PR (PR-PWA-01) sécurise le chargement et rend le mode démonstration explicite.
 
-**Décision mainteneur du 3 septembre 2026 :** priorité absolue à la PWA terrain offline. Après PR-L, gel des nouvelles surfaces fonctionnelles et phase de hardening terrain. CLI/CSV, QGIS et distribution sont différés jusqu’à décision explicite ultérieure.
+**Décision mainteneur du 9 septembre 2026 :** la phase de hardening terrain est désormais une séquence de 14 PR. Vision : une PWA qu’un écologue ouvre spontanément sur le terrain, comprend immédiatement et dont il peut vérifier chaque résultat. CLI/CSV, QGIS et distribution restent différés.
 
 **Ce document n’autorise aucun chantier.** Chaque phase se traite dans une PR dédiée, petite et vérifiable. Ne pas lancer une refonte générale du pipeline ni du front à partir de ce fichier.
 
@@ -17,7 +17,7 @@ Cible à moyen terme :
 
 > Un moteur français de résolution des statuts réglementaires et patrimoniaux d’un taxon selon son territoire, avec données traçables et fonctionnement offline.
 
-**Priorité produit actuelle :** faire de la PWA un outil terrain offline extrêmement fiable avant toute extension vers CLI/CSV, QGIS, package ou API.
+**Priorité produit actuelle :** une PWA qu’un écologue ouvre spontanément sur le terrain, comprend immédiatement et dont il peut vérifier chaque résultat.
 
 La PWA actuelle est le consommateur prioritaire du moteur. CLI, QGIS, package et API restent des cibles documentées, **hors roadmap active**.
 
@@ -33,12 +33,14 @@ Question unique à laquelle le projet doit rester excellent :
 
 ## 2. État actuel du repository
 
-État au **2026-09-03** (PR-A à PR-K mergées ; PR-L = cette PR). Ce paragraphe est ce que les agents doivent lire en premier.
+État au **2026-09-09** (PR-A à PR-L mergées ; PR #40 mergée ; PR-PWA-01 = cette PR). Ce paragraphe est ce que les agents doivent lire en premier.
 
 - PWA offline-first fonctionnelle (Vite + `vite-plugin-pwa`).
 - `resolveStatuses()` est extrait et **utilisé** par `main.ts` (PR-E / PR-F).
 - Le resolver accepte `department?` (PR-K). Sans département, le comportement reste identique.
-- Sélecteur département facultatif dans la recherche et la fiche (PR-L) : `state` / persistance `localStorage["department"]` ; passage direct à `resolveStatuses` ; recalcul local sans réseau ; warnings territoriaux visibles.
+- Sélecteur département facultatif dans la recherche et la fiche (PR-L).
+- **PR #40 — contrôle réel du cache : MERGÉE.** `primeOffline()` vérifie les 29 fichiers du manifeste dans Cache Storage. Plus de confiance dans `offlineDatasetVersion`. Cache incomplet détecté ; réparation online si possible. Pas encore de gestion régionale/atomique.
+- **PR-PWA-01 (cette PR) :** le runtime ne bascule plus automatiquement vers la démonstration. Bootstrap explicite : officiel disponible / téléchargement nécessaire / erreur récupérable / démo choisie.
 - Matrice de couverture générée depuis `ready-sources.json` (PR-A).
 - Contrat d’acquisition à états explicites (`FETCH_OK`, `ARCHIVED_FALLBACK`, `UNAVAILABLE`, `TYPE_MISMATCH`, `CHANGED_UNVERIFIED`) (PR-C / PR-D).
 - Runner générique `run-adapter.mjs` (PR-G).
@@ -103,7 +105,7 @@ Les 13 régions métropolitaines sont dans le manifeste. Le socle BDC est nation
 ### 2.4 Ce qui n’existe pas encore (ou est différé)
 
 - Licence du code ; métadonnées GitHub About encore vides.
-- Hardening terrain / offline — **phase active suivante** : audit puis petites PR selon les problèmes observés. Pas de PR-P / PR-Q / PR-R inventées maintenant.
+- Hardening terrain / offline — **séquence active** PR-PWA-01 (cette PR) → PR-PWA-02 (écran Données hors ligne, **non lancée**) → … jusqu’à PR-RELEASE-01. Voir §6.1.
 - CLI / CSV — **DIFFÉRÉ** (PR-M).
 - QGIS — **DIFFÉRÉ** (PR-N).
 - Distribution / package / API — **DIFFÉRÉE** (PR-O).
@@ -184,8 +186,11 @@ P2-A / PR-K   Département dans le resolver     ┐
   ↓                                             ├ réalisés
 PR-L          Sélecteur département PWA         ┘
   ↓
-PWA TERRAIN HARDENING
-  offline réel · fiabilité · UX mobile · performance · tests terrain
+PR #40        Contrôle réel du Cache Storage     ✅ mergée
+  ↓
+PR-PWA-01     Chargement / démo explicite        ← cette PR
+  ↓
+séquence PWA terrain (14 PR, §6.1)
 ```
 
 CLI/CSV (PR-M), QGIS (PR-N) et distribution (PR-O) sont **DIFFÉRÉS / BACKLOG** : hors roadmap active.
@@ -860,18 +865,82 @@ adaptateurs historiques          │
                          PR-L sélecteur département
                                 │
                                 ▼
-                      PWA TERRAIN HARDENING
+                         PR #40 cache réel
+                                │
+                                ▼
+                         PR-PWA-01 démo explicite
+                                │
+                                ▼
+                      séquence PWA terrain §6.1
 ```
 
 CLI / QGIS / package / API (PR-M / N / O) restent documentés plus bas, **hors de ce graphe actif**.
 
 ---
 
-## 6.1 Phase prioritaire après PR-L — Hardening PWA terrain/offline
+## 6.1 Phase prioritaire — hardening PWA terrain (séquence du 9 septembre 2026)
 
-Cette section **documente** la phase. Elle ne l’implémente pas. Pas de PR-P / PR-Q / PR-R inventées maintenant : un audit terrain après PR-L découpera les petites PR nécessaires.
+Vision :
 
-Objectif :
+> Une PWA qu’un écologue ouvre spontanément sur le terrain, comprend immédiatement et dont il peut vérifier chaque résultat.
+
+### Point zéro déjà mergé
+
+**PR #40 — contrôle réel du cache : MERGÉE**
+
+- contrôle des 29 fichiers du manifeste ;
+- suppression de la confiance dans `offlineDatasetVersion` ;
+- cache incomplet détecté ;
+- réparation online si possible ;
+- pas encore de gestion régionale/atomique.
+
+### Séquence active (14 PR)
+
+Aucun numéro GitHub n’est inventé ici. Une seule PR à la fois.
+
+```text
+PR-PWA-01 — Chargement / démo explicite     ← réalisée par cette PR
+PR-PWA-02 — Écran Données hors ligne
+PR-PWA-03 — Mises à jour atomiques
+PR-PWA-04 — Validation navigateur/appareils
+        ↓ checkpoint : offline fiable
+        L'application fonctionne réellement et de manière fiable hors ligne.
+
+PR-PWA-05 — Fiche lisible
+PR-PWA-06 — Sources existantes accessibles
+PR-DATA-01 — Preuve documentaire / cd_doc
+PR-DATA-02 — Couverture réelle versionnée
+PR-DATA-03 — Territoires / remplacements / corpus
+        ↓ checkpoint : résultats traçables
+        Les résultats sont compréhensibles, traçables et contrôlés.
+
+PR-PWA-07 — Recherche
+PR-PWA-08 — Favoris / récents
+PR-PWA-09 — Synthèse partageable
+PR-PWA-10 — Ergonomie / accessibilité
+PR-RELEASE-01 — Release pilote
+        ↓ checkpoint : réutilisation autonome
+        Des écologues la réutilisent sans accompagnement permanent.
+```
+
+**PR-PWA-01** (cette PR) : séparer le chargement officiel de la démonstration ; plus de fallback automatique vers les fixtures ; états `available` / `download_required` / `recoverable_error` / démo explicite.
+
+Ne pas lancer PR-PWA-02 dans la même livraison.
+
+### Hors de cette séquence
+
+Toujours hors roadmap active :
+
+- cartographie ;
+- identification photo ;
+- assistant IA ;
+- comptes utilisateurs ;
+- backend ;
+- plugin QGIS ;
+- CLI/CSV historique différé (PR-M) ;
+- distribution moteur/API historique différée (PR-O).
+
+Objectif historique de la phase (toujours valable comme critères de fond) :
 
 > Pouvoir partir une journée sur le terrain sans réseau et faire confiance à l’application.
 
@@ -1012,12 +1081,14 @@ Ordre proposé. Chaque ligne = **une** PR.
 | **PR-I** | ~~Migrer une **deuxième** source simple (BRE LRR CSV) pour valider l’abstraction~~ **Réalisée** (cette PR) : deuxième adaptateur BRE LRR ; common OEB minimal ; parité stricte ZNIEFF + LRR ; quality sidecars sur les deux sources ; production historique conservée | PR-G, PR-H | adaptateur + registre | Deux sources passent par le runner | Spécificités LRR | Script historique |
 | **PR-J** | ~~Workflow CI générique (matrice) **uniquement** pour les sources migrées~~ **Réalisée** (cette PR) : matrice CI registry-driven sur les sources IMPORTED avec adapter ; ZNIEFF + LRR actuellement ; quality sidecars par job ; smoke Bretagne historique conservé | PR-I | 1 YAML matrice | Équivalence smoke BRE | Casser le dispatch | YAML historique conservé |
 | **PR-K** | ~~Département dans le resolver (sans UI)~~ **Réalisée** (cette PR) : `department?` dans `resolveStatuses` ; filtrage data-driven des portées département / anciennes régions ; sans département = comportement inchangé ; aucune UI | PR-E, table `regions.mjs` | resolver + tests OCC/NAQ | Sans département = inchangé | Mal parser les `scopeLabel` libres | Flag off |
-| **PR-L** | ~~Sélecteur département PWA (opt-in)~~ **Réalisée** (cette PR) : sélecteur facultatif recherche + fiche ; `state.department` / persistance ; passage direct à `resolveStatuses` ; recalcul local sans réseau ; warnings territoriaux visibles | PR-K, PR-F | `main.ts`, CSS | Terrain : OCC 31 vs 34 | UX | Cacher le sélecteur |
+| **PR-L** | ~~Sélecteur département PWA (opt-in)~~ **Réalisée** (#39) : sélecteur facultatif recherche + fiche ; `state.department` / persistance ; passage direct à `resolveStatuses` ; recalcul local sans réseau ; warnings territoriaux visibles | PR-K, PR-F | `main.ts`, CSS | Terrain : OCC 31 vs 34 | UX | Cacher le sélecteur |
+| **PR-PWA-01** | ~~Chargement / démo explicite~~ **Réalisée** (cette PR) : plus de fallback automatique vers les fixtures ; bootstrap officiel / téléchargement / erreur récupérable / démo choisie | PR-L, #40 | `catalog.ts`, `main.ts` | 503 / offline / JSON invalide → pas de démo | UX | Revert bootstrap |
+| **PR-PWA-02** | Écran Données hors ligne (inventaire régional) — **non lancée** | PR-PWA-01 | `main.ts` | Préparation par région | UX | — |
 | **PR-M** | CLI liste / CSV — **DIFFÉRÉ / BACKLOG — hors roadmap active** | PR-F | CLI + tests | `ambiguous` / `not_found` / *Hyles* | — | Supprimer le CLI |
 | **PR-N** | Note d’architecture QGIS (choix 1/2/3) puis plugin minimal — **DIFFÉRÉ / BACKLOG — hors roadmap active** | PR-M | `docs/` + plugin | Pas de règles dans le plugin | Portée | Ne pas merger le plugin |
 | **PR-O** | ADR distribution (JSON / SQLite / package / API) — **DIFFÉRÉ / BACKLOG — hors roadmap active** | moteur stable §8 | `docs/` | Décision écrite, **rien publié** | — | — |
 
-Après PR-L, aucune nouvelle fonctionnalité de type CLI/QGIS/API n’est lancée automatiquement. La prochaine étape est un audit de la PWA terrain puis un découpage en petites PR de hardening selon les problèmes réellement observés.
+Après PR-L et #40, la séquence active est §6.1. Ne pas lancer PR-PWA-02 (ni M / N / O) automatiquement.
 
 **Pilote d’abstraction :** Bretagne ZNIEFF OEB (CSV data.gouv). Ne pas piloter avec BFC (tableur maître) ni OCC (zones biogéographiques).
 
@@ -1032,4 +1103,4 @@ Après PR-L, aucune nouvelle fonctionnalité de type CLI/QGIS/API n’est lancé
 3. Respecter « Hors périmètre » de la phase.
 4. Ne pas inventer de statuts, de SHA, ni de licence.
 5. `npm test` et `npm run build` verts. Ne pas « réparer » les workflows de téléchargement amont dans une PR qui n’est pas PR-C/D.
-6. Ne pas enchaîner automatiquement la PR suivante. Après PR-L, ne pas lancer PR-M / N / O.
+6. Ne pas enchaîner automatiquement la PR suivante. Après PR-PWA-01, ne pas lancer PR-PWA-02 ni PR-M / N / O.
