@@ -526,17 +526,95 @@ button:disabled,
   outline-offset: 2px;
 }
 
+.taxon-identity h1 {
+  margin-bottom: 6px;
+}
+
+.taxon-card .scientific-name {
+  margin-bottom: 6px;
+  color: #495046;
+  font-size: 1.05rem;
+}
+
+.taxon-meta {
+  margin-bottom: 0;
+  color: #73796e;
+  font-size: 0.82rem;
+}
+
+.taxon-cdref {
+  font-weight: 500;
+  color: #5c6358;
+}
+
+.taxon-territory {
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid #e5e6df;
+}
+
+.taxon-section-heading {
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5c6358;
+}
+
+.territory-context {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 6px;
+}
+
+.territory-region {
+  font-size: 1.12rem;
+  font-weight: 750;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.territory-scope {
+  color: #4d5448;
+  font-size: 0.95rem;
+}
+
+.territory-hint {
+  margin: 0 0 12px;
+  color: #6b7167;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .taxon-card .territory-filter {
   margin-top: 0;
+}
+
+.taxon-card .territory-filter .field-label {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: #5c6358;
+}
+
+.divider {
+  height: 1px;
+  background: #e5e6df;
+  margin: 18px 0;
 }
 
 .status-results {
   margin-top: 18px;
 }
 
+.status-results > .taxon-section-heading {
+  margin-top: 4px;
+}
+
 .territory-notice {
-  margin: 0 0 14px;
-  padding: 11px 13px;
+  margin: 0 0 16px;
+  padding: 12px 13px;
   border-radius: 12px;
   background: #eef3e8;
   border: 1px solid #d5decc;
@@ -546,6 +624,15 @@ button:disabled,
   overflow-wrap: anywhere;
 }
 
+.territory-notice-label {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5a6654;
+}
+
 .territory-notice p,
 .territory-notice ul {
   margin: 0;
@@ -553,24 +640,6 @@ button:disabled,
 
 .territory-notice ul {
   padding-left: 1.15em;
-}
-
-.taxon-card .scientific-name {
-  margin-bottom: 5px;
-  color: #495046;
-  font-size: 1.08rem;
-}
-
-.taxon-meta {
-  margin-bottom: 0;
-  color: #73796e;
-  font-size: 0.82rem;
-}
-
-.divider {
-  height: 1px;
-  background: #e5e6df;
-  margin: 18px 0;
 }
 
 .status-list {
@@ -586,58 +655,85 @@ button:disabled,
 }
 
 .status-row {
-  display: grid;
-  grid-template-columns: minmax(150px, 0.9fr) minmax(0, 1.1fr);
-  gap: 8px 22px;
-  align-items: start;
-  padding: 13px 0 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+  padding: 14px 0 12px;
 }
 
 .status-row dt {
   min-width: 0;
-  color: #535a50;
+  color: #5c6358;
   font-weight: 650;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
-.status-row dt small {
+.status-type {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status-row dt small,
+.status-scope {
   display: block;
   margin-top: 4px;
   color: #7a6650;
   font-size: 0.74rem;
   font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   line-height: 1.35;
 }
 
 .status-row dd {
   min-width: 0;
   margin: 0;
-  font-weight: 800;
-  line-height: 1.4;
+  font-weight: 750;
+  line-height: 1.35;
   text-align: left;
   overflow-wrap: anywhere;
 }
 
 .status-value-line {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
   max-width: 100%;
+}
+
+.status-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 1.18rem;
+  font-weight: 750;
+  color: #20231f;
 }
 
 .status-help-btn {
   flex: none;
-  width: 1.55rem;
-  height: 1.55rem;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   border: 1px solid #c9cec4;
   border-radius: 999px;
   background: #f4f5f1;
   color: #4f5649;
-  font-size: 0.82rem;
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
+}
+
+.status-help-btn:focus-visible {
+  outline: 3px solid #6d8064;
+  outline-offset: 2px;
 }
 
 .status-help-btn[aria-expanded='true'] {
@@ -646,8 +742,8 @@ button:disabled,
 }
 
 .status-help {
-  margin: 0 0 12px;
-  padding: 10px 12px;
+  margin: 4px 0 12px;
+  padding: 12px 13px;
   border-radius: 10px;
   background: #f3f4ef;
   border: 1px solid #e0e3da;
@@ -671,7 +767,7 @@ button:disabled,
 }
 
 .status-help-text {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: #4d5448;
   font-size: 0.84rem;
   font-weight: 500;
@@ -684,16 +780,25 @@ button:disabled,
 
 .status-help-close {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
   border: 0;
   background: transparent;
   color: #3f6b4d;
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.86rem;
   font-weight: 700;
-  padding: 0;
+  padding: 8px 0;
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.status-help-close:focus-visible {
+  outline: 3px solid #6d8064;
+  outline-offset: 2px;
 }
 
 .empty-status {
@@ -702,6 +807,7 @@ button:disabled,
 
 .empty-status .empty-state {
   margin-bottom: 8px;
+  color: #4d5448;
 }
 
 .visually-hidden {
@@ -726,19 +832,8 @@ button:disabled,
 }
 
 @media (max-width: 520px) {
-  .status-row {
-    grid-template-columns: 1fr;
-    gap: 4px;
-  }
-
-  .status-row dd {
-    font-size: 1rem;
-  }
-
-  .status-help-btn {
-    width: 1.75rem;
-    height: 1.75rem;
-    font-size: 0.9rem;
+  .status-value {
+    font-size: 1.12rem;
   }
 }
 

@@ -48,6 +48,10 @@ describe('PWA resolver wiring', () => {
     expect(body).not.toMatch(/\bsortedStatuses\b/)
     expect(body).not.toMatch(/\busefulStatus\b/)
     expect(body).not.toMatch(/state\.statuses\.filter\s*\(/)
+    expect(body).toMatch(/const taxonStatuses = result\.statuses/)
+    expect(body).not.toMatch(/taxonStatuses\.filter/)
+    expect(body).not.toMatch(/taxonStatuses\.sort/)
+    expect(body).toMatch(/sourceSummary\(\s*taxonStatuses\s*\)/)
   })
 
   it('keeps territorial applicability out of the UI', () => {
