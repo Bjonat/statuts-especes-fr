@@ -103,6 +103,13 @@ describe('PWA offline data wiring', () => {
     expect(functionBody(mainSource, 'confirmRemoveOfflineRegion')).not.toMatch(/state\.statuses/)
   })
 
+  it('lets the user change region from the unloaded-referential error screen', () => {
+    const errorScreen = functionBody(mainSource, 'renderError')
+    expect(errorScreen).toMatch(/region-select/)
+    expect(errorScreen).toMatch(/bindRegionSelect/)
+    expect(errorScreen).toMatch(/Réessayer/)
+  })
+
   it('does not estimate volumes with HEAD and leaves dataset caching to the app', () => {
     expect(offlineSource).not.toMatch(/['"]HEAD['"]/)
     expect(mainSource).not.toMatch(/method:\s*['"]HEAD['"]/)

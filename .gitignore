@@ -5,3 +5,8 @@ coverage/
 *.local
 .DS_Store
 __pycache__/
+playwright-report/
+test-results/
+blob-report/
+e2e/fixtures/generated/
+public/data/

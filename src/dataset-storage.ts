@@ -99,6 +99,16 @@ export async function openNamedCache(name: string): Promise<Cache | null> {
   }
 }
 
+export async function namedCacheExists(name: string): Promise<boolean> {
+  if (!cachesApiAvailable()) return false
+  try {
+    const keys = await caches.keys()
+    return keys.includes(name)
+  } catch {
+    return false
+  }
+}
+
 export async function openMetadataCache(): Promise<Cache | null> {
   return openNamedCache(METADATA_CACHE_NAME)
 }
@@ -236,6 +246,7 @@ export async function loadDatasetArray<T>(
 }
 
 async function migrateLegacyManifest(): Promise<DataManifest | null> {
+  if (!(await namedCacheExists(LEGACY_MANIFEST_CACHE))) return null
   const cache = await openNamedCache(LEGACY_MANIFEST_CACHE)
   if (!cache) return null
   try {
@@ -248,6 +259,7 @@ async function migrateLegacyManifest(): Promise<DataManifest | null> {
 }
 
 export async function migrateLegacyCatalogFiles(manifest: DataManifest): Promise<void> {
+  if (!(await namedCacheExists(LEGACY_CATALOG_CACHE))) return
   const legacy = await openNamedCache(LEGACY_CATALOG_CACHE)
   if (!legacy) return
   const versioned = await openDatasetCache(manifest.datasetVersion)
