@@ -700,18 +700,24 @@ button:disabled,
 
 .status-value-line {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   max-width: 100%;
 }
 
 .status-value {
-  flex: 1 1 auto;
   min-width: 0;
   font-size: 1.18rem;
   font-weight: 750;
   color: #20231f;
+}
+
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .status-help-btn {
@@ -799,6 +805,85 @@ button:disabled,
 .status-help-close:focus-visible {
   outline: 3px solid #6d8064;
   outline-offset: 2px;
+}
+
+.status-source-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #c9cec4;
+  border-radius: 11px;
+  background: #f4f5f1;
+  color: #2f342c;
+  font-size: 0.88rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.status-source-btn:focus-visible {
+  outline: 3px solid #6d8064;
+  outline-offset: 2px;
+}
+
+.status-source-btn[aria-expanded='true'] {
+  border-color: #8a927f;
+  background: #e8ebe3;
+}
+
+.status-source {
+  margin: 4px 0 12px;
+  padding: 12px 13px;
+  border-radius: 10px;
+  background: #f7f8f4;
+  border: 1px solid #d9ddd2;
+}
+
+.status-source-kicker {
+  margin: 0 0 6px;
+  color: #6a7166;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.status-source-name {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+  font-weight: 750;
+  line-height: 1.35;
+  color: #2f342c;
+  overflow-wrap: anywhere;
+}
+
+.status-source-meta {
+  margin: 0 0 4px;
+  color: #4d5448;
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.status-source-label {
+  display: block;
+  color: #6a7166;
+  font-weight: 650;
+}
+
+.status-source-missing {
+  margin: 0 0 6px;
+  color: #4d5448;
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.status-source-id {
+  margin: 0 0 8px;
+  color: #6b7167;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
 }
 
 .empty-status {

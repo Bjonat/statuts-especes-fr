@@ -50,6 +50,14 @@ const FLORA_A = [
     synonyms: [],
     family: 'Testaceae',
   },
+  {
+    cdRef: 900005,
+    realm: 'flora',
+    scientificName: 'Status orbus',
+    vernacularNames: ['Statut orphelin de test'],
+    synonyms: [],
+    family: 'Testaceae',
+  },
 ]
 
 const FLORA_B = [
@@ -75,13 +83,13 @@ const FAUNA = [
   },
 ]
 
-function sources(versionLabel, checkedAt) {
+function sources(datasetVersion, checkedAt) {
   return [
     {
       id: 'taxref-v18',
       name: 'TAXREF (fixture E2E)',
       producer: 'E2E synthétique',
-      version: versionLabel,
+      version: datasetVersion,
       official: true,
       checkedAt,
     },
@@ -89,23 +97,31 @@ function sources(versionLabel, checkedAt) {
       id: 'bdc-v18',
       name: 'BDC Statuts (fixture E2E)',
       producer: 'E2E synthétique',
-      version: versionLabel,
+      version: datasetVersion,
       official: true,
       checkedAt,
     },
     {
-      id: 'e2e-occ-synth',
-      name: 'Référentiel OCC synthétique de test',
-      producer: 'E2E synthétique',
-      version: versionLabel,
+      id: 'fixture-lrr-occ',
+      name: 'Fixture LRR Occitanie',
+      producer: 'Producteur E2E LRR',
+      version: datasetVersion,
+      publicationYear: 2026,
       official: true,
       checkedAt,
     },
     {
-      id: 'e2e-naq-synth',
-      name: 'Référentiel NAQ synthétique de test',
-      producer: 'E2E synthétique',
-      version: versionLabel,
+      id: 'fixture-znieff-occ',
+      name: 'Fixture ZNIEFF Occitanie',
+      producer: 'Autre producteur E2E',
+      version: 'test-2',
+      official: true,
+    },
+    {
+      id: 'fixture-naq-synth',
+      name: 'Fixture NAQ synthétique',
+      producer: 'Producteur E2E NAQ',
+      version: datasetVersion,
       official: true,
       checkedAt,
     },
@@ -118,31 +134,37 @@ function definitions(marker) {
       category: 'red_list_regional',
       label: 'Liste rouge régionale (fixture)',
       value: `VU — fixture ${marker}`,
-      sourceId: 'e2e-occ-synth',
+      sourceId: 'fixture-lrr-occ',
     },
     {
       category: 'znieff',
       label: 'Déterminante ZNIEFF (fixture Midi-Pyrénées)',
       value: 'Oui — Midi-Pyrénées (fixture)',
-      sourceId: 'e2e-occ-synth',
+      sourceId: 'fixture-znieff-occ',
     },
     {
       category: 'znieff',
       label: 'Déterminante ZNIEFF (fixture Languedoc-Roussillon)',
       value: 'Oui — Languedoc-Roussillon (fixture)',
-      sourceId: 'e2e-occ-synth',
+      sourceId: 'fixture-znieff-occ',
     },
     {
       category: 'protection_regional',
       label: 'Protection régionale (fixture)',
       value: `Protégée — fixture ${marker}`,
-      sourceId: 'e2e-naq-synth',
+      sourceId: 'fixture-naq-synth',
     },
     {
       category: 'red_list_regional',
       label: 'Liste rouge régionale faune (fixture)',
       value: `NT — fixture ${marker}`,
-      sourceId: 'e2e-occ-synth',
+      sourceId: 'fixture-lrr-occ',
+    },
+    {
+      category: 'other',
+      label: 'Statut orphelin de test',
+      value: 'Présent — sans métadonnée de source',
+      sourceId: 'fixture-source-absente',
     },
   ]
 }
@@ -169,6 +191,7 @@ function buildVersion(outDir, spec) {
     [900001, 1, 2, 'Midi-Pyrénées'],
     [900001, 2, 2, 'Languedoc-Roussillon'],
     [900002, 0, 1],
+    [900005, 5, 1],
     ...spec.extraOccFloraLinks,
   ]
   const occFaunaLinks = [[900101, 4, 1]]
@@ -224,7 +247,7 @@ export function generateFixtures(rootDir) {
     flora: FLORA_A,
     fauna: FAUNA,
     definitions: definitions('e2e-a'),
-    sources: sources('e2e-2026-09-09', '2026-09-09'),
+    sources: sources('e2e-a', '2026-09-09'),
     extraOccFloraLinks: [],
   })
 
@@ -234,7 +257,7 @@ export function generateFixtures(rootDir) {
     flora: FLORA_B,
     fauna: FAUNA,
     definitions: definitions('e2e-b'),
-    sources: sources('e2e-2026-09-10', '2026-09-10'),
+    sources: sources('e2e-b', '2026-09-10'),
     extraOccFloraLinks: [[900003, 0, 1]],
   })
 
