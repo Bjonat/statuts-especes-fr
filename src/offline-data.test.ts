@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+// @ts-expect-error Node builtin resolved by Vitest; no @types/node in the app tsconfig.
+import { createHash } from 'node:crypto'
 import {
   catalogFileUrl,
   createOfflineDataManager,
@@ -9,8 +11,12 @@ import {
 import type { DataManifest } from './types'
 import { METROPOLITAN_REGION_CODES } from './types'
 
+const EMPTY_JSON = '[]'
+const EMPTY_HASH = createHash('sha256').update(EMPTY_JSON).digest('hex').slice(0, 12)
+const EMPTY_BYTES = new TextEncoder().encode(EMPTY_JSON).byteLength
+
 const regions = METROPOLITAN_REGION_CODES.map((code) => ({ code, name: code }))
-const file = (name: string, bytes = 8) => ({ file: `${name}-abcdef.json`, count: 1, bytes })
+const file = (name: string) => ({ file: `${name}-${EMPTY_HASH}.json`, count: 0, bytes: EMPTY_BYTES })
 const manifest = {
   schemaVersion: 3 as const,
   official: true as const,
@@ -21,12 +27,12 @@ const manifest = {
   regions,
   sources: [],
   files: {
-    taxa: { flora: file('taxa-flora', 100), fauna: file('taxa-fauna', 200) },
-    statusDefinitions: file('status-definitions', 50),
+    taxa: { flora: file('taxa-flora'), fauna: file('taxa-fauna') },
+    statusDefinitions: file('status-definitions'),
     statusLinks: Object.fromEntries(
       ['flora', 'fauna'].map((realm) => [
         realm,
-        Object.fromEntries(regions.map(({ code }) => [code, file(`status-links-${realm}-${code.toLowerCase()}`, 10)])),
+        Object.fromEntries(regions.map(({ code }) => [code, file(`status-links-${realm}-${code.toLowerCase()}`)])),
       ]),
     ),
   },
@@ -65,7 +71,18 @@ describe('offline data manager', () => {
     vi.stubGlobal('document', { baseURI })
     vi.stubGlobal('navigator', network)
     vi.stubGlobal('window', { caches: {} })
-    vi.stubGlobal('caches', { open: vi.fn(async () => cache) })
+    vi.stubGlobal('caches', {
+      open: vi.fn(async (name: string) => {
+        if (name.startsWith('statuts-data-catalogs-v-') || name === 'statuts-data-catalogs') return cache
+        return {
+          match: async () => undefined,
+          put: async () => {},
+          delete: async () => false,
+        }
+      }),
+      keys: async () => [],
+      delete: async () => true,
+    })
     fetchMock = vi.fn(async (url: URL | string) => {
       const href = String(url)
       if (href.includes('HEAD') || (typeof url === 'object' && 'method' in url)) {

@@ -84,9 +84,10 @@ describe('PWA offline data wiring', () => {
   })
 
   it('allows a single prepare at a time and aborts when leaving the screen', () => {
-    expect(functionBody(mainSource, 'prepareOfflineRegion')).toMatch(/state\.offlinePreparing/)
-    expect(functionBody(mainSource, 'prepareOfflineRegion')).toMatch(/if \(!manager \|\| state\.offlinePreparing\) return/)
+    expect(functionBody(mainSource, 'prepareOfflineRegion')).toMatch(/cacheMutationBusy/)
+    expect(functionBody(mainSource, 'prepareOfflineRegion')).toMatch(/if \(!manager \|\| cacheMutationBusy\(\)\) return/)
     expect(functionBody(mainSource, 'closeOffline')).toMatch(/offlineAbort\?\.abort\(/)
+    expect(functionBody(mainSource, 'closeOffline')).toMatch(/datasetAbort\?\.abort\(/)
     expect(functionBody(mainSource, 'cancelOfflinePrepare')).toMatch(/offlineAbort\?\.abort\(/)
   })
 
@@ -102,11 +103,12 @@ describe('PWA offline data wiring', () => {
     expect(functionBody(mainSource, 'confirmRemoveOfflineRegion')).not.toMatch(/state\.statuses/)
   })
 
-  it('does not estimate volumes with HEAD and leaves Workbox unchanged', () => {
+  it('does not estimate volumes with HEAD and leaves dataset caching to the app', () => {
     expect(offlineSource).not.toMatch(/['"]HEAD['"]/)
     expect(mainSource).not.toMatch(/method:\s*['"]HEAD['"]/)
     expect(viteSource).toMatch(/registerType:\s*['"]autoUpdate['"]/)
-    expect(viteSource).toMatch(/maxEntries:\s*40/)
-    expect(viteSource).toMatch(/statuts-data-catalogs/)
+    expect(viteSource).not.toMatch(/maxEntries:\s*40/)
+    expect(viteSource).not.toMatch(/statuts-data-manifest/)
+    expect(viteSource).not.toMatch(/cacheName:\s*['"]statuts-data-catalogs['"]/)
   })
 })

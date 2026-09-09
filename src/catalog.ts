@@ -1,11 +1,17 @@
 import { DEMO_DATA_WARNING, regions as demoRegions, sources as demoSources, statuses as demoStatuses, taxa as demoTaxa } from './demo'
+import {
+  bootstrapActiveManifest,
+  createDatasetUpdateManager,
+  installFirstActiveManifest,
+  loadDatasetArray,
+  tryFetchRemoteManifest,
+} from './dataset-storage'
+import type { DatasetUpdateManager } from './dataset-storage'
 import { createOfflineDataManager } from './offline-data'
 import type { OfflineDataManager } from './offline-data'
 import { collectSourceIdsFromLinks, hydrateStatusLinks } from './status-data'
-import { METROPOLITAN_REGION_CODES } from './types'
 import type {
   DataManifest,
-  DatasetFile,
   Realm,
   Region,
   RegionCode,
@@ -17,6 +23,8 @@ import type {
 } from './types'
 
 const NATIONAL_SOURCE_IDS = new Set(['taxref-v18', 'bdc-v18'])
+
+export { isDataManifest, isDatasetFile, parseDataManifest } from './manifest'
 
 export interface DataStore {
   official: boolean
@@ -31,6 +39,8 @@ export interface DataStore {
   listSourcesForRegion(region: RegionCode): Promise<SourceDataset[]>
   /** Gestionnaire hors ligne du jeu officiel. Null en démonstration. */
   offline: OfflineDataManager | null
+  /** Mises à jour atomiques du jeu officiel. Null en démonstration. */
+  updates: DatasetUpdateManager | null
 }
 
 function sortSources(sources: SourceDataset[]): SourceDataset[] {
@@ -40,83 +50,6 @@ function sortSources(sources: SourceDataset[]): SourceDataset[] {
     if (leftNational !== rightNational) return leftNational - rightNational
     return left.name.localeCompare(right.name, 'fr')
   })
-}
-
-function isDatasetFile(value: unknown): value is DatasetFile {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as { file?: unknown; count?: unknown; bytes?: unknown }
-  if (typeof candidate.file !== 'string' || !/^[a-z0-9-]+-[a-f0-9]+\.json$/i.test(candidate.file)) return false
-  if (typeof candidate.count !== 'number') return false
-  if (candidate.bytes !== undefined) {
-    if (
-      typeof candidate.bytes !== 'number' ||
-      !Number.isFinite(candidate.bytes) ||
-      !Number.isInteger(candidate.bytes) ||
-      candidate.bytes < 0
-    ) {
-      return false
-    }
-  }
-  return true
-}
-
-function isRegion(value: unknown): value is Region {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as { code?: unknown; name?: unknown }
-  return (
-    typeof candidate.code === 'string' &&
-    METROPOLITAN_REGION_CODES.includes(candidate.code as RegionCode) &&
-    typeof candidate.name === 'string' &&
-    candidate.name.length > 0
-  )
-}
-
-function isManifest(value: unknown): value is DataManifest {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<DataManifest>
-  if (
-    candidate.schemaVersion !== 3 ||
-    candidate.official !== true ||
-    typeof candidate.generatedAt !== 'string' ||
-    typeof candidate.datasetVersion !== 'string' ||
-    !Array.isArray(candidate.regions) ||
-    candidate.regions.length !== METROPOLITAN_REGION_CODES.length ||
-    !candidate.regions.every(isRegion) ||
-    !Array.isArray(candidate.sources) ||
-    !candidate.files
-  ) {
-    return false
-  }
-
-  const regionSet = new Set(candidate.regions.map((region) => region.code))
-  if (!METROPOLITAN_REGION_CODES.every((region) => regionSet.has(region))) return false
-
-  const taxa = candidate.files.taxa
-  const definitions = candidate.files.statusDefinitions
-  const links = candidate.files.statusLinks
-  if (
-    !taxa ||
-    !definitions ||
-    !links ||
-    !isDatasetFile(taxa.flora) ||
-    !isDatasetFile(taxa.fauna) ||
-    !isDatasetFile(definitions)
-  ) {
-    return false
-  }
-
-  return (['flora', 'fauna'] as Realm[]).every((realm) =>
-    METROPOLITAN_REGION_CODES.every((region) => isDatasetFile(links[realm]?.[region])),
-  )
-}
-
-async function fetchArray<T>(file: string): Promise<T[]> {
-  const url = new URL(`data/${file}`, document.baseURI)
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`Jeu de données indisponible : ${file}`)
-  const data: unknown = await response.json()
-  if (!Array.isArray(data)) throw new Error(`Format de données invalide : ${file}`)
-  return data as T[]
 }
 
 export type DataLoadFailureReason = 'offline_without_data' | 'manifest_unavailable' | 'manifest_invalid'
@@ -150,23 +83,34 @@ export function createDemoDataStore(): DataStore {
       return sortSources(demoSources.filter((source) => used.has(source.id)))
     },
     offline: null,
+    updates: null,
   }
 }
 
-function createOfficialStore(manifest: DataManifest): DataStore {
+export function createOfficialStore(manifest: DataManifest): DataStore {
   const taxaCache = new Map<Realm, Taxon[]>()
   const statusCache = new Map<string, TaxonStatus[]>()
   let definitionsPromise: Promise<StatusDefinition[]> | null = null
+  const offline = createOfflineDataManager(manifest)
+  const updates = createDatasetUpdateManager(
+    () => manifest,
+    async () => {
+      const inventory = await offline.inspect()
+      return inventory.regions
+        .filter((region) => region.consultableOffline)
+        .map((region) => region.region)
+    },
+  )
 
   function loadDefinitions(): Promise<StatusDefinition[]> {
-    definitionsPromise ??= fetchArray<StatusDefinition>(manifest.files.statusDefinitions.file)
+    definitionsPromise ??= loadDatasetArray<StatusDefinition>(manifest, manifest.files.statusDefinitions)
     return definitionsPromise
   }
 
   async function loadTaxa(realm: Realm): Promise<Taxon[]> {
     const cached = taxaCache.get(realm)
     if (cached) return cached
-    const rows = await fetchArray<Taxon>(manifest.files.taxa[realm].file)
+    const rows = await loadDatasetArray<Taxon>(manifest, manifest.files.taxa[realm])
     taxaCache.set(realm, rows)
     return rows
   }
@@ -178,7 +122,7 @@ function createOfficialStore(manifest: DataManifest): DataStore {
 
     const [definitions, links] = await Promise.all([
       loadDefinitions(),
-      fetchArray<StatusLink>(manifest.files.statusLinks[realm][region].file),
+      loadDatasetArray<StatusLink>(manifest, manifest.files.statusLinks[realm][region]),
     ])
     const rows = hydrateStatusLinks(definitions, links, region)
     statusCache.set(key, rows)
@@ -193,8 +137,8 @@ function createOfficialStore(manifest: DataManifest): DataStore {
 
     const [definitions, floraLinks, faunaLinks] = await Promise.all([
       loadDefinitions(),
-      fetchArray<StatusLink>(manifest.files.statusLinks.flora[region].file),
-      fetchArray<StatusLink>(manifest.files.statusLinks.fauna[region].file),
+      loadDatasetArray<StatusLink>(manifest, manifest.files.statusLinks.flora[region]),
+      loadDatasetArray<StatusLink>(manifest, manifest.files.statusLinks.fauna[region]),
     ])
     const used = new Set([
       ...collectSourceIdsFromLinks(definitions, floraLinks),
@@ -215,40 +159,39 @@ function createOfficialStore(manifest: DataManifest): DataStore {
     loadTaxa,
     loadStatuses,
     listSourcesForRegion,
-    offline: createOfflineDataManager(manifest),
+    offline,
+    updates,
   }
+}
+
+export async function loadOfficialStoreFromActive(): Promise<DataStore | null> {
+  const active = await bootstrapActiveManifest()
+  if (!active) return null
+  return createOfficialStore(active)
 }
 
 /**
  * Charge uniquement le jeu officiel. Une panne ne produit jamais de store de démonstration.
  * La démo n’existe que via createDemoDataStore(), après un choix utilisateur.
+ * Un manifeste actif local est ouvert sans fetch réseau.
  */
 export async function loadDataStore(): Promise<DataStoreLoadResult> {
-  let manifestResponse: Response
-  try {
-    const manifestUrl = new URL('data/manifest.json', document.baseURI)
-    manifestResponse = await fetch(manifestUrl, { cache: 'no-cache' })
-  } catch {
-    if (!navigator.onLine) {
-      return { state: 'download_required', reason: 'offline_without_data' }
-    }
-    return { state: 'recoverable_error', reason: 'manifest_unavailable' }
+  const active = await bootstrapActiveManifest()
+  if (active) {
+    return { state: 'available', store: createOfficialStore(active) }
   }
 
-  if (!manifestResponse.ok) {
-    return { state: 'recoverable_error', reason: 'manifest_unavailable' }
+  const remote = await tryFetchRemoteManifest()
+  if (remote.ok) {
+    await installFirstActiveManifest(remote.manifest)
+    return { state: 'available', store: createOfficialStore(remote.manifest) }
   }
 
-  let manifestData: unknown
-  try {
-    manifestData = await manifestResponse.json()
-  } catch {
+  if (remote.reason === 'invalid') {
     return { state: 'recoverable_error', reason: 'manifest_invalid' }
   }
-
-  if (!isManifest(manifestData)) {
-    return { state: 'recoverable_error', reason: 'manifest_invalid' }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return { state: 'download_required', reason: 'offline_without_data' }
   }
-
-  return { state: 'available', store: createOfficialStore(manifestData) }
+  return { state: 'recoverable_error', reason: 'manifest_unavailable' }
 }
