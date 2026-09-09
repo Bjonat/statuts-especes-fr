@@ -4,7 +4,7 @@ Ce repository fournit aujourd’hui une **PWA mobile offline-first**, un **moteu
 
 **Aujourd’hui :** PWA terrain + resolver région / département + pipeline v3 + dataset embarqué + [matrice de couverture](docs/generated/source-coverage.md).
 
-**Priorité actuelle :** hardening PWA terrain — fiche taxon lisible (PR-PWA-05) ; validation navigateur Chromium PASS ; validation appareils réels encore à compléter ; PWA-06 non lancée — voir [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Priorité actuelle :** hardening PWA terrain — provenance par statut (PR-PWA-06) ; validation navigateur Chromium PASS ; validation appareils réels encore à compléter ; PR-DATA-01 non lancée — voir [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 CLI/CSV, QGIS et distribution restent documentés mais **différés**. Ces usages ne sont pas disponibles.
 
@@ -17,7 +17,8 @@ Parcours actuel :
 3. préciser éventuellement un **département** (`Toute la région` reste le défaut) ;
 4. rechercher un taxon par nom scientifique, nom vernaculaire ou synonyme ;
 5. consulter la **fiche** : taxon, territoire, statuts et valeurs ;
-6. voir les **sources** et **millésimes**.
+6. ouvrir la **source** de chaque statut (nom, producteur, version déjà intégrés) ;
+7. voir le résumé des **sources** et **millésimes** du dataset, ou la page régionale des référentiels couverts.
 
 `Toute la région` conserve le comportement historique : aucun filtrage supplémentaire des portées partielles. Un département ne recharge pas le dataset : le filtre est appliqué localement par `resolveStatuses`.
 

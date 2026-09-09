@@ -9,6 +9,7 @@ import {
   buildStatusHelp,
   formatStatusValueForDisplay,
 } from './status-help'
+import { statusSourceView } from './source-display'
 import type { DatasetCheckStatus, DatasetUpdateCheck, DatasetUpdateProgress } from './dataset-storage'
 import { datasetUpdateFailureReason } from './dataset-storage'
 import type { OfflineDownloadProgress, OfflineInventory } from './offline-data'
@@ -857,6 +858,30 @@ function renderStatusHelpPanel(status: TaxonStatus, index: number): string {
   `
 }
 
+function renderStatusSourcePanel(status: TaxonStatus, index: number): string {
+  const view = statusSourceView(status, store().sources)
+  const body =
+    view.state === 'found'
+      ? view.fields
+          .map((field) => {
+            if (field.key === 'name') {
+              return `<p class="status-source-name">${escapeHtml(field.value)}</p>`
+            }
+            return `<p class="status-source-meta"><span class="status-source-label">${escapeHtml(field.label)}</span> ${escapeHtml(field.value)}</p>`
+          })
+          .join('')
+      : `<p class="status-source-missing">${escapeHtml(view.message)}</p>
+         <p class="status-source-id">sourceId : ${escapeHtml(view.sourceId)}</p>`
+
+  return `
+    <div class="status-source" id="status-source-${index}" hidden>
+      <p class="status-source-kicker">Source du statut</p>
+      ${body}
+      <button type="button" class="status-help-close" data-source-close="${index}">Fermer</button>
+    </div>
+  `
+}
+
 async function loadRealmData(realm: Realm, region: RegionCode): Promise<void> {
   state.loading = true
   state.error = null
@@ -1265,18 +1290,28 @@ function renderDetail(): void {
                           <dd>
                             <span class="status-value-line">
                               <span class="status-value">${escapeHtml(shortStatusValue(status))}</span>
-                              <button
-                                type="button"
-                                class="status-help-btn"
-                                data-help-toggle="${index}"
-                                aria-expanded="false"
-                                aria-controls="status-help-${index}"
-                                title="Explication du statut"
-                              >ⓘ<span class="visually-hidden">Aide sur ce statut</span></button>
+                              <span class="status-actions">
+                                <button
+                                  type="button"
+                                  class="status-help-btn"
+                                  data-help-toggle="${index}"
+                                  aria-expanded="false"
+                                  aria-controls="status-help-${index}"
+                                  title="Explication du statut"
+                                >ⓘ<span class="visually-hidden">Aide sur ce statut</span></button>
+                                <button
+                                  type="button"
+                                  class="status-source-btn"
+                                  data-source-toggle="${index}"
+                                  aria-expanded="false"
+                                  aria-controls="status-source-${index}"
+                                >Source</button>
+                              </span>
                             </span>
                           </dd>
                         </div>
                         ${renderStatusHelpPanel(status, index)}
+                        ${renderStatusSourcePanel(status, index)}
                       </div>
                     `,
                   )
@@ -1316,6 +1351,15 @@ function renderDetail(): void {
     })
   }
 
+  const closeAllStatusSources = (): void => {
+    root.querySelectorAll<HTMLElement>('.status-source').forEach((panel) => {
+      panel.hidden = true
+    })
+    root.querySelectorAll<HTMLButtonElement>('[data-source-toggle]').forEach((button) => {
+      button.setAttribute('aria-expanded', 'false')
+    })
+  }
+
   root.querySelectorAll<HTMLButtonElement>('[data-help-toggle]').forEach((button) => {
     button.addEventListener('click', () => {
       const index = button.dataset.helpToggle
@@ -1330,12 +1374,37 @@ function renderDetail(): void {
     })
   })
 
+  root.querySelectorAll<HTMLButtonElement>('[data-source-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const index = button.dataset.sourceToggle
+      const panel = root.querySelector<HTMLElement>(`#status-source-${index}`)
+      if (!panel) return
+      const willOpen = panel.hidden
+      closeAllStatusSources()
+      if (willOpen) {
+        panel.hidden = false
+        button.setAttribute('aria-expanded', 'true')
+      }
+    })
+  })
+
   root.querySelectorAll<HTMLButtonElement>('[data-help-close]').forEach((button) => {
     button.addEventListener('click', () => {
       const index = button.dataset.helpClose
       closeAllStatusHelp()
       const toggle = index
         ? root.querySelector<HTMLButtonElement>(`[data-help-toggle="${index}"]`)
+        : null
+      toggle?.focus()
+    })
+  })
+
+  root.querySelectorAll<HTMLButtonElement>('[data-source-close]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const index = button.dataset.sourceClose
+      closeAllStatusSources()
+      const toggle = index
+        ? root.querySelector<HTMLButtonElement>(`[data-source-toggle="${index}"]`)
         : null
       toggle?.focus()
     })

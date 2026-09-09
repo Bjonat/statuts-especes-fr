@@ -48,6 +48,7 @@ describe('PWA taxon card presentation', () => {
     expect(body).toMatch(/status\.scope === 'partial'/)
     expect(body).toMatch(/Portée :/)
     expect(body).toMatch(/renderStatusHelpPanel\(status, index\)/)
+    expect(body).toMatch(/renderStatusSourcePanel\(status, index\)/)
     expect(body).toMatch(/sourceSummary\(\s*taxonStatuses\s*\)/)
     expect(body).toMatch(/NO_IDENTIFIED_STATUS_MESSAGE/)
     expect(body).not.toMatch(/aucun enjeu/i)
@@ -80,6 +81,28 @@ describe('PWA taxon card presentation', () => {
     expect(notices).toMatch(/territory-notice/)
     expect(notices).toMatch(/Avertissement territorial/)
     expect(notices).not.toMatch(/class="warning"/)
+  })
+
+  it('binds each status to its sourceId without guessing from label or category', () => {
+    const detail = functionBody(mainSource, 'renderDetail')
+    const panel = functionBody(mainSource, 'renderStatusSourcePanel')
+    expect(mainSource).toMatch(
+      /import\s+\{[^}]*\bstatusSourceView\b[^}]*\}\s+from\s+['"]\.\/source-display['"]/,
+    )
+    expect(panel).toMatch(/statusSourceView\(\s*status,\s*store\(\)\.sources\s*\)/)
+    expect(panel).toMatch(/MISSING_STATUS_SOURCE_MESSAGE|view\.message/)
+    expect(panel).toMatch(/sourceId :/)
+    expect(panel).not.toMatch(/status\.category/)
+    expect(panel).not.toMatch(/status\.label/)
+    expect(panel).not.toMatch(/status\.value/)
+    expect(panel).not.toMatch(/taxref-v18/)
+    expect(panel).not.toMatch(/bdc-v18/)
+    expect(detail).toMatch(/data-source-toggle/)
+    expect(detail).toMatch(/aria-controls="status-source-\$\{index\}"/)
+    expect(detail).toMatch(/>Source</)
+    expect(detail).toMatch(/closeAllStatusSources/)
+    expect(detail).not.toMatch(/\bcd_doc\b/)
+    expect(detail).not.toMatch(/legifrance/i)
   })
 
   it('does not introduce network work when the department changes on the card', () => {
