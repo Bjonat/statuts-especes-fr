@@ -1,6 +1,6 @@
-# Validation navigateur (PR-PWA-04)
+# Validation navigateur (PR-PWA-04, étendue par PR-PWA-05)
 
-Checkpoint de fiabilité hors ligne **automatisé**. Les parcours s’exécutent dans Chromium contre le build Vite de production (`dist/`), le service worker `generateSW`, la vraie Cache Storage, des reloads et le mode offline du navigateur.
+Checkpoint de fiabilité hors ligne **automatisé**. Les parcours s’exécutent dans Chromium contre le build Vite de production (`dist/`), le service worker `generateSW`, la vraie Cache Storage, des reloads et le mode offline du navigateur. PR-PWA-05 y ajoute les parcours de fiche taxon, sans remplacer le protocole appareils réels.
 
 Ce document n’équivaut pas à une validation Chrome Android ni Safari iOS. Voir [`device-validation.md`](device-validation.md).
 
@@ -15,7 +15,7 @@ npm run test:e2e
 - Navigateur CI : **Chromium uniquement**
 - Serveur : `node e2e/test-server.mjs` (127.0.0.1, `dist/` + `/data/` synthétique)
 - Datasets : `e2e-a` (2026-09-09T10:00:00Z) et `e2e-b` (2026-09-10T10:00:00Z)
-- Taxons : `Planta fictiva`, `Taxon testus`, `Animalia testensis`, `Herba imaginaria` (B uniquement)
+- Taxons : `Planta fictiva`, `Taxon testus`, `Flora vacua` (aucun statut OCC), `Animalia testensis`, `Herba imaginaria` (B uniquement)
 - Aucune source distante, aucun dataset `public/data/` de production
 
 ## Matrice
@@ -53,6 +53,11 @@ Les résultats ci-dessous correspondent à la suite `e2e/*.spec.ts` exécutée l
 | B corrompue → A conservée | oui | PASS |
 | Mutations concurrentes bloquées pendant l’update | oui | PASS |
 | Mobile viewport smoke 360×800 et 390×844 | oui | PASS |
+| Fiche Flore (identité, territoire, statuts, aide) | oui | PASS |
+| Fiche Faune (parcours minimal) | oui | PASS |
+| Département OCC 31 / 34 sans fetch catalogue | oui | PASS |
+| Empty state territorial (Flora vacua) | oui | PASS |
+| Fiche responsive 320 / 360×800 / 390×844 | oui | PASS |
 
 ## Checkpoint
 

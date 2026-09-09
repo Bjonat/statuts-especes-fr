@@ -218,3 +218,26 @@ export async function goOfflineAndReload(context: BrowserContext, page: Page): P
 export function catalogRequestPaths(paths: string[]): string[] {
   return paths.filter((path) => path.startsWith('/data/') && path !== '/data/manifest.json')
 }
+
+export async function expectNoHorizontalOverflow(page: Page, label: string): Promise<void> {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2,
+  )
+  expect(overflow, `débordement horizontal ${label}`).toBe(false)
+}
+
+export async function expectStackedStatusRows(page: Page): Promise<void> {
+  const stacked = await page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('.status-row'))
+    if (rows.length === 0) return false
+    return rows.every((row) => {
+      const type = row.querySelector('.status-type')
+      const value = row.querySelector('.status-value')
+      if (!type || !value) return false
+      const typeBox = type.getBoundingClientRect()
+      const valueBox = value.getBoundingClientRect()
+      return Math.abs(typeBox.left - valueBox.left) < 32 && valueBox.top >= typeBox.bottom - 2
+    })
+  })
+  expect(stacked, 'les libellés et valeurs de statut doivent être empilés').toBe(true)
+}

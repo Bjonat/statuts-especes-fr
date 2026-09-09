@@ -1,7 +1,7 @@
 # Roadmap technique — moteur de statuts d’espèces FR
 
 Document de référence pour les développements à venir.
-Dernière actualisation : 2026-09-09. PR-A à PR-L, PR #40, PR-PWA-01, PR-PWA-02 et PR-PWA-03 sont mergées. Cette PR (PR-PWA-04) installe la validation navigateur automatisée. La validation appareils réels reste à compléter. PWA-05 n’est pas lancée.
+Dernière actualisation : 2026-09-09. PR-A à PR-L, PR #40, PR-PWA-01 à PR-PWA-04 sont mergées. Cette PR (PR-PWA-05) rend la fiche taxon lisible sur le terrain. Validation Chromium automatisée : PASS. Validation appareils réels : PENDING. PWA-06 n’est pas lancée.
 
 **Décision mainteneur du 9 septembre 2026 :** la phase de hardening terrain est désormais une séquence de 14 PR. Vision : une PWA qu’un écologue ouvre spontanément sur le terrain, comprend immédiatement et dont il peut vérifier chaque résultat. CLI/CSV, QGIS et distribution restent différés.
 
@@ -35,7 +35,7 @@ Question unique à laquelle le projet doit rester excellent :
 
 ## 2. État actuel du repository
 
-État au **2026-09-09** (PR-A à PR-L mergées ; PR #40 mergée ; PR-PWA-01 mergée ; PR-PWA-02 mergée ; PR-PWA-03 mergée ; PR-PWA-04 = cette PR). Ce paragraphe est ce que les agents doivent lire en premier.
+État au **2026-09-09** (PR-A à PR-L mergées ; PR #40 mergée ; PR-PWA-01 à PR-PWA-04 mergées ; PR-PWA-05 = cette PR). Ce paragraphe est ce que les agents doivent lire en premier.
 
 - PWA offline-first fonctionnelle (Vite + `vite-plugin-pwa`).
 - `resolveStatuses()` est extrait et **utilisé** par `main.ts` (PR-E / PR-F).
@@ -45,7 +45,8 @@ Question unique à laquelle le projet doit rester excellent :
 - **PR-PWA-01 : MERGÉE.** Plus de fallback automatique vers la démonstration. Bootstrap explicite : officiel disponible / téléchargement nécessaire / erreur récupérable / démo choisie.
 - **PR-PWA-02 : MERGÉE.** Inventaire régional depuis Cache Storage ; socle partagé automatique ; progression ; interruption/reprise ; suppression ; volume estimé ; aucun téléchargement global au bootstrap.
 - **PR-PWA-03 : MERGÉE.** Manifeste actif persistant ; caches versionnés ; staging isolé ; vérification contenu ; activation atomique ; previous conservée ; migration caches PWA-02 ; reprise après interruption.
-- **PR-PWA-04 (cette PR) :** suite Playwright Chromium contre le `dist/` de production et le vrai service worker. Checkpoint terrain : **validation navigateur automatisée** ; **validation appareils réels à compléter**. PWA-05 non lancée.
+- **PR-PWA-04 : MERGÉE (#44).** Suite Playwright Chromium contre le `dist/` de production et le vrai service worker. Validation navigateur automatisée : **PASS**. Validation appareils réels : **PENDING**.
+- **PR-PWA-05 (cette PR) :** fiche taxon lisible (identité, territoire, statuts, valeurs, portées, avertissements, aide). Aucune règle métier changée. PWA-06 non lancée.
 - Matrice de couverture générée depuis `ready-sources.json` (PR-A).
 - Contrat d’acquisition à états explicites (`FETCH_OK`, `ARCHIVED_FALLBACK`, `UNAVAILABLE`, `TYPE_MISMATCH`, `CHANGED_UNVERIFIED`) (PR-C / PR-D).
 - Runner générique `run-adapter.mjs` (PR-G).
@@ -110,7 +111,7 @@ Les 13 régions métropolitaines sont dans le manifeste. Le socle BDC est nation
 ### 2.4 Ce qui n’existe pas encore (ou est différé)
 
 - Licence du code ; métadonnées GitHub About encore vides.
-- Hardening terrain / offline — **séquence active** PR-PWA-01 ✅ → PR-PWA-02 ✅ → PR-PWA-03 ✅ → PR-PWA-04 (cette PR, validation navigateur automatisée ; validation appareil à compléter) → PR-PWA-05 **non lancée**. Voir §6.1.
+- Hardening terrain / offline — **séquence active** PR-PWA-01 ✅ → PR-PWA-02 ✅ → PR-PWA-03 ✅ → PR-PWA-04 ✅ (#44, Chromium PASS, appareils PENDING) → PR-PWA-05 (cette PR) → PR-PWA-06 **non lancée**. Voir §6.1.
 - CLI / CSV — **DIFFÉRÉ** (PR-M).
 - QGIS — **DIFFÉRÉ** (PR-N).
 - Distribution / package / API — **DIFFÉRÉE** (PR-O).
@@ -199,10 +200,12 @@ PR-PWA-02     Écran Données hors ligne           ✅
   ↓
 PR-PWA-03     Mises à jour atomiques             ✅
   ↓
-PR-PWA-04     Validation navigateur/appareils    ← cette PR
-              (automatisation validée ; validation appareil à compléter)
+PR-PWA-04     Validation navigateur/appareils    ✅ #44
+              (Chromium PASS ; appareils PENDING)
   ↓
-PR-PWA-05     Fiche lisible                      → non lancée
+PR-PWA-05     Fiche lisible                      ← cette PR
+  ↓
+PR-PWA-06     Sources existantes accessibles     → non lancée
   ↓
 séquence PWA terrain (14 PR, §6.1)
 ```
@@ -922,13 +925,13 @@ Aucun numéro GitHub n’est inventé ici. Une seule PR à la fois.
 PR-PWA-01 — Chargement / démo explicite     ✅
 PR-PWA-02 — Écran Données hors ligne        ✅
 PR-PWA-03 — Mises à jour atomiques          ✅
-PR-PWA-04 — Validation navigateur/appareils ← réalisée par cette PR
+PR-PWA-04 — Validation navigateur/appareils ✅ MERGÉE (#44)
         ↓ checkpoint terrain : automatisation validée, validation appareil à compléter
-        Validation navigateur automatisée : voir docs/browser-validation.md
+        Validation navigateur automatisée : PASS (docs/browser-validation.md)
         Validation appareils réels : PENDING (docs/device-validation.md)
 
-PR-PWA-05 — Fiche lisible                   → non lancée
-PR-PWA-06 — Sources existantes accessibles
+PR-PWA-05 — Fiche lisible                   ← cette PR
+PR-PWA-06 — Sources existantes accessibles  → non lancée
 PR-DATA-01 — Preuve documentaire / cd_doc
 PR-DATA-02 — Couverture réelle versionnée
 PR-DATA-03 — Territoires / remplacements / corpus
@@ -944,9 +947,11 @@ PR-RELEASE-01 — Release pilote
         Des écologues la réutilisent sans accompagnement permanent.
 ```
 
-**PR-PWA-04** (cette PR) : Playwright Chromium contre `dist/` + vrai service worker ; dataset E2E synthétique local ; protocole manuel Android/iOS distinct. Ne pas déclarer le checkpoint « offline fiable sur appareils » tant que les protocoles réels n’ont pas été exécutés.
+**PR-PWA-04** : MERGÉE (#44). Playwright Chromium contre `dist/` + vrai service worker ; dataset E2E synthétique local ; protocole manuel Android/iOS distinct. Ne pas déclarer le checkpoint « offline fiable sur appareils » tant que les protocoles réels n’ont pas été exécutés.
 
-Ne pas lancer PR-PWA-05 dans la même livraison.
+**PR-PWA-05** (cette PR) : hiérarchie visuelle de la fiche taxon (identité, territoire, statuts, aide). Aucune règle métier, aucun pipeline, aucune page source détaillée.
+
+Ne pas lancer PR-PWA-06 dans la même livraison.
 
 ### Hors de cette séquence
 
@@ -1106,13 +1111,13 @@ Ordre proposé. Chaque ligne = **une** PR.
 | **PR-PWA-01** | ~~Chargement / démo explicite~~ **Réalisée** (#41) : plus de fallback automatique vers les fixtures ; bootstrap officiel / téléchargement / erreur récupérable / démo choisie | PR-L, #40 | `catalog.ts`, `main.ts` | 503 / offline / JSON invalide → pas de démo | UX | Revert bootstrap |
 | **PR-PWA-02** | ~~Écran Données hors ligne~~ **Réalisée** (#42) : inventaire régional Cache Storage ; socle automatique ; progression ; interruption/reprise ; suppression ; volume estimé ; pas de preload 29 fichiers au bootstrap | PR-PWA-01 | `offline-data.ts`, `main.ts`, manifeste `bytes` | Préparation par région ; cache = vérité | UX | Revert écran |
 | **PR-PWA-03** | ~~Mises à jour atomiques~~ **Réalisée** (#43) : manifeste actif persistant ; caches versionnés ; staging isolé ; vérification contenu ; activation atomique ; previous conservée ; migration PWA-02 ; reprise après interruption | PR-PWA-02 | `dataset-storage.ts`, `catalog.ts`, `offline-data.ts`, `vite.config.ts` | A reste active jusqu’au commit de B | Cache / SW | Revert stockage |
-| **PR-PWA-04** | ~~Validation navigateur/appareils~~ **Réalisée par cette PR** : Playwright Chromium / `dist/` / vrai SW ; protocole Android/iOS documenté mais **non exécuté** ici | PR-PWA-03 | `e2e/`, `playwright.config.ts`, `docs/browser-validation.md`, `docs/device-validation.md` | Parcours terrain Chromium | CI / flaky | Distinguer automate vs appareil |
-| **PR-PWA-05** | Fiche lisible — **non lancée** | PR-PWA-04 | UI fiche | — | — | — |
+| **PR-PWA-04** | ~~Validation navigateur/appareils~~ **MERGÉE (#44)** : Playwright Chromium / `dist/` / vrai SW ; protocole Android/iOS documenté mais **non exécuté** | PR-PWA-03 | `e2e/`, `playwright.config.ts`, `docs/browser-validation.md`, `docs/device-validation.md` | Parcours terrain Chromium | CI / flaky | Distinguer automate vs appareil |
+| **PR-PWA-05** | ~~Fiche lisible~~ **Réalisée par cette PR** : hiérarchie mobile-first de la fiche ; resolver inchangé ; aide / empty state / sources conservés | PR-PWA-04 | `src/main.ts`, `src/styles.css`, tests fiche, `e2e/pwa-taxon-card.spec.ts` | Fiche scannable à 360 px | UX | Revert CSS / markup fiche |
 | **PR-M** | CLI liste / CSV — **DIFFÉRÉ / BACKLOG — hors roadmap active** | PR-F | CLI + tests | `ambiguous` / `not_found` / *Hyles* | — | Supprimer le CLI |
 | **PR-N** | Note d’architecture QGIS (choix 1/2/3) puis plugin minimal — **DIFFÉRÉ / BACKLOG — hors roadmap active** | PR-M | `docs/` + plugin | Pas de règles dans le plugin | Portée | Ne pas merger le plugin |
 | **PR-O** | ADR distribution (JSON / SQLite / package / API) — **DIFFÉRÉ / BACKLOG — hors roadmap active** | moteur stable §8 | `docs/` | Décision écrite, **rien publié** | — | — |
 
-Après PR-PWA-04, ne pas lancer PR-PWA-05 (ni M / N / O) automatiquement.
+Après PR-PWA-05, ne pas lancer PR-PWA-06 (ni M / N / O) automatiquement.
 
 **Pilote d’abstraction :** Bretagne ZNIEFF OEB (CSV data.gouv). Ne pas piloter avec BFC (tableur maître) ni OCC (zones biogéographiques).
 
@@ -1127,4 +1132,4 @@ Après PR-PWA-04, ne pas lancer PR-PWA-05 (ni M / N / O) automatiquement.
 3. Respecter « Hors périmètre » de la phase.
 4. Ne pas inventer de statuts, de SHA, ni de licence.
 5. `npm test`, `npm run build` et `npm run test:e2e` verts. Ne pas « réparer » les workflows de téléchargement amont dans une PR qui n’est pas PR-C/D.
-6. Ne pas enchaîner automatiquement la PR suivante. Après PR-PWA-04, ne pas lancer PR-PWA-05 ni PR-M / N / O.
+6. Ne pas enchaîner automatiquement la PR suivante. Après PR-PWA-05, ne pas lancer PR-PWA-06 ni PR-M / N / O.

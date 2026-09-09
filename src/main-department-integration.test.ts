@@ -91,9 +91,12 @@ describe('PWA department selector wiring', () => {
     const body = functionBody(mainSource, 'renderDetail')
     expect(body).toMatch(/renderTerritoryNotices\(\s*result\.warnings\s*\)/)
     expect(body).toMatch(/département \$\{state\.department\}/)
+    expect(body).toMatch(/Toute la région/)
+    expect(body).toMatch(/Les statuts affichés correspondent à ce territoire/)
     expect(body).toMatch(/aria-live="polite"/)
     expect(functionBody(mainSource, 'renderTerritoryNotices')).toMatch(/escapeHtml\(/)
     expect(functionBody(mainSource, 'renderTerritoryNotices')).toMatch(/territory-notice/)
+    expect(functionBody(mainSource, 'renderTerritoryNotices')).toMatch(/role="note"/)
   })
 
   it('ignores a stale stored department against the current region', () => {

@@ -789,7 +789,7 @@ function renderTerritoryNotices(warnings: string[]): string {
     warnings.length === 1
       ? `<p>${escapeHtml(warnings[0])}</p>`
       : `<ul>${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>`
-  return `<aside class="territory-notice" role="note">${body}</aside>`
+  return `<aside class="territory-notice" role="note"><p class="territory-notice-label">Avertissement territorial</p>${body}</aside>`
 }
 
 function formatCheckedDate(value?: string): string {
@@ -1211,9 +1211,12 @@ function renderDetail(): void {
     statuses: state.statuses,
   })
   const taxonStatuses = result.statuses
-  const territoryContext = state.department
-    ? `${state.realm === 'flora' ? 'Flore' : 'Faune'} - ${region?.name ?? state.region} - département ${state.department}`
-    : `${state.realm === 'flora' ? 'Flore' : 'Faune'} - ${region?.name ?? state.region}`
+  const groupLabel = state.realm === 'flora' ? 'Flore' : 'Faune'
+  const regionLabel = region?.name ?? state.region
+  const vernacularName = taxon.vernacularNames[0]
+  const territoryScope = state.department
+    ? `département ${state.department}`
+    : 'Toute la région'
 
   root.innerHTML = `
     <main class="shell">
@@ -1223,18 +1226,30 @@ function renderDetail(): void {
       </header>
 
       <section class="panel taxon-card">
-        <p class="eyebrow">${escapeHtml(territoryContext)}</p>
-        <h1>${escapeHtml(taxon.vernacularNames[0] ?? taxon.scientificName)}</h1>
-        <p class="scientific-name"><i>${escapeHtml(taxon.scientificName)}</i></p>
-        <p class="taxon-meta">${taxon.family ? `${escapeHtml(taxon.family)} - ` : ''}CD_REF ${taxon.cdRef}</p>
+        <header class="taxon-identity">
+          <p class="eyebrow">${escapeHtml(groupLabel)}</p>
+          <h1>${escapeHtml(vernacularName ?? taxon.scientificName)}</h1>
+          ${
+            vernacularName
+              ? `<p class="scientific-name"><i>${escapeHtml(taxon.scientificName)}</i></p>`
+              : ''
+          }
+          <p class="taxon-meta">${taxon.family ? `${escapeHtml(taxon.family)} · ` : ''}<span class="taxon-cdref">CD_REF ${taxon.cdRef}</span></p>
+        </header>
 
-        <div class="divider"></div>
-
-        ${departmentFieldMarkup()}
+        <section class="taxon-territory" aria-labelledby="taxon-territory-heading">
+          <h2 id="taxon-territory-heading" class="taxon-section-heading">Territoire</h2>
+          <p class="territory-context">
+            <span class="territory-region">${escapeHtml(regionLabel)}</span>
+            <span class="territory-scope">${escapeHtml(territoryScope)}</span>
+          </p>
+          <p class="territory-hint">Les statuts affichés correspondent à ce territoire.</p>
+          ${departmentFieldMarkup()}
+        </section>
 
         <div class="status-results" aria-live="polite">
         ${renderTerritoryNotices(result.warnings)}
-        <h2>Statuts</h2>
+        <h2 class="taxon-section-heading">Statuts</h2>
         ${
           taxonStatuses.length
             ? `<dl class="status-list">
@@ -1244,8 +1259,8 @@ function renderDetail(): void {
                       <div class="status-item">
                         <div class="status-row">
                           <dt>
-                            ${escapeHtml(shortStatusLabel(status))}
-                            ${status.scope === 'partial' && status.scopeLabel ? `<small>Portée : ${escapeHtml(cleanDisplayText(status.scopeLabel))}</small>` : ''}
+                            <span class="status-type">${escapeHtml(shortStatusLabel(status))}</span>
+                            ${status.scope === 'partial' && status.scopeLabel ? `<small class="status-scope">Portée : ${escapeHtml(cleanDisplayText(status.scopeLabel))}</small>` : ''}
                           </dt>
                           <dd>
                             <span class="status-value-line">

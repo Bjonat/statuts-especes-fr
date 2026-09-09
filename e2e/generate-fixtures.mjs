@@ -42,6 +42,14 @@ const FLORA_A = [
     synonyms: [],
     family: 'Testaceae',
   },
+  {
+    cdRef: 900004,
+    realm: 'flora',
+    scientificName: 'Flora vacua',
+    vernacularNames: ['Plante sans statut de test'],
+    synonyms: [],
+    family: 'Testaceae',
+  },
 ]
 
 const FLORA_B = [
