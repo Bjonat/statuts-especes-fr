@@ -49,6 +49,14 @@ export type StatusCategory =
 
 export type StatusScope = 'national' | 'regional' | 'partial'
 
+/** Preuve documentaire optionnelle (BDC `cd_doc` / `full_citation` / `doc_url`). */
+export interface StatusDocumentEvidence {
+  /** Identifiant opaque `cd_doc` ; jamais converti en nombre. */
+  cdDoc: string
+  citation?: string
+  url?: string
+}
+
 export interface TaxonStatus {
   cdRef: number
   region: RegionCode
@@ -58,6 +66,7 @@ export interface TaxonStatus {
   sourceId: string
   scope?: StatusScope
   scopeLabel?: string
+  document?: StatusDocumentEvidence
 }
 
 export interface StatusDefinition {
@@ -65,6 +74,7 @@ export interface StatusDefinition {
   label: string
   value: string
   sourceId: string
+  document?: StatusDocumentEvidence
 }
 
 export type StatusScopeCode = 0 | 1 | 2

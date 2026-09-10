@@ -49,6 +49,12 @@ test.describe('PWA provenance par statut', () => {
     await expect(panel.getByText(/Année de publication\s+2026/)).toBeVisible()
     await expect(panel.getByText(/Vérifié le\s+09\/09\/2026/)).toBeVisible()
     await expect(panel.getByText('Référentiel officiel')).toBeVisible()
+    await expect(panel.getByText('Document d’origine')).toBeVisible()
+    await expect(panel.getByText('Citation fictive explicite du document fixture-doc-1')).toBeVisible()
+    await expect(panel.getByText('CD_DOC fixture-doc-1')).toBeVisible()
+    const docLink = panel.getByRole('link', { name: 'Consulter le document' })
+    await expect(docLink).toHaveAttribute('href', 'https://example.test/fixture-doc-1')
+    await expect(docLink).toHaveAttribute('rel', 'noopener noreferrer')
 
     await panel.getByRole('button', { name: 'Fermer' }).click()
     await expect(source).toHaveAttribute('aria-expanded', 'false')
@@ -80,6 +86,9 @@ test.describe('PWA provenance par statut', () => {
     await expect(znieff.getByText('Année de publication')).toHaveCount(0)
     await expect(znieff.getByText('Vérifié le')).toHaveCount(0)
     await expect(znieff.getByText('Fixture LRR Occitanie')).toHaveCount(0)
+    await expect(znieff.getByText('Document d’origine')).toHaveCount(0)
+    await expect(znieff.getByText('CD_DOC')).toHaveCount(0)
+    await expect(znieff.getByRole('link', { name: 'Consulter le document' })).toHaveCount(0)
 
     await sourceButtons(page).nth(2).click()
     const znieffAgain = page.locator('#status-source-2')
@@ -132,6 +141,8 @@ test.describe('PWA provenance par statut', () => {
     const panel = page.locator('#status-source-0')
     await expect(panel.getByText('Fixture LRR Occitanie')).toBeVisible()
     await expect(panel.getByText('Producteur E2E LRR')).toBeVisible()
+    await expect(panel.getByText('Citation fictive explicite du document fixture-doc-1')).toBeVisible()
+    await expect(panel.getByText('CD_DOC fixture-doc-1')).toBeVisible()
     await panel.getByRole('button', { name: 'Fermer' }).click()
     await expect(panel).toBeHidden()
     await expect(page.getByText('VU - fixture e2e-a')).toBeVisible()
@@ -152,6 +163,13 @@ test.describe('PWA provenance par statut', () => {
     await expect(panel.getByText('BDC')).toHaveCount(0)
     await expect(panel.getByText('Fixture LRR Occitanie')).toHaveCount(0)
     await expect(panel.getByText('Fixture ZNIEFF Occitanie')).toHaveCount(0)
+    await expect(panel.getByText('Document d’origine')).toBeVisible()
+    await expect(panel.getByText('Citation orpheline de test')).toBeVisible()
+    await expect(panel.getByText('CD_DOC fixture-doc-orphan')).toBeVisible()
+    await expect(panel.getByRole('link', { name: 'Consulter le document' })).toHaveAttribute(
+      'href',
+      'https://example.test/fixture-doc-orphan',
+    )
   })
 
   test('responsive 320 / 360 / 390 : Aide et Source accessibles, pas d’overflow', async ({ page, request }) => {
@@ -178,8 +196,59 @@ test.describe('PWA provenance par statut', () => {
       await source.click()
       const panel = page.locator('#status-source-0')
       await expect(panel.getByText('Fixture LRR Occitanie')).toBeVisible()
+      await expect(panel.getByText('Document d’origine')).toBeVisible()
       await expectNoHorizontalOverflow(page, `source ${viewport.width}×${viewport.height}`)
       await panel.getByRole('button', { name: 'Fermer' }).click()
     }
+  })
+
+  test('deux documents distincts ne sont pas fusionnés', async ({ page, request }) => {
+    await setDataset(request, 'a')
+    await openPwa(page)
+    await searchTaxon(page, 'Flore', 'gemina')
+    await openFirstResult(page, 'Taxon à deux documents de test')
+
+    await expect(page.getByText('VU - jumeau e2e-a')).toHaveCount(2)
+    await expect(sourceButtons(page)).toHaveCount(2)
+
+    await sourceButtons(page).nth(0).click()
+    const first = page.locator('#status-source-0')
+    await expect(first.getByText('CD_DOC fixture-doc-twin-a')).toBeVisible()
+    await expect(first.getByText('Citation jumelle A')).toBeVisible()
+    await expect(first.getByRole('link', { name: 'Consulter le document' })).toHaveAttribute(
+      'href',
+      'https://example.test/fixture-doc-twin-a',
+    )
+
+    await sourceButtons(page).nth(1).click()
+    const second = page.locator('#status-source-1')
+    await expect(second.getByText('CD_DOC fixture-doc-twin-b')).toBeVisible()
+    await expect(second.getByText('Citation jumelle B')).toBeVisible()
+    await expect(second.getByRole('link', { name: 'Consulter le document' })).toHaveCount(0)
+    await expect(first).toBeHidden()
+  })
+
+  test('offline : citation et CD_DOC restent consultables après reload', async ({ page, context, request }) => {
+    await setDataset(request, 'a')
+    await openPwa(page)
+    await expectOfficialHome(page)
+    await ensureControlled(page)
+    await openOfflineScreen(page)
+    await prepareRegion(page, 'Occitanie')
+    await goHomeFromOffline(page)
+    await primeRegion(page, 'Occitanie')
+    await goOfflineAndReload(context, page)
+    await expectOfficialHome(page)
+
+    await searchTaxon(page, 'Flore', 'Planta')
+    await openFirstResult(page, 'Plante fictive de test')
+    await sourceButtons(page).first().click()
+    const panel = page.locator('#status-source-0')
+    await expect(panel.getByText('Citation fictive explicite du document fixture-doc-1')).toBeVisible()
+    await expect(panel.getByText('CD_DOC fixture-doc-1')).toBeVisible()
+    await expect(panel.getByRole('link', { name: 'Consulter le document' })).toHaveAttribute(
+      'href',
+      'https://example.test/fixture-doc-1',
+    )
   })
 })

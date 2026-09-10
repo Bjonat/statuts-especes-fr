@@ -886,6 +886,51 @@ button:disabled,
   overflow-wrap: anywhere;
 }
 
+.status-source-document {
+  margin: 10px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid #d9ddd2;
+}
+
+.status-source-document-kicker {
+  margin: 0 0 6px;
+  color: #6a7166;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.status-source-citation {
+  margin: 0 0 6px;
+  color: #2f342c;
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.status-source-cddoc {
+  margin: 0 0 6px;
+  color: #6b7167;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.status-source-doc-link {
+  margin: 0 0 4px;
+}
+
+.status-source-doc-link a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #2f4a2c;
+  font-size: 0.88rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .empty-status {
   margin: 8px 0 4px;
 }

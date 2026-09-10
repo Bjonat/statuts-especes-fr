@@ -80,3 +80,41 @@ export function statusSourceView(
   }
   return { state: 'found', source, fields: statusSourceFields(source) }
 }
+
+export interface StatusDocumentView {
+  cdDoc: string
+  citation?: string
+  href?: string
+}
+
+/**
+ * Accepte uniquement http(s). Ne construit jamais d’URL depuis cdDoc.
+ * Conservé tel quel (pas de normalisation) lorsqu’il est valide.
+ */
+export function safeDocumentHref(url?: string): string | null {
+  const trimmed = String(url ?? '').trim()
+  if (!trimmed) return null
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return trimmed
+  } catch {
+    return null
+  }
+  return null
+}
+
+export function statusDocumentView(
+  status: Pick<TaxonStatus, 'document'>,
+): StatusDocumentView | null {
+  const evidence = status.document
+  const cdDoc = typeof evidence?.cdDoc === 'string' ? evidence.cdDoc.trim() : ''
+  if (!cdDoc || !evidence) return null
+
+  const citation = typeof evidence.citation === 'string' ? evidence.citation.trim() : ''
+  const href = safeDocumentHref(evidence.url)
+  return {
+    cdDoc,
+    ...(citation ? { citation } : {}),
+    ...(href ? { href } : {}),
+  }
+}

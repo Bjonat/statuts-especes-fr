@@ -58,6 +58,14 @@ const FLORA_A = [
     synonyms: [],
     family: 'Testaceae',
   },
+  {
+    cdRef: 900006,
+    realm: 'flora',
+    scientificName: 'Documenta gemina',
+    vernacularNames: ['Taxon à deux documents de test'],
+    synonyms: [],
+    family: 'Testaceae',
+  },
 ]
 
 const FLORA_B = [
@@ -135,6 +143,11 @@ function definitions(marker) {
       label: 'Liste rouge régionale (fixture)',
       value: `VU — fixture ${marker}`,
       sourceId: 'fixture-lrr-occ',
+      document: {
+        cdDoc: 'fixture-doc-1',
+        citation: 'Citation fictive explicite du document fixture-doc-1',
+        url: 'https://example.test/fixture-doc-1',
+      },
     },
     {
       category: 'znieff',
@@ -165,6 +178,32 @@ function definitions(marker) {
       label: 'Statut orphelin de test',
       value: 'Présent — sans métadonnée de source',
       sourceId: 'fixture-source-absente',
+      document: {
+        cdDoc: 'fixture-doc-orphan',
+        citation: 'Citation orpheline de test',
+        url: 'https://example.test/fixture-doc-orphan',
+      },
+    },
+    {
+      category: 'red_list_regional',
+      label: 'Liste rouge régionale jumelle (fixture)',
+      value: `VU — jumeau ${marker}`,
+      sourceId: 'fixture-lrr-occ',
+      document: {
+        cdDoc: 'fixture-doc-twin-a',
+        citation: 'Citation jumelle A',
+        url: 'https://example.test/fixture-doc-twin-a',
+      },
+    },
+    {
+      category: 'red_list_regional',
+      label: 'Liste rouge régionale jumelle (fixture)',
+      value: `VU — jumeau ${marker}`,
+      sourceId: 'fixture-lrr-occ',
+      document: {
+        cdDoc: 'fixture-doc-twin-b',
+        citation: 'Citation jumelle B',
+      },
     },
   ]
 }
@@ -192,6 +231,8 @@ function buildVersion(outDir, spec) {
     [900001, 2, 2, 'Languedoc-Roussillon'],
     [900002, 0, 1],
     [900005, 5, 1],
+    [900006, 6, 1],
+    [900006, 7, 1],
     ...spec.extraOccFloraLinks,
   ]
   const occFaunaLinks = [[900101, 4, 1]]

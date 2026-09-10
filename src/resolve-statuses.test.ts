@@ -548,4 +548,38 @@ describe('resolveStatuses', () => {
       'Portée partielle non applicable au département 31 : ancienne région Languedoc-Roussillon',
     ])
   })
+
+  it('transporte le document du statut retenu sans le choisir ni le fusionner', () => {
+    const withDocument = status({
+      cdRef: 53663,
+      region: 'CVL',
+      category: 'red_list_regional',
+      label: 'Liste rouge régionale',
+      value: 'RE',
+      sourceId: 'bdc-v18',
+      document: {
+        cdDoc: '443486',
+        citation: 'Citation A',
+        url: 'https://example.test/a',
+      },
+    })
+    const other = status({
+      cdRef: 53663,
+      region: 'CVL',
+      category: 'protection_national',
+      label: 'Protection nationale',
+      value: 'Oui',
+      sourceId: 'bdc-v18',
+      document: { cdDoc: 'OTHER' },
+    })
+
+    const result = resolveStatuses({ cdRef: 53663, region: 'CVL', statuses: [other, withDocument] })
+    expect(result.statuses).toHaveLength(2)
+    expect(result.statuses.find((entry) => entry.category === 'red_list_regional')?.document).toEqual(
+      withDocument.document,
+    )
+    expect(result.statuses.find((entry) => entry.category === 'protection_national')?.document).toEqual(
+      other.document,
+    )
+  })
 })

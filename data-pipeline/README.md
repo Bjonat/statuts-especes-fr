@@ -112,14 +112,29 @@ Un build qui télécharge **toutes** les sources `ready` peut échouer si une UR
 Chaque relation pointe vers une définition :
 
 ```text
-StatusDefinition = { category, label, value, sourceId }
+StatusDefinition = { category, label, value, sourceId, document? }
+StatusDocumentEvidence = { cdDoc, citation?, url? }
 ```
 
-Un lien régional contient le `CD_REF`, l’identifiant de définition, un code de portée et, pour une portée partielle, son libellé territorial.
+Un lien régional contient le `CD_REF`, l’identifiant de définition, un code de portée et, pour une portée partielle, son libellé territorial. **La preuve documentaire appartient à la définition**, pas au lien compact. Le manifeste reste `schemaVersion: 3`.
 
-La provenance est conservée via **`sourceId`** et le **manifeste** (identifiant, millésime, producteur, `checkedAt`). Les définitions n’embarquent **pas** `citation` ni `documentUrl` : ces champs sont volontairement exclus du bundle mobile.
+La provenance dataset est conservée via **`sourceId`** et le **manifeste** (identifiant, millésime, producteur, `checkedAt`). Ce n’est pas le même niveau que le document d’origine (`cd_doc` BDC).
 
-Les citations longues et URL documentaires, lorsqu’elles existent, restent du côté pipeline / audits / registre. La PWA affiche la source et le millésime, pas une citation bibliographique complète.
+Les statuts BDC conservent désormais leur preuve documentaire lorsqu’elle est fournie par la source :
+
+- `cd_doc` → `document.cdDoc` (chaîne opaque, jamais convertie en nombre) ;
+- `full_citation` → `document.citation` (trim seulement) ;
+- `doc_url` → `document.url` (trim seulement, jamais inventée depuis `cdDoc`).
+
+Règles :
+
+- pas de `cd_doc` → pas d’objet `document` (même si citation ou URL sont présentes : anomalie, aucun identifiant fabriqué) ;
+- aucun champ documentaire vide n’est sérialisé ;
+- `document` n’est **pas** ajouté à `SourceDataset` ;
+- les sources régionales déjà produites restent sans `document` tant qu’elles n’exposent pas un document structuré dans leur paquet ;
+- deux statuts visuellement identiques (`category` / `label` / `value` / `sourceId`) avec des `cdDoc` différents produisent **deux définitions**.
+
+Une citation longue ne devient jamais `status.value`. La PWA affiche la preuve dans le panneau Source existant, seulement si `document` est présent.
 
 ## Volumes du socle national
 
@@ -132,6 +147,13 @@ Sur le **socle TAXREF v18 + BDC v18** métropole (hors enrichissements régionau
 - ~6,3 Mo compressés (artifact CI)
 
 Les enrichissements régionaux augmentent relations et définitions selon les sources du build. Ne pas utiliser d’anciens totaux « trois régions pilotes » (229 813 / 686) comme métrique courante.
+
+Mesure PR-DATA-01 sur le socle national TAXREF v18 + BDC v18 (hors paquets régionaux), même 877 930 relations :
+
+- définitions **sans** clé documentaire : 292 (~30 Ko) ;
+- définitions **avec** `document` : 1 411 (~625 Ko, +1 119 définitions / +594 Ko).
+
+L’augmentation vient surtout des citations BDC conservées et de la non-fusion de `cdDoc` distincts. Pas d’optimisation prématurée : +0,6 Mo sur ~43 Mo de JSON brut.
 
 ## Validation métier
 

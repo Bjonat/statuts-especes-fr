@@ -152,6 +152,16 @@ test('le pipeline projette un statut national sur les 13 régions', async () => 
   const cvlLrr = statuses.find((status) => status.region === 'CVL' && status.category === 'red_list_regional')
   const naqPr = statuses.find((status) => status.region === 'NAQ' && status.category === 'protection_regional')
   assert.equal(cvlLrr?.scope, 'regional')
+  assert.deepEqual(cvlLrr?.document, {
+    cdDoc: 'DOC1',
+    citation: 'Liste rouge Centre',
+    url: 'https://example.test/lrr',
+  })
   assert.equal(naqPr?.scope, 'partial')
   assert.equal(naqPr?.scopeLabel, 'ancienne région Aquitaine')
+  assert.deepEqual(naqPr?.document, {
+    cdDoc: 'DOC2',
+    citation: 'Arrêté Aquitaine',
+    url: 'https://example.test/pr',
+  })
 })

@@ -173,6 +173,28 @@ function statusValue(row) {
   return label || 'Oui'
 }
 
+function optionalTrimmed(value) {
+  const trimmed = String(value ?? '').trim()
+  return trimmed || undefined
+}
+
+/**
+ * Extrait la preuve documentaire BDC sans inventer d’identifiant.
+ * `cd_doc` absent → aucune preuve, même si citation/URL existent.
+ */
+export function buildStatusDocument(row) {
+  const cdDoc = optionalTrimmed(row.cd_doc)
+  if (!cdDoc) return undefined
+
+  const citation = optionalTrimmed(row.full_citation)
+  const url = optionalTrimmed(row.doc_url)
+  return {
+    cdDoc,
+    ...(citation ? { citation } : {}),
+    ...(url ? { url } : {}),
+  }
+}
+
 export async function buildStatuses(bdcPath, knownTaxa) {
   const knownRefs = new Set(knownTaxa.map((taxon) => taxon.cdRef))
   const statuses = []
@@ -193,6 +215,7 @@ export async function buildStatuses(bdcPath, knownTaxa) {
       if (seen.has(dedupeKey)) continue
       seen.add(dedupeKey)
 
+      const document = buildStatusDocument(row)
       statuses.push({
         cdRef,
         region: region.code,
@@ -202,6 +225,7 @@ export async function buildStatuses(bdcPath, knownTaxa) {
         sourceId: 'bdc-v18',
         scope: scope.scope,
         scopeLabel: scope.scopeLabel,
+        ...(document ? { document } : {}),
       })
     }
   }

@@ -50,6 +50,7 @@ describe('PWA taxon card presentation', () => {
     expect(body).toMatch(/renderStatusHelpPanel\(status, index\)/)
     expect(body).toMatch(/renderStatusSourcePanel\(status, index\)/)
     expect(body).toMatch(/sourceSummary\(\s*taxonStatuses\s*\)/)
+    expect(functionBody(mainSource, 'sourceSummary')).not.toMatch(/\.document\b/)
     expect(body).toMatch(/NO_IDENTIFIED_STATUS_MESSAGE/)
     expect(body).not.toMatch(/aucun enjeu/i)
     expect(body).not.toMatch(/non protégée/i)
@@ -103,6 +104,15 @@ describe('PWA taxon card presentation', () => {
     expect(detail).toMatch(/closeAllStatusSources/)
     expect(detail).not.toMatch(/\bcd_doc\b/)
     expect(detail).not.toMatch(/legifrance/i)
+    expect(panel).toMatch(/renderStatusDocumentBlock\(\s*status\s*\)/)
+    const documentBlock = functionBody(mainSource, 'renderStatusDocumentBlock')
+    expect(documentBlock).toMatch(/statusDocumentView\(\s*status\s*\)/)
+    expect(documentBlock).toMatch(/Document d.origine/)
+    expect(documentBlock).toMatch(/CD_DOC/)
+    expect(documentBlock).toMatch(/Consulter le document/)
+    expect(documentBlock).toMatch(/noopener noreferrer/)
+    expect(documentBlock).not.toMatch(/inpn\.mnhn\.fr\/docs-web/)
+    expect(documentBlock).not.toMatch(/javascript:/i)
   })
 
   it('does not introduce network work when the department changes on the card', () => {
