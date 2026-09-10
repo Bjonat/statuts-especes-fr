@@ -1,6 +1,6 @@
 # Validation navigateur (PR-PWA-04, étendue par PR-PWA-05, PR-PWA-06 et PR-DATA-01)
 
-Checkpoint de fiabilité hors ligne **automatisé**. Les parcours s’exécutent dans Chromium contre le build Vite de production (`dist/`), le service worker `generateSW`, la vraie Cache Storage, des reloads et le mode offline du navigateur. PR-PWA-06 y ajoute la provenance par statut. PR-DATA-01 y ajoute la preuve documentaire embarquée (`document.cdDoc` / citation / URL http(s) seulement), sans protocole appareils réels.
+Checkpoint de fiabilité hors ligne **automatisé**. Les parcours s’exécutent dans Chromium contre le build Vite de production (`dist/`), le service worker `generateSW`, la vraie Cache Storage, des reloads et le mode offline du navigateur. PR-PWA-06 y ajoute la provenance par statut. PR-DATA-01 y ajoute la preuve documentaire embarquée (`document.cdDoc` / citation / URL http(s) seulement). PR-DATA-01.1 nettoie uniquement l’affichage des citations HTML documentaires, sans protocole appareils réels.
 
 Ce document n’équivaut pas à une validation Chrome Android ni Safari iOS. Voir [`device-validation.md`](device-validation.md).
 

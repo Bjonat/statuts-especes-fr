@@ -118,3 +118,17 @@ export function statusDocumentView(
     ...(href ? { href } : {}),
   }
 }
+
+/**
+ * Présentation uniquement. Ne réécrit pas status.document.citation.
+ * Retourne du texte, jamais du HTML à injecter.
+ */
+export function formatDocumentCitationForDisplay(citation: string): string {
+  return String(citation ?? '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/?[a-zA-Z][^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+    .trim()
+}

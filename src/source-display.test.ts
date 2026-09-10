@@ -4,6 +4,7 @@ import type { SourceDataset, TaxonStatus } from './types'
 import {
   MISSING_STATUS_SOURCE_MESSAGE,
   findStatusSource,
+  formatDocumentCitationForDisplay,
   formatSourceCheckedAt,
   safeDocumentHref,
   statusDocumentView,
@@ -216,5 +217,37 @@ describe('statusDocumentView', () => {
       ),
     ).toBeNull()
     expect(statusDocumentView(status())).toBeNull()
+  })
+
+  it('conserve la citation BDC brute, y compris les artefacts HTML', () => {
+    const raw =
+      'Baeta, R. 2022. <em>Liste rouge des libellules et demoiselles du Centre–Val de Loire</em>. ANEPE Caudalis &amp; FNE Centre Val-de Loire. 25 pp.<br /><br />&nbsp;'
+    expect(
+      statusDocumentView(
+        status({
+          document: { cdDoc: '411507', citation: raw },
+        }),
+      )?.citation,
+    ).toBe(raw)
+  })
+})
+
+describe('formatDocumentCitationForDisplay', () => {
+  it('nettoie les artefacts HTML BDC sans modifier le contenu scientifique', () => {
+    const raw =
+      'Baeta, R. 2022. <em>Liste rouge des libellules et demoiselles du Centre–Val de Loire</em>. ANEPE Caudalis &amp; FNE Centre Val-de Loire. 25 pp.<br /><br />&nbsp;'
+    expect(formatDocumentCitationForDisplay(raw)).toBe(
+      'Baeta, R. 2022. Liste rouge des libellules et demoiselles du Centre–Val de Loire. ANEPE Caudalis & FNE Centre Val-de Loire. 25 pp.',
+    )
+  })
+
+  it('ne réécrit pas la preuve brute passée en argument', () => {
+    const raw =
+      'Baeta, R. 2022. <em>Liste rouge des libellules et demoiselles du Centre–Val de Loire</em>. ANEPE Caudalis &amp; FNE Centre Val-de Loire. 25 pp.<br /><br />&nbsp;'
+    formatDocumentCitationForDisplay(raw)
+    expect(raw).toContain('<em>')
+    expect(raw).toContain('&amp;')
+    expect(raw).toContain('<br />')
+    expect(raw).toContain('&nbsp;')
   })
 })
