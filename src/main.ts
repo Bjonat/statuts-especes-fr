@@ -9,7 +9,7 @@ import {
   buildStatusHelp,
   formatStatusValueForDisplay,
 } from './status-help'
-import { statusDocumentView, statusSourceView } from './source-display'
+import { formatDocumentCitationForDisplay, statusDocumentView, statusSourceView } from './source-display'
 import type { DatasetCheckStatus, DatasetUpdateCheck, DatasetUpdateProgress } from './dataset-storage'
 import { datasetUpdateFailureReason } from './dataset-storage'
 import type { OfflineDownloadProgress, OfflineInventory } from './offline-data'
@@ -863,7 +863,7 @@ function renderStatusDocumentBlock(status: TaxonStatus): string {
   if (!documentView) return ''
 
   const citation = documentView.citation
-    ? `<p class="status-source-citation">${escapeHtml(cleanDisplayText(documentView.citation))}</p>`
+    ? `<p class="status-source-citation">${escapeHtml(formatDocumentCitationForDisplay(documentView.citation))}</p>`
     : ''
   const link = documentView.href
     ? `<p class="status-source-doc-link"><a href="${escapeHtml(documentView.href)}" target="_blank" rel="noopener noreferrer">Consulter le document</a></p>`

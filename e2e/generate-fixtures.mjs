@@ -145,7 +145,8 @@ function definitions(marker) {
       sourceId: 'fixture-lrr-occ',
       document: {
         cdDoc: 'fixture-doc-1',
-        citation: 'Citation fictive explicite du document fixture-doc-1',
+        citation:
+          'Citation fictive <em>explicite</em> du document fixture-doc-1 &amp; suite.<br /><br />&nbsp;',
         url: 'https://example.test/fixture-doc-1',
       },
     },

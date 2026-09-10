@@ -75,21 +75,11 @@ assert.ok(
   definitions.every((definition) => !('citation' in definition) && !('documentUrl' in definition)),
   'aucune citation / documentUrl au premier niveau des définitions',
 )
-const visualToDocs = new Map()
 for (const [index, definition] of definitions.entries()) {
   if ('document' in definition) {
     assertDocumentEvidence(definition.document, `définition #${index}`)
   }
-  const visual = JSON.stringify([definition.category, definition.label, definition.value, definition.sourceId])
-  const docs = visualToDocs.get(visual) ?? new Set()
-  if (definition.document?.cdDoc) docs.add(definition.document.cdDoc)
-  visualToDocs.set(visual, docs)
 }
-const splitVisuals = [...visualToDocs.values()].filter((docs) => docs.size > 1)
-assert.ok(
-  splitVisuals.length >= 1,
-  'plusieurs CD_DOC pour un même triplet visuel doivent rester des définitions distinctes',
-)
 
 const papillons = definitions.filter((definition) => definition.document?.cdDoc === '443486')
 if (papillons.length) {

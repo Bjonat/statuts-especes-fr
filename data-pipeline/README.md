@@ -134,7 +134,7 @@ Règles :
 - les sources régionales déjà produites restent sans `document` tant qu’elles n’exposent pas un document structuré dans leur paquet ;
 - deux statuts visuellement identiques (`category` / `label` / `value` / `sourceId`) avec des `cdDoc` différents produisent **deux définitions**.
 
-Une citation longue ne devient jamais `status.value`. La PWA affiche la preuve dans le panneau Source existant, seulement si `document` est présent.
+Une citation longue ne devient jamais `status.value`. La PWA affiche la preuve dans le panneau Source existant, seulement si `document` est présent. Les artefacts HTML documentaires (`<em>`, `<br />`, `&nbsp;`, `&amp;`, …) sont normalisés **à l’affichage seulement** ; `document.citation` stocké reste la chaîne BDC.
 
 ## Volumes du socle national
 

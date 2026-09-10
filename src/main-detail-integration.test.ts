@@ -107,6 +107,8 @@ describe('PWA taxon card presentation', () => {
     expect(panel).toMatch(/renderStatusDocumentBlock\(\s*status\s*\)/)
     const documentBlock = functionBody(mainSource, 'renderStatusDocumentBlock')
     expect(documentBlock).toMatch(/statusDocumentView\(\s*status\s*\)/)
+    expect(documentBlock).toMatch(/formatDocumentCitationForDisplay\(\s*documentView\.citation\s*\)/)
+    expect(documentBlock).toMatch(/escapeHtml\(\s*formatDocumentCitationForDisplay/)
     expect(documentBlock).toMatch(/Document d.origine/)
     expect(documentBlock).toMatch(/CD_DOC/)
     expect(documentBlock).toMatch(/Consulter le document/)
