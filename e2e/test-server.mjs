@@ -35,6 +35,7 @@ const DATASETS = new Set([
   'invalid-manifest',
   'unavailable',
   'corrupt-b',
+  'corrupt-coverage-b',
   'slow-b',
   'slow-region',
 ])
@@ -71,14 +72,24 @@ function resetState() {
 }
 
 function currentVersionDir() {
-  if (state.dataset === 'b' || state.dataset === 'slow-b' || state.dataset === 'corrupt-b') {
+  if (
+    state.dataset === 'b' ||
+    state.dataset === 'slow-b' ||
+    state.dataset === 'corrupt-b' ||
+    state.dataset === 'corrupt-coverage-b'
+  ) {
     return join(FIXTURES_DIR, 'b')
   }
   return join(FIXTURES_DIR, 'a')
 }
 
 function currentManifest() {
-  if (state.dataset === 'b' || state.dataset === 'slow-b' || state.dataset === 'corrupt-b') {
+  if (
+    state.dataset === 'b' ||
+    state.dataset === 'slow-b' ||
+    state.dataset === 'corrupt-b' ||
+    state.dataset === 'corrupt-coverage-b'
+  ) {
     return fixtures.b
   }
   return fixtures.a
@@ -95,7 +106,9 @@ function shouldDelay(fileName) {
 }
 
 function isCorruptFile(fileName) {
-  return state.dataset === 'corrupt-b' && fileName === fixtures.b.files.statusDefinitions.file
+  if (state.dataset === 'corrupt-b' && fileName === fixtures.b.files.statusDefinitions.file) return true
+  if (state.dataset === 'corrupt-coverage-b' && fileName === fixtures.b.files.sourceCoverage.file) return true
+  return false
 }
 
 function safeDistPath(urlPath) {

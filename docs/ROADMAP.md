@@ -1,7 +1,7 @@
 # Roadmap technique — moteur de statuts d’espèces FR
 
 Document de référence pour les développements à venir.
-Dernière actualisation : 2026-09-09. PR-A à PR-L, PR #40, PR-PWA-01 à PR-PWA-06 sont mergées. Cette PR (PR-DATA-01) conserve la preuve documentaire BDC (`cd_doc` / `full_citation` / `doc_url`). Validation Chromium automatisée : PASS. Validation appareils réels : PENDING. PR-DATA-02 et PR-DATA-03 ne sont pas lancées.
+Dernière actualisation : 2026-09-11. PR-A à PR-L, PR #40, PR-PWA-01 à PR-PWA-06, PR-DATA-01 (#47) et PR-DATA-01.1 (#48) sont mergées. Base actuelle : `35f37076151c810e23f045b74b79fdb57d2fa03e`. Cette PR (PR-DATA-02) rattache un snapshot de couverture versionné au dataset. Validation Chromium automatisée : PASS. Validation appareils réels : PENDING. PR-DATA-03 n’est pas lancée.
 
 **Décision mainteneur du 9 septembre 2026 :** la phase de hardening terrain est désormais une séquence de 14 PR. Vision : une PWA qu’un écologue ouvre spontanément sur le terrain, comprend immédiatement et dont il peut vérifier chaque résultat. CLI/CSV, QGIS et distribution restent différés.
 
@@ -35,7 +35,7 @@ Question unique à laquelle le projet doit rester excellent :
 
 ## 2. État actuel du repository
 
-État au **2026-09-09** (PR-A à PR-L mergées ; PR #40 mergée ; PR-PWA-01 à PR-PWA-06 mergées ; PR-DATA-01 = cette PR). Ce paragraphe est ce que les agents doivent lire en premier.
+État au **2026-09-11** (PR-A à PR-L mergées ; PR #40 mergée ; PR-PWA-01 à PR-PWA-06 mergées ; PR-DATA-01 MERGÉE #47 ; PR-DATA-01.1 MERGÉE #48 ; base `35f37076151c810e23f045b74b79fdb57d2fa03e` ; PR-DATA-02 = cette PR). Ce paragraphe est ce que les agents doivent lire en premier.
 
 - PWA offline-first fonctionnelle (Vite + `vite-plugin-pwa`).
 - `resolveStatuses()` est extrait et **utilisé** par `main.ts` (PR-E / PR-F).
@@ -48,7 +48,9 @@ Question unique à laquelle le projet doit rester excellent :
 - **PR-PWA-04 : MERGÉE (#44).** Suite Playwright Chromium contre le `dist/` de production et le vrai service worker. Validation navigateur automatisée : **PASS**. Validation appareils réels : **PENDING**.
 - **PR-PWA-05 : MERGÉE (#45, `4499548e744ca99c5de6f1335f6e6ee8912bc1d5`).** Fiche taxon lisible. Validation Chromium : **PASS**. Android / iOS réels : **PENDING**.
 - **PR-PWA-06 : MERGÉE (#46, `3b5a24d5f73ae11f5b92857469ffd6231b5fdced`).** Provenance inline de chaque statut via `status.sourceId` → `SourceDataset`.
-- **PR-DATA-01 (cette PR) :** les statuts BDC conservent leur preuve documentaire (`cd_doc`, `full_citation`, `doc_url`) lorsqu’elle est fournie par la source. PR-DATA-02 / PR-DATA-03 non lancées.
+- **PR-DATA-01 : MERGÉE (#47).** Preuve documentaire BDC (`cd_doc`, `full_citation`, `doc_url`).
+- **PR-DATA-01.1 : MERGÉE (#48, `35f37076151c810e23f045b74b79fdb57d2fa03e`).** Présentation propre des citations (affichage seulement).
+- **PR-DATA-02 (cette PR) :** snapshot `source-coverage-<hash>.json` rattaché à `manifest.files.sourceCoverage` et à `datasetVersion`. PR-DATA-03 non lancée.
 - Matrice de couverture générée depuis `ready-sources.json` (PR-A).
 - Contrat d’acquisition à états explicites (`FETCH_OK`, `ARCHIVED_FALLBACK`, `UNAVAILABLE`, `TYPE_MISMATCH`, `CHANGED_UNVERIFIED`) (PR-C / PR-D).
 - Runner générique `run-adapter.mjs` (PR-G).
@@ -70,7 +72,7 @@ Question unique à laquelle le projet doit rester excellent :
 | Matrice CI migrée | `IMPORTED` + `adapter` | `.github/workflows/regional-adapters-matrix.yml` |
 | Ingestion historique | Encore majoritaire | `data-pipeline/regions/{ara,bfc,bre,…}/`, smokes dédiés |
 | Registre machine | 26 sources, états `IMPORTED` / `WITNESS` | `data-pipeline/regions/ready-sources.json` |
-| Couverture | Générée, non éditée à la main | `docs/generated/source-coverage.md` |
+| Couverture | Vue registre commise + snapshot de build versionné (DATA-02) | `coverage.mjs`, `generated/coverage.json`, `source-coverage-<hash>.json` |
 
 Le contrat de dataset consommé par la PWA reste le manifeste v3 :
 
@@ -79,7 +81,8 @@ public/data/
 ├── manifest.json                 # schemaVersion 3
 ├── taxa-{flora|fauna}-<hash>.json
 ├── status-definitions-<hash>.json
-└── status-links-{realm}-{region}-<hash>.json
+├── status-links-{realm}-{region}-<hash>.json
+└── source-coverage-<hash>.json   # DATA-02 ; optionnel à la lecture des v3 historiques
 ```
 
 À l’exécution, la PWA :
@@ -113,7 +116,7 @@ Les 13 régions métropolitaines sont dans le manifeste. Le socle BDC est nation
 ### 2.4 Ce qui n’existe pas encore (ou est différé)
 
 - Licence du code ; métadonnées GitHub About encore vides.
-- Hardening terrain / offline — **séquence active** PR-PWA-01 ✅ → PR-PWA-02 ✅ → PR-PWA-03 ✅ → PR-PWA-04 ✅ (#44) → PR-PWA-05 ✅ (#45) → PR-PWA-06 ✅ (#46, `3b5a24d`) → PR-DATA-01 (cette PR). PR-DATA-02 / PR-DATA-03 **non lancées**. Chromium : PASS. Android / iOS : PENDING. Voir §6.1.
+- Hardening terrain / offline — **séquence active** PR-PWA-01 ✅ → PR-PWA-02 ✅ → PR-PWA-03 ✅ → PR-PWA-04 ✅ (#44) → PR-PWA-05 ✅ (#45) → PR-PWA-06 ✅ (#46) → PR-DATA-01 ✅ (#47) → PR-DATA-01.1 ✅ (#48) → PR-DATA-02 (cette PR). PR-DATA-03 **non lancée**. Chromium : PASS. Android / iOS : PENDING. Voir §6.1.
 - CLI / CSV — **DIFFÉRÉ** (PR-M).
 - QGIS — **DIFFÉRÉ** (PR-N).
 - Distribution / package / API — **DIFFÉRÉE** (PR-O).
@@ -209,9 +212,13 @@ PR-PWA-05     Fiche lisible                      ✅ #45
   ↓
 PR-PWA-06     Sources existantes accessibles     ✅ #46
   ↓
-PR-DATA-01    Preuve documentaire / cd_doc       ← cette PR
+PR-DATA-01    Preuve documentaire / cd_doc       ✅ #47
   ↓
-PR-DATA-02 / PR-DATA-03                          → non lancées
+PR-DATA-01.1  Présentation des citations         ✅ #48
+  ↓
+PR-DATA-02    Couverture réelle versionnée       ← cette PR
+  ↓
+PR-DATA-03                                       → non lancée
   ↓
 séquence PWA terrain (14 PR, §6.1)
 ```
@@ -938,8 +945,9 @@ PR-PWA-04 — Validation navigateur/appareils ✅ MERGÉE (#44)
 
 PR-PWA-05 — Fiche lisible                   ✅ MERGÉE (#45, 4499548)
 PR-PWA-06 — Sources existantes accessibles  ✅ MERGÉE (#46, 3b5a24d)
-PR-DATA-01 — Preuve documentaire / cd_doc   ← cette PR
-PR-DATA-02 — Couverture réelle versionnée   → non lancée
+PR-DATA-01 — Preuve documentaire / cd_doc   ✅ MERGÉE (#47)
+PR-DATA-01.1 — Présentation des citations   ✅ MERGÉE (#48, 35f3707)
+PR-DATA-02 — Couverture réelle versionnée   ← cette PR
 PR-DATA-03 — Territoires / remplacements / corpus → non lancée
         ↓ checkpoint : résultats traçables
         Les résultats sont compréhensibles, traçables et contrôlés.
@@ -959,7 +967,11 @@ PR-RELEASE-01 — Release pilote
 
 **PR-PWA-06** : MERGÉE (#46, `3b5a24d5f73ae11f5b92857469ffd6231b5fdced`). Chaque statut affiché ouvre sa source déjà intégrée (`sourceId` → `SourceDataset`).
 
-**PR-DATA-01** (cette PR) : les statuts BDC conservent leur preuve documentaire lorsqu’elle est fournie par la source. Manifeste v3 inchangé. Pas d’invention documentaire. PR-DATA-02 / PR-DATA-03 non lancées.
+**PR-DATA-01** : MERGÉE (#47). Preuve documentaire BDC. Manifeste v3 inchangé.
+
+**PR-DATA-01.1** : MERGÉE (#48, `35f37076151c810e23f045b74b79fdb57d2fa03e`). Nettoyage d’affichage des citations. Pas de mutation des citations stockées.
+
+**PR-DATA-02** (cette PR) : snapshot `source-coverage-<hash>.json` déterministe, référencé par `manifest.files.sourceCoverage` (optionnel à la lecture des v3 historiques). `datasetVersion` inclut ce descriptor. Pas de cycle de hash. Absence de preuve = `unknown`. PR-DATA-03 non lancée.
 
 Validation Chromium : PASS. Android / iOS réels : PENDING.
 
@@ -1124,12 +1136,14 @@ Ordre proposé. Chaque ligne = **une** PR.
 | **PR-PWA-04** | ~~Validation navigateur/appareils~~ **MERGÉE (#44)** : Playwright Chromium / `dist/` / vrai SW ; protocole Android/iOS documenté mais **non exécuté** | PR-PWA-03 | `e2e/`, `playwright.config.ts`, `docs/browser-validation.md`, `docs/device-validation.md` | Parcours terrain Chromium | CI / flaky | Distinguer automate vs appareil |
 | **PR-PWA-05** | ~~Fiche lisible~~ **MERGÉE (#45, 4499548)** : hiérarchie mobile-first de la fiche ; resolver inchangé | PR-PWA-04 | `src/main.ts`, `src/styles.css`, tests fiche, `e2e/pwa-taxon-card.spec.ts` | Fiche scannable à 360 px | UX | Revert CSS / markup fiche |
 | **PR-PWA-06** | ~~Sources existantes accessibles~~ **MERGÉE (#46, `3b5a24d`)** : provenance inline `sourceId` → `SourceDataset` ; fail visible si source absente ; page régionale conservée | PR-PWA-05 | `src/source-display.ts`, `src/main.ts`, E2E source | Statut → source exacte, offline | UX | Revert panneau Source |
-| **PR-DATA-01** | ~~Preuve documentaire / cd_doc~~ **Réalisée par cette PR** : `StatusDocumentEvidence` optionnelle ; compaction par `cdDoc` ; panneau Source enrichi ; pas d’invention | PR-PWA-06 | `pipeline.mjs`, `compact.mjs`, `types.ts`, panneau Source, E2E | cd_doc survit jusqu’à la PWA | Poids définitions | Revert `document` |
+| **PR-DATA-01** | ~~Preuve documentaire / cd_doc~~ **MERGÉE (#47)** : `StatusDocumentEvidence` optionnelle ; compaction par `cdDoc` ; panneau Source enrichi ; pas d’invention | PR-PWA-06 | `pipeline.mjs`, `compact.mjs`, `types.ts`, panneau Source, E2E | cd_doc survit jusqu’à la PWA | Poids définitions | Revert `document` |
+| **PR-DATA-01.1** | ~~Présentation des citations~~ **MERGÉE (#48)** : affichage assaini ; citations stockées inchangées | PR-DATA-01 | `source-display.ts` | citations lisibles | HTML BDC | Revert formatage |
+| **PR-DATA-02** | ~~Couverture réelle versionnée~~ **Réalisée par cette PR** : snapshot hashé `source-coverage` dans `manifest.files` ; moteur PR-A réutilisé ; v3 historique sans couverture toujours lisible | PR-DATA-01.1 | `coverage.mjs`, `build.mjs`, `manifest.ts`, `dataset-storage.ts` | fait attaché à une `datasetVersion` | cycle de hash | Revert `sourceCoverage` |
 | **PR-M** | CLI liste / CSV — **DIFFÉRÉ / BACKLOG — hors roadmap active** | PR-F | CLI + tests | `ambiguous` / `not_found` / *Hyles* | — | Supprimer le CLI |
 | **PR-N** | Note d’architecture QGIS (choix 1/2/3) puis plugin minimal — **DIFFÉRÉ / BACKLOG — hors roadmap active** | PR-M | `docs/` + plugin | Pas de règles dans le plugin | Portée | Ne pas merger le plugin |
 | **PR-O** | ADR distribution (JSON / SQLite / package / API) — **DIFFÉRÉ / BACKLOG — hors roadmap active** | moteur stable §8 | `docs/` | Décision écrite, **rien publié** | — | — |
 
-Après PR-DATA-01, ne pas lancer PR-DATA-02 / PR-DATA-03 (ni M / N / O) automatiquement.
+Après PR-DATA-02, ne pas lancer PR-DATA-03 (ni M / N / O) automatiquement.
 
 **Pilote d’abstraction :** Bretagne ZNIEFF OEB (CSV data.gouv). Ne pas piloter avec BFC (tableur maître) ni OCC (zones biogéographiques).
 
@@ -1144,4 +1158,4 @@ Après PR-DATA-01, ne pas lancer PR-DATA-02 / PR-DATA-03 (ni M / N / O) automati
 3. Respecter « Hors périmètre » de la phase.
 4. Ne pas inventer de statuts, de SHA, ni de licence.
 5. `npm test`, `npm run build` et `npm run test:e2e` verts. Ne pas « réparer » les workflows de téléchargement amont dans une PR qui n’est pas PR-C/D.
-6. Ne pas enchaîner automatiquement la PR suivante. Après PR-DATA-01, ne pas lancer PR-DATA-02 / PR-DATA-03 ni PR-M / N / O.
+6. Ne pas enchaîner automatiquement la PR suivante. Après PR-DATA-02, ne pas lancer PR-DATA-03 ni PR-M / N / O.

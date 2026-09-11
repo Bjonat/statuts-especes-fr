@@ -1,3 +1,9 @@
+/**
+ * Vue commise du registre (data-pipeline/generated/coverage.json + docs/generated/source-coverage.md).
+ * Peut avoir `"dataset": null` : c’est la déclaration mainteneur, pas le snapshot d’un build.
+ * Le snapshot runtime d’un build officiel est `public/data/source-coverage-<hash>.json`,
+ * référencé par `manifest.files.sourceCoverage`. Les deux artefacts ne se remplacent pas.
+ */
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -37,7 +43,12 @@ await fs.writeFile(markdownPath, renderCoverageMarkdown(coverage), 'utf8')
 
 const regionalSources = new Set(coverage.entries.filter((entry) => entry.layer === 'regional').map((entry) => entry.sourceId))
 console.log(
-  `Couverture écrite : ${coverage.entries.length} entrées, ${regionalSources.size} sources régionales normalisées.`,
+  `Vue registre écrite : ${coverage.entries.length} entrées, ${regionalSources.size} sources régionales normalisées.`,
 )
 console.log(`JSON : ${jsonPath}`)
 console.log(`Markdown : ${markdownPath}`)
+if (!manifest) {
+  console.log(
+    'Sans --manifest, dataset reste null (déclaration mainteneur). Le snapshot de build officiel est public/data/source-coverage-<hash>.json, référencé par manifest.files.sourceCoverage.',
+  )
+}

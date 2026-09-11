@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import {
   CoverageRegistryError,
   buildCoverage,
+  buildCoverageEntries,
   regionCodes,
   renderCoverageMarkdown,
   serializeCoverageJson,
@@ -289,6 +290,85 @@ test('sentinelles du registre réel ARA / BRE / BFC / COR / HDF', async () => {
     ),
     false,
   )
+})
+
+test('buildCoverageEntries : registre A + dataset A → present', () => {
+  const registry = registryFixture([sourceFixture({ id: 'dreal-ara-znieff' })])
+  const entries = buildCoverageEntries(registry, new Set(['dreal-ara-znieff', 'taxref-v18', 'bdc-v18']))
+  const ara = entries.find((entry) => entry.sourceId === 'dreal-ara-znieff')
+  assert.equal(ara.datasetEvidence, 'present')
+  assert.deepEqual(ara.matchedDatasetSourceIds, ['dreal-ara-znieff'])
+})
+
+test('buildCoverageEntries : registre A + dataset sans A → unknown', () => {
+  const registry = registryFixture([sourceFixture({ id: 'dreal-ara-znieff' })])
+  const entries = buildCoverageEntries(registry, new Set(['taxref-v18', 'bdc-v18']))
+  const ara = entries.find((entry) => entry.sourceId === 'dreal-ara-znieff')
+  assert.equal(ara.datasetEvidence, 'unknown')
+  assert.deepEqual(ara.matchedDatasetSourceIds, [])
+  assert.notEqual(ara.datasetEvidence, 'absent')
+  assert.notEqual(ara.datasetEvidence, false)
+})
+
+test('buildCoverageEntries : pipelineId exact ne prouve que les tuples de la ressource', () => {
+  const registry = registryFixture([
+    sourceFixture({
+      id: 'dreal-pdl-znieff-2018',
+      region: 'PDL',
+      resources: [
+        { realm: 'fauna', pipelineId: 'dreal-pdl-znieff-faune-2018' },
+        { realm: 'flora', pipelineId: 'dreal-pdl-znieff-flore-2018' },
+      ],
+    }),
+  ])
+  const entries = buildCoverageEntries(registry, new Set(['dreal-pdl-znieff-faune-2018']))
+  const fauna = entries.find((entry) => entry.sourceId === 'dreal-pdl-znieff-2018' && entry.realm === 'fauna')
+  const flora = entries.find((entry) => entry.sourceId === 'dreal-pdl-znieff-2018' && entry.realm === 'flora')
+  assert.equal(fauna.datasetEvidence, 'present')
+  assert.deepEqual(fauna.matchedDatasetSourceIds, ['dreal-pdl-znieff-faune-2018'])
+  assert.equal(flora.datasetEvidence, 'unknown')
+  assert.deepEqual(flora.matchedDatasetSourceIds, [])
+})
+
+test('buildCoverageEntries : même registre + mêmes sources → même tableau sérialisé', () => {
+  const registry = registryFixture([sourceFixture({ id: 'dreal-ara-znieff' })])
+  const sourceIds = new Set(['dreal-ara-znieff', 'taxref-v18'])
+  const first = JSON.stringify(buildCoverageEntries(registry, sourceIds))
+  const second = JSON.stringify(buildCoverageEntries(registry, sourceIds))
+  assert.equal(first, second)
+  assert.equal(first.includes('generatedAt'), false)
+  assert.equal(/\d{4}-\d{2}-\d{2}T/.test(first), false)
+})
+
+test('WITNESS reste unknown s’il n’est pas publié dans le dataset', () => {
+  const registry = registryFixture([
+    sourceFixture({
+      id: 'arb-bfc-statuts-2023-12-19',
+      region: 'BFC',
+      state: 'WITNESS',
+      publicationPolicy: 'schema-witness-smoke-only',
+    }),
+  ])
+  const entries = buildCoverageEntries(registry, new Set(['taxref-v18', 'bdc-v18', 'dreal-bfc-statuts-2026-03-03']))
+  const witness = entries.filter((entry) => entry.sourceId === 'arb-bfc-statuts-2023-12-19')
+  assert.ok(witness.length >= 1)
+  assert.ok(witness.every((entry) => entry.sourceState === 'WITNESS'))
+  assert.ok(witness.every((entry) => entry.datasetEvidence === 'unknown'))
+  assert.ok(witness.every((entry) => entry.matchedDatasetSourceIds.length === 0))
+})
+
+test('WITNESS ne devient present que s’il est réellement publié', () => {
+  const registry = registryFixture([
+    sourceFixture({
+      id: 'arb-bfc-statuts-2023-12-19',
+      region: 'BFC',
+      state: 'WITNESS',
+    }),
+  ])
+  const unpublished = buildCoverageEntries(registry, new Set(['taxref-v18']))
+  const published = buildCoverageEntries(registry, new Set(['arb-bfc-statuts-2023-12-19']))
+  assert.equal(unpublished.find((entry) => entry.sourceId === 'arb-bfc-statuts-2023-12-19').datasetEvidence, 'unknown')
+  assert.equal(published.find((entry) => entry.sourceId === 'arb-bfc-statuts-2023-12-19').datasetEvidence, 'present')
 })
 
 test('les fichiers générés commis correspondent au registre', async () => {

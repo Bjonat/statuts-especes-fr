@@ -57,7 +57,9 @@ export function catalogFileUrl(file: string, baseURI = document.baseURI): string
 }
 
 export function sharedDatasetFiles(manifest: DataManifest): DatasetFile[] {
-  return [manifest.files.taxa.flora, manifest.files.taxa.fauna, manifest.files.statusDefinitions]
+  const files = [manifest.files.taxa.flora, manifest.files.taxa.fauna, manifest.files.statusDefinitions]
+  if (manifest.files.sourceCoverage) files.push(manifest.files.sourceCoverage)
+  return files
 }
 
 export function regionDatasetFiles(manifest: DataManifest, region: RegionCode): DatasetFile[] {

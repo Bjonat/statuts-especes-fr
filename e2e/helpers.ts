@@ -118,6 +118,21 @@ export async function catalogFiles(page: Page, version: string): Promise<string[
     .map((path) => path.slice('data/'.length))
 }
 
+export function sourceCoverageFileName(files: string[]): string | undefined {
+  return files.find((file) => /^source-coverage-[a-f0-9]{12}\.json$/i.test(file))
+}
+
+export async function readCachedJson<T>(page: Page, version: string, fileName: string): Promise<T | null> {
+  return page.evaluate(
+    async ({ cacheName, path }) => {
+      const cache = await caches.open(cacheName)
+      const response = await cache.match(new URL(path, document.baseURI))
+      return response ? ((await response.json()) as T) : null
+    },
+    { cacheName: `${CATALOG_PREFIX}${version}`, path: `data/${fileName}` },
+  )
+}
+
 export async function waitForCachedFileCount(
   page: Page,
   version: string,

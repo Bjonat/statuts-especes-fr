@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildCoverageEntries } from '../data-pipeline/coverage.mjs'
 
 const REGIONS = [
   { code: 'ARA', name: 'Auvergne-Rhône-Alpes' },
@@ -133,7 +134,51 @@ function sources(datasetVersion, checkedAt) {
       official: true,
       checkedAt,
     },
+    ...(datasetVersion === 'e2e-b'
+      ? [
+          {
+            id: 'fixture-coverage-b',
+            name: 'Fixture couverture B uniquement',
+            producer: 'Producteur E2E B',
+            version: datasetVersion,
+            official: true,
+            checkedAt,
+          },
+        ]
+      : []),
   ]
+}
+
+function fixtureCoverageRegistry(extraSources = []) {
+  return {
+    schemaVersion: 1,
+    checkedAt: '2026-09-09',
+    sources: [
+      {
+        id: 'fixture-lrr-occ',
+        region: 'OCC',
+        categories: ['red_list_regional'],
+        realms: ['flora', 'fauna'],
+        state: 'READY',
+        resources: [{ version: 'e2e' }],
+      },
+      {
+        id: 'fixture-znieff-occ',
+        region: 'OCC',
+        categories: ['znieff'],
+        realms: ['flora'],
+        state: 'READY',
+      },
+      {
+        id: 'fixture-naq-synth',
+        region: 'NAQ',
+        categories: ['protection_regional'],
+        realms: ['flora', 'fauna'],
+        state: 'READY',
+      },
+      ...extraSources,
+    ],
+  }
 }
 
 function definitions(marker) {
@@ -256,6 +301,15 @@ function buildVersion(outDir, spec) {
     }
   }
 
+  const sourceCoverageRows = buildCoverageEntries(
+    spec.coverageRegistry ?? fixtureCoverageRegistry(),
+    new Set(spec.sources.map((source) => source.id)),
+  )
+  const sourceCoverage = {
+    ...writeHashed(outDir, 'source-coverage', sourceCoverageRows),
+    schemaVersion: 1,
+  }
+
   const manifest = {
     schemaVersion: 3,
     generatedAt: spec.generatedAt,
@@ -269,6 +323,7 @@ function buildVersion(outDir, spec) {
       taxa: { flora, fauna },
       statusDefinitions,
       statusLinks,
+      sourceCoverage,
     },
   }
 
@@ -301,6 +356,15 @@ export function generateFixtures(rootDir) {
     definitions: definitions('e2e-b'),
     sources: sources('e2e-b', '2026-09-10'),
     extraOccFloraLinks: [[900003, 0, 1]],
+    coverageRegistry: fixtureCoverageRegistry([
+      {
+        id: 'fixture-coverage-b',
+        region: 'OCC',
+        categories: ['other'],
+        realms: ['flora'],
+        state: 'READY',
+      },
+    ]),
   })
 
   writeFileSync(

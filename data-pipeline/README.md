@@ -17,29 +17,38 @@ Les archives brutes ne sont pas versionnées dans Git.
 
 ## Registre, manifeste, couverture
 
+Deux niveaux distincts. Ne pas les remplacer l’un par l’autre.
+
 | Artefact | Rôle |
 | --- | --- |
-| [`regions/ready-sources.json`](regions/ready-sources.json) | Registre machine : ce que le pipeline *déclare* |
-| `public/data/manifest.json` | Manifeste : ce qu’un *build* a *inclus* |
-| [`docs/generated/source-coverage.md`](../docs/generated/source-coverage.md) | Matrice humaine générée |
-| [`generated/coverage.json`](generated/coverage.json) | Même vue, JSON |
+| [`regions/ready-sources.json`](regions/ready-sources.json) | **Registre** : ce que le pipeline *déclare* (source unique, pas de second registre) |
+| [`generated/coverage.json`](generated/coverage.json) | **Vue registre commise.** Peut avoir `"dataset": null`. Déclaration mainteneur. |
+| [`docs/generated/source-coverage.md`](../docs/generated/source-coverage.md) | Même vue, lisible |
+| `public/data/manifest.json` | Manifeste v3 d’un *build* (`schemaVersion: 3`) |
+| `public/data/source-coverage-<hash>.json` | **Snapshot de build.** Tableau `CoverageEntry[]` déterministe, hashé, référencé par `manifest.files.sourceCoverage` |
 
-La couverture (ce que le système déclare ou prouve couvrir) n’est pas l’affichage PWA (ce qui est montré pour un taxon une fois les référentiels intégrés filtrés). `resolveStatuses()` n’existe pas encore.
+La vue registre (`npm run coverage:build`) décrit les déclarations du registre. Elle n’est pas rattachée à une `datasetVersion`.
+
+Le snapshot de build est produit par `build.mjs` à partir des sources **réellement retenues** (`buildSources` + `regionalMerge.sources`). Il ne contient ni `generatedAt` ni `datasetVersion` (pas de cycle de hash). Le manifeste référence exactement ce fichier, puis `datasetVersion` est calculé sur l’ensemble de `files`.
+
+Ancien manifeste v3 **sans** `sourceCoverage` : toujours lisible. Nouveau build officiel : `sourceCoverage` obligatoire.
+
+La couverture (ce que le système déclare ou prouve *dans ce dataset*) n’est pas l’applicabilité juridique d’un statut à un taxon, ni un score de complétude. Absence de preuve = `unknown`, jamais `absent` / `false` / « non couvert ».
 
 ```bash
 npm run coverage:build
-# optionnel, si un manifeste v3 est disponible :
+# optionnel, preuves dataset en plus de la vue registre :
 node data-pipeline/generate-coverage.mjs --manifest public/data/manifest.json
 ```
 
-Une preuve `présent` n’est posée que si un identifiant candidat figure tel quel dans le manifeste :
+Une preuve `présent` n’est posée que si un identifiant candidat figure tel quel parmi les sources du build :
 
 - `source.id` : preuve **source-wide** (tous les tuples de cette source) ;
 - `resource.pipelineId` : preuve **limitée aux tuples** produits par cette ressource.
 
 Les identifiants « parapluie » sans correspondance exacte restent `inconnu`. Ne jamais déduire `absent` / `false`.
 
-`coverage:build` relit registre + manifeste. Il ne relance pas l’ingestion.
+`coverage:build` relit le registre (et un manifeste s’il est fourni). Il ne relance pas l’ingestion et n’écrit pas le snapshot runtime.
 
 Détail humain : [`REGIONAL_SOURCES.md`](REGIONAL_SOURCES.md). Audits : `docs/data-sources-*.md`. Ne pas maintenir ici une seconde liste manuelle complète des sources.
 
