@@ -24,7 +24,7 @@ function legacyManifest(): DataManifest {
           realm,
           Object.fromEntries(regions.map(({ code }) => [code, file(`status-links-${realm}-${code.toLowerCase()}`)])),
         ]),
-      ),
+      ) as DataManifest['files']['statusLinks'],
     },
   }
 }
