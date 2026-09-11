@@ -24,7 +24,7 @@ import type {
 
 const NATIONAL_SOURCE_IDS = new Set(['taxref-v18', 'bdc-v18'])
 
-export { isDataManifest, isDatasetFile, parseDataManifest } from './manifest'
+export { isCoverageDatasetFile, isDataManifest, isDatasetFile, parseDataManifest } from './manifest'
 
 export interface DataStore {
   official: boolean

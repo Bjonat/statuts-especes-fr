@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
+import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { COVERAGE_SCHEMA_VERSION, REALMS, STATUS_CATEGORIES, regionCodes } from './coverage.mjs'
 import { UNPUBLISHABLE_SOURCE_IDS } from './regional.mjs'
 
 function parseArgs(argv) {
@@ -45,6 +47,91 @@ for (const source of manifest.sources) {
     `témoin de schéma non publiable embarqué: ${source.id}`,
   )
 }
+
+const coverageDescriptor = manifest.files.sourceCoverage
+assert.ok(coverageDescriptor, 'nouveau build officiel : manifest.files.sourceCoverage obligatoire')
+assert.equal(coverageDescriptor.schemaVersion, COVERAGE_SCHEMA_VERSION, 'sourceCoverage.schemaVersion')
+assert.match(coverageDescriptor.file, /^source-coverage-[a-f0-9]{12}\.json$/, 'nom source-coverage hashé')
+assert.equal(typeof coverageDescriptor.count, 'number', 'sourceCoverage.count')
+assert.equal(typeof coverageDescriptor.bytes, 'number', 'sourceCoverage.bytes')
+
+const coveragePath = path.join(directory, coverageDescriptor.file)
+const coverageBuffer = await fs.readFile(coveragePath)
+assert.equal(coverageBuffer.byteLength, coverageDescriptor.bytes, 'sourceCoverage.bytes cohérent')
+const coverageHash = crypto.createHash('sha256').update(coverageBuffer).digest('hex').slice(0, 12)
+assert.ok(coverageDescriptor.file.includes(coverageHash), 'sourceCoverage hash cohérent')
+const coverageEntries = JSON.parse(coverageBuffer.toString('utf8'))
+assert.ok(Array.isArray(coverageEntries), 'sourceCoverage : tableau CoverageEntry[]')
+assert.equal(coverageEntries.length, coverageDescriptor.count, 'sourceCoverage.count cohérent')
+
+const publishedSourceIds = new Set(manifest.sources.map((source) => source.id).filter(Boolean))
+const knownRegions = new Set(regionCodes())
+for (const [index, entry] of coverageEntries.entries()) {
+  const where = `couverture #${index}`
+  assert.equal(typeof entry, 'object', `${where}: objet`)
+  assert.ok(entry, `${where}: non null`)
+  assert.ok(knownRegions.has(entry.region), `${where}: région inconnue (${entry.region})`)
+  assert.ok(REALMS.has(entry.realm), `${where}: règne inconnu (${entry.realm})`)
+  if (entry.layer === 'national') {
+    assert.equal(entry.category, null, `${where}: catégorie nationale nulle`)
+  } else if (entry.category !== null) {
+    assert.ok(STATUS_CATEGORIES.has(entry.category), `${where}: catégorie inconnue (${entry.category})`)
+  }
+  assert.ok(entry.datasetEvidence === 'present' || entry.datasetEvidence === 'unknown', `${where}: datasetEvidence`)
+  assert.notEqual(entry.datasetEvidence, 'absent', `${where}: absent interdit`)
+  assert.notEqual(entry.datasetEvidence, false, `${where}: false interdit`)
+  assert.equal(typeof entry.datasetEvidence, 'string', `${where}: preuve non booléenne`)
+  assert.ok(Array.isArray(entry.matchedDatasetSourceIds), `${where}: matchedDatasetSourceIds`)
+  if (entry.datasetEvidence === 'present') {
+    assert.ok(entry.matchedDatasetSourceIds.length >= 1, `${where}: present sans identifiant matché`)
+    for (const sourceId of entry.matchedDatasetSourceIds) {
+      assert.ok(publishedSourceIds.has(sourceId), `${where}: match ${sourceId} absent de manifest.sources`)
+    }
+  } else {
+    assert.deepEqual(entry.matchedDatasetSourceIds, [], `${where}: unknown ne doit pas contenir de faux match`)
+  }
+}
+
+for (const region of regionCodes()) {
+  for (const realm of REALMS) {
+    for (const sourceId of ['taxref-v18', 'bdc-v18']) {
+      const entry = coverageEntries.find(
+        (item) => item.sourceId === sourceId && item.region === region && item.realm === realm && item.layer === 'national',
+      )
+      assert.ok(entry, `socle national ${sourceId} ${region} ${realm}`)
+      assert.equal(entry.datasetEvidence, 'present', `socle national ${sourceId} ${region} ${realm} présent`)
+      assert.ok(entry.matchedDatasetSourceIds.includes(sourceId), `socle national ${sourceId} matché`)
+    }
+  }
+}
+
+const breZnieffPipelineId = 'oeb-bretagne-znieff-csv-2026-01-29'
+if (publishedSourceIds.has(breZnieffPipelineId)) {
+  const breZnieff = coverageEntries.filter((entry) => entry.sourceId === 'oeb-bretagne-znieff')
+  assert.ok(breZnieff.length >= 2, 'Bretagne ZNIEFF : tuples registre')
+  assert.ok(
+    breZnieff.every((entry) => entry.datasetEvidence === 'present' && entry.matchedDatasetSourceIds.includes(breZnieffPipelineId)),
+    'Bretagne ZNIEFF : preuve pipelineId',
+  )
+}
+const breLrrPipelineId = 'oeb-bretagne-lrr-csv-2026-01-29'
+if (publishedSourceIds.has(breLrrPipelineId)) {
+  const breLrr = coverageEntries.filter((entry) => entry.sourceId === 'oeb-bretagne-lrr')
+  assert.ok(breLrr.length >= 2, 'Bretagne LRR : tuples registre')
+  assert.ok(
+    breLrr.every((entry) => entry.datasetEvidence === 'present' && entry.matchedDatasetSourceIds.includes(breLrrPipelineId)),
+    'Bretagne LRR : preuve pipelineId',
+  )
+}
+
+const witnessId = 'arb-bfc-statuts-2023-12-19'
+const witnessEntries = coverageEntries.filter((entry) => entry.sourceId === witnessId)
+assert.ok(witnessEntries.length >= 1, 'WITNESS BFC déclaré dans le registre')
+assert.equal(publishedSourceIds.has(witnessId), false, 'WITNESS BFC non publié dans manifest.sources')
+assert.ok(
+  witnessEntries.every((entry) => entry.datasetEvidence === 'unknown' && entry.matchedDatasetSourceIds.length === 0),
+  'WITNESS BFC : unknown, jamais present par le seul registre',
+)
 
 const flora = await readJson(path.join(directory, manifest.files.taxa.flora.file))
 const fauna = await readJson(path.join(directory, manifest.files.taxa.fauna.file))

@@ -297,17 +297,26 @@ function readManifestSourceIds(manifest) {
 }
 
 /**
- * Construit la matrice de couverture.
+ * Construit uniquement les entrées déterministes de couverture.
+ * `datasetSourceIds` = identifiants réellement publiés dans ce build (`Set`),
+ * ou `null` lorsqu’aucun dataset n’est fourni (toutes les preuves restent `unknown`).
+ * Une seule implémentation des règles PR-A : pas de copie dans `build.mjs`.
+ */
+export function buildCoverageEntries(registry, datasetSourceIds = null) {
+  validateReadySourcesRegistry(registry)
+  return sortEntries([
+    ...nationalEntries(datasetSourceIds),
+    ...regionalEntries(registry.sources, datasetSourceIds),
+  ])
+}
+
+/**
+ * Construit la matrice de couverture (vue humaine / registre).
  * `declaration` vient uniquement du registre (+ socle national injecté).
  * `datasetEvidence` n’est `present` que sur une correspondance d’identifiant explicite.
  */
 export function buildCoverage(registry, manifest = null) {
-  validateReadySourcesRegistry(registry)
-  const manifestSourceIds = readManifestSourceIds(manifest)
-  const entries = sortEntries([
-    ...nationalEntries(manifestSourceIds),
-    ...regionalEntries(registry.sources, manifestSourceIds),
-  ])
+  const entries = buildCoverageEntries(registry, readManifestSourceIds(manifest))
 
   return {
     schemaVersion: COVERAGE_SCHEMA_VERSION,

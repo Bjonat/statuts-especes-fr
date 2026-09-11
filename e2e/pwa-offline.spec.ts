@@ -45,7 +45,7 @@ test.describe('PWA offline terrain', () => {
     await expect(page.locator('.offline-shared')).toContainText('Prêt')
 
     const occFiles = await catalogFiles(page, 'e2e-a')
-    expect(occFiles).toHaveLength(5)
+    expect(occFiles).toHaveLength(6)
     await expectActiveVersion(page, 'e2e-a')
 
     await goHomeFromOffline(page)
@@ -131,7 +131,7 @@ test.describe('PWA offline terrain', () => {
     await expect(naq.getByRole('button', { name: 'Reprendre' })).toBeVisible()
     const partial = await catalogFiles(page, 'e2e-a')
     expect(partial.length).toBeGreaterThanOrEqual(1)
-    expect(partial.length).toBeLessThan(5)
+    expect(partial.length).toBeLessThan(6)
 
     await setDataset(request, 'a')
     await clearRequestLog(request)
@@ -145,7 +145,7 @@ test.describe('PWA offline terrain', () => {
       expect(fetchedAfterResume, `fichier déjà valide re-fetch : ${file}`).not.toContain(file)
     }
     expect(fetchedAfterResume.length).toBeGreaterThan(0)
-    expect(await catalogFiles(page, 'e2e-a')).toHaveLength(5)
+    expect(await catalogFiles(page, 'e2e-a')).toHaveLength(6)
   })
 
   test('mobile viewport smoke 360×800 et 390×844', async ({ page }) => {

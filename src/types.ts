@@ -112,6 +112,11 @@ export interface DatasetFile {
   bytes?: number
 }
 
+/** Snapshot de couverture d’un build officiel. Optionnel à la lecture des v3 historiques. */
+export interface CoverageDatasetFile extends DatasetFile {
+  schemaVersion: 1
+}
+
 export interface DataManifest {
   schemaVersion: 3
   generatedAt: string
@@ -125,5 +130,7 @@ export interface DataManifest {
     taxa: Record<Realm, DatasetFile>
     statusDefinitions: DatasetFile
     statusLinks: Record<Realm, Record<RegionCode, DatasetFile>>
+    /** Présent sur les builds officiels DATA-02 ; absent des v3 historiques. */
+    sourceCoverage?: CoverageDatasetFile
   }
 }

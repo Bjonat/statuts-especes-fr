@@ -1,5 +1,5 @@
 import { METROPOLITAN_REGION_CODES } from './types'
-import type { DataManifest, DatasetFile, Realm, Region, RegionCode } from './types'
+import type { CoverageDatasetFile, DataManifest, DatasetFile, Realm, Region, RegionCode } from './types'
 
 export class DatasetIntegrityError extends Error {
   readonly reason = 'integrity' as const
@@ -12,6 +12,8 @@ export class DatasetIntegrityError extends Error {
 
 export const DATASET_VERSION_PATTERN = /^[A-Za-z0-9._-]{1,80}$/
 export const DATASET_FILE_NAME_PATTERN = /^[a-z0-9-]+-[a-f0-9]{12}\.json$/i
+export const SOURCE_COVERAGE_FILE_NAME_PATTERN = /^source-coverage-[a-f0-9]{12}\.json$/i
+export const COVERAGE_SCHEMA_VERSION = 1 as const
 
 export function isDatasetVersion(value: unknown): value is string {
   return typeof value === 'string' && DATASET_VERSION_PATTERN.test(value)
@@ -33,6 +35,16 @@ export function isDatasetFile(value: unknown): value is DatasetFile {
     }
   }
   return true
+}
+
+export function isCoverageDatasetFile(value: unknown): value is CoverageDatasetFile {
+  if (!isDatasetFile(value)) return false
+  const candidate = value as { schemaVersion?: unknown; file?: string }
+  return (
+    candidate.schemaVersion === COVERAGE_SCHEMA_VERSION &&
+    typeof candidate.file === 'string' &&
+    SOURCE_COVERAGE_FILE_NAME_PATTERN.test(candidate.file)
+  )
 }
 
 function isRegion(value: unknown): value is Region {
@@ -78,6 +90,10 @@ export function isDataManifest(value: unknown): value is DataManifest {
     !isDatasetFile(taxa.fauna) ||
     !isDatasetFile(definitions)
   ) {
+    return false
+  }
+
+  if (candidate.files.sourceCoverage !== undefined && !isCoverageDatasetFile(candidate.files.sourceCoverage)) {
     return false
   }
 

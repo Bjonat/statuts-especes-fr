@@ -1,8 +1,9 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { buildStatusDictionary, statusToCompactLink } from './compact.mjs'
+import { COVERAGE_SCHEMA_VERSION, buildCoverageEntries } from './coverage.mjs'
 import {
   buildSources,
   buildStatuses,
@@ -11,6 +12,8 @@ import {
   publicRegions,
 } from './pipeline.mjs'
 import { loadRegionalPackages, mergeRegionalPackages } from './regional.mjs'
+
+const here = path.dirname(fileURLToPath(import.meta.url))
 
 function parseArgs(argv) {
   const args = {}
@@ -38,12 +41,32 @@ export async function writeDataset(outputDirectory, prefix, rows) {
   return { file, count: rows.length, bytes: stats.size }
 }
 
+export function computeDatasetVersion(files) {
+  return hashContent(JSON.stringify(files))
+}
+
+/**
+ * Snapshot runtime : tableau CoverageEntry[] hashé, sans datasetVersion ni generatedAt.
+ * La version du dataset se calcule ensuite depuis l’ensemble de `files`, y compris ce descriptor.
+ */
+export async function writeSourceCoverageSnapshot(outputDirectory, registry, publishedSourceIds) {
+  const sourceIds = publishedSourceIds instanceof Set ? publishedSourceIds : new Set(publishedSourceIds)
+  const entries = buildCoverageEntries(registry, sourceIds)
+  const descriptor = await writeDataset(outputDirectory, 'source-coverage', entries)
+  return {
+    entries,
+    descriptor: { ...descriptor, schemaVersion: COVERAGE_SCHEMA_VERSION },
+  }
+}
+
 async function clearGeneratedDatasets(outputDirectory) {
   try {
     const entries = await fs.readdir(outputDirectory)
     await Promise.all(
       entries
-        .filter((entry) => /^(?:catalog|taxa|statuses|status-definitions|status-links)-.*\.json$/.test(entry))
+        .filter((entry) =>
+          /^(?:catalog|taxa|statuses|status-definitions|status-links|source-coverage)-.*\.json$/.test(entry),
+        )
         .map((entry) => fs.rm(path.join(outputDirectory, entry))),
     )
   } catch (error) {
@@ -133,7 +156,15 @@ async function main() {
 
   const generatedAt = new Date().toISOString()
   const sources = [...buildSources(generatedAt.slice(0, 10)), ...regionalMerge.sources]
-  const datasetVersion = hashContent(JSON.stringify(files))
+  const registryPath = path.resolve(args.registry ?? path.join(here, 'regions/ready-sources.json'))
+  const registry = JSON.parse(await fs.readFile(registryPath, 'utf8'))
+  const { descriptor: sourceCoverage } = await writeSourceCoverageSnapshot(
+    outputDirectory,
+    registry,
+    sources.map((source) => source.id),
+  )
+  files.sourceCoverage = sourceCoverage
+  const datasetVersion = computeDatasetVersion(files)
   const manifest = {
     schemaVersion: 3,
     generatedAt,

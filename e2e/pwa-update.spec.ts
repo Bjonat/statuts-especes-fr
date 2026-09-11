@@ -71,7 +71,7 @@ test.describe('PWA mises à jour A → B', () => {
     await expectPreviousVersion(page, null)
     const partialB = await catalogFiles(page, 'e2e-b')
     expect(partialB.length).toBeGreaterThanOrEqual(1)
-    expect(await catalogFiles(page, 'e2e-a')).toHaveLength(5)
+    expect(await catalogFiles(page, 'e2e-a')).toHaveLength(6)
 
     await goHomeFromOffline(page)
     await primeRegion(page, 'Occitanie')
@@ -112,7 +112,7 @@ test.describe('PWA mises à jour A → B', () => {
       expect(fetchedOnResume, `fichier B déjà validé re-fetch : ${file}`).not.toContain(file)
     }
     expect((await catalogFiles(page, 'e2e-a')).length).toBeGreaterThan(0)
-    expect((await catalogFiles(page, 'e2e-b')).length).toBeGreaterThanOrEqual(5)
+    expect((await catalogFiles(page, 'e2e-b')).length).toBeGreaterThanOrEqual(6)
 
     await goHomeFromOffline(page)
     await goOfflineAndReload(context, page)

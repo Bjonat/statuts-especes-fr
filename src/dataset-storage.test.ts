@@ -17,6 +17,7 @@ import {
   readActiveManifest,
   readPreviousManifest,
   requiredUpdateFiles,
+  sharedDatasetFiles,
   writeActiveManifest,
 } from './dataset-storage'
 import { verifyDatasetBuffer } from './manifest'
@@ -71,9 +72,21 @@ function makeManifest(version: string, generatedAt: string, json: string, count:
   } as unknown as DataManifest
 }
 
+function withCoverage(manifest: DataManifest, json: string, count: number): DataManifest {
+  return {
+    ...manifest,
+    files: {
+      ...manifest.files,
+      sourceCoverage: { ...hashedFile('source-coverage', json, count), schemaVersion: 1 },
+    },
+  }
+}
+
 const manifestA = makeManifest('version-a', '2026-09-09T10:00:00.000Z', EMPTY_JSON, 0)
 const manifestB = makeManifest('version-b', '2026-09-10T10:00:00.000Z', OTHER_JSON, 1)
 const manifestC = makeManifest('version-c', '2026-09-11T10:00:00.000Z', '[1]', 1)
+const manifestACoverage = withCoverage(manifestA, EMPTY_JSON, 0)
+const manifestBCoverage = withCoverage(manifestB, OTHER_JSON, 1)
 
 type FakeCache = {
   entries: Map<string, Response>
@@ -311,6 +324,43 @@ describe('dataset storage', () => {
     expect(requiredUpdateFiles(manifestB, ['OCC'])).toHaveLength(5)
     expect(requiredUpdateFiles(manifestB, ['OCC', 'NAQ'])).toHaveLength(7)
     expect(requiredUpdateFiles(manifestB, [])).toHaveLength(0)
+  })
+
+  it('sharedDatasetFiles includes sourceCoverage on a new manifest and keeps the historical list without it', () => {
+    expect(sharedDatasetFiles(manifestB).map((file) => file.file)).toEqual([
+      manifestB.files.taxa.flora.file,
+      manifestB.files.taxa.fauna.file,
+      manifestB.files.statusDefinitions.file,
+    ])
+    expect(sharedDatasetFiles(manifestBCoverage).map((file) => file.file)).toEqual([
+      manifestBCoverage.files.taxa.flora.file,
+      manifestBCoverage.files.taxa.fauna.file,
+      manifestBCoverage.files.statusDefinitions.file,
+      manifestBCoverage.files.sourceCoverage!.file,
+    ])
+    expect(requiredUpdateFiles(manifestBCoverage, ['OCC'])).toHaveLength(6)
+    expect(requiredUpdateFiles(manifestBCoverage, ['OCC', 'NAQ'])).toHaveLength(8)
+    expect(requiredUpdateFiles(manifestB, ['OCC'])).toHaveLength(5)
+  })
+
+  it('refuses a corrupt sourceCoverage file and keeps A active', async () => {
+    await persistActive(manifestACoverage)
+    seedVersion(manifestACoverage, EMPTY_JSON, [
+      ...sharedDatasetFiles(manifestACoverage),
+      manifestACoverage.files.statusLinks.flora.OCC,
+      manifestACoverage.files.statusLinks.fauna.OCC,
+    ])
+    const required = requiredUpdateFiles(manifestBCoverage, ['OCC'])
+    expect(required.map((file) => file.file)).toContain(manifestBCoverage.files.sourceCoverage!.file)
+    for (const file of required) payloads.set(file.file, OTHER_JSON)
+    payloads.set(manifestBCoverage.files.sourceCoverage!.file, '{"nope":true}')
+    await expect(prepareAndActivateCandidate(manifestACoverage, manifestBCoverage, ['OCC'])).rejects.toMatchObject({
+      reason: 'integrity',
+    })
+    expect((await readActiveManifest())?.datasetVersion).toBe('version-a')
+    expect(await readPreviousManifest()).toBeNull()
+    const occA = await createOfflineDataManager(manifestACoverage).inspect()
+    expect(occA.regions.find((region) => region.region === 'OCC')?.consultableOffline).toBe(true)
   })
 
   it('maps distinct accepted datasetVersion values to distinct cache names', () => {

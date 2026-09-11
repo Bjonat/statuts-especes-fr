@@ -100,6 +100,7 @@ describe('offline data manager', () => {
     expect(inventory.shared.availability).toBe('missing')
     expect(inventory.shared.cachedFiles).toBe(0)
     expect(inventory.shared.totalFiles).toBe(3)
+    expect(sharedDatasetFiles(manifest)).toHaveLength(3)
     expect(inventory.regions).toHaveLength(13)
     expect(inventory.regions.every((region) => region.availability === 'missing')).toBe(true)
     expect(inventory.regions.every((region) => region.consultableOffline === false)).toBe(true)
@@ -341,5 +342,22 @@ describe('offline data manager', () => {
     await createOfflineDataManager(manifest).inspect()
     expect(fetchMock).not.toHaveBeenCalled()
     expect(JSON.stringify(fetchMock.mock.calls)).not.toMatch(/HEAD/)
+  })
+
+  it('counts sourceCoverage as a fourth shared file when the manifest has it', () => {
+    const withCoverage = {
+      ...manifest,
+      files: {
+        ...manifest.files,
+        sourceCoverage: { ...file('source-coverage'), schemaVersion: 1 as const },
+      },
+    } as DataManifest
+    expect(sharedDatasetFiles(manifest)).toHaveLength(3)
+    expect(sharedDatasetFiles(withCoverage).map((item) => item.file)).toEqual([
+      manifest.files.taxa.flora.file,
+      manifest.files.taxa.fauna.file,
+      manifest.files.statusDefinitions.file,
+      withCoverage.files.sourceCoverage!.file,
+    ])
   })
 })
